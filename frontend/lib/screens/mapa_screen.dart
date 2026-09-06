@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
@@ -8,6 +7,7 @@ import '../models/seat_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/seat_map_provider.dart';
+import '../widgets/comprovante_dialog.dart';
 import '../widgets/interactive_floor_plan.dart';
 
 class MapaScreen extends StatefulWidget {
@@ -408,8 +408,10 @@ class _MapaScreenState extends State<MapaScreen> {
                 if (mounted) {
                   if (res.success && res.data != null) {
                     final comprovante = res.data!['comprovante'] as String? ?? 'RES-CONFIRMADO';
-                    _mostrarModalComprovanteReserva(
-                      titulo: res.data!['trocaRealizada'] == true ? 'Troca de Mesa Confirmada!' : 'Reserva Confirmada com Sucesso!',
+                    final troca = res.data!['trocaRealizada'] == true;
+                    ComprovanteDialog.show(
+                      context,
+                      tipo: troca ? TipoComprovante.troca : TipoComprovante.reserva,
                       comprovante: comprovante,
                       dataReserva: seatProvider.selectedDateIso,
                       escritorioNome: seatProvider.selectedEscritorio?.nome ?? 'Escritório',
@@ -417,6 +419,7 @@ class _MapaScreenState extends State<MapaScreen> {
                       cadeiraIdentificador: cadeira.identificador,
                       usuarioNome: auth.user?.nome,
                       usuarioMatricula: auth.user?.matricula,
+                      dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -436,193 +439,69 @@ class _MapaScreenState extends State<MapaScreen> {
     );
   }
 
-  void _mostrarModalComprovanteReserva({
-    required String titulo,
-    required String comprovante,
-    required String dataReserva,
-    required String escritorioNome,
-    required String escritorioCidade,
-    required String cadeiraIdentificador,
-    String? usuarioNome,
-    String? usuarioMatricula,
-  }) {
-    String dataFormatada = dataReserva;
-    try {
-      final dt = DateTime.parse(dataReserva);
-      dataFormatada = DateFormat("dd/MM/yyyy (EEEE)", 'pt_BR').format(dt);
-    } catch (_) {}
+  void _showCancelDialog(ReservaModel reserva, String token) {
+    final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.all(24),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Ícone e Título de Sucesso
-              Center(
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF86EFAC), width: 2),
-                  ),
-                  child: const Icon(Icons.verified_rounded, color: Color(0xFF16A34A), size: 36),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                titulo,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Comprovante Digital de Reserva Emitido',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 20),
-
-              // CARD ESTILIZADO DO COMPROVANTE (VOUCHER)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  children: [
-                    // Linha do Hash / Voucher com Botão de Copiar
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'CÓDIGO DO COMPROVANTE',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: Color(0xFF64748B)),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                comprovante,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0F172A),
-                                ),
-                              ),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF2563EB)),
-                            tooltip: 'Copiar Comprovante',
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: comprovante));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Código copiado com sucesso!'), duration: Duration(seconds: 2)),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Detalhes da Reserva
-                    _buildComprovanteLinha('Colaborador', '${usuarioNome ?? "Usuário"} ${usuarioMatricula != null ? "($usuarioMatricula)" : ""}'),
-                    const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                    _buildComprovanteLinha('Data da Reserva', dataFormatada),
-                    const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                    _buildComprovanteLinha('Escritório', '$escritorioNome ($escritorioCidade)'),
-                    const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                    _buildComprovanteLinha('Estação / Mesa', 'Mesa $cadeiraIdentificador', isDestacado: true),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 22),
-
-              // Botões de Ação
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.copy_rounded, size: 16),
-                      label: const Text('Copiar Código'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: comprovante));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Código copiado!'), duration: Duration(seconds: 2)),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('OK, Entendido', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626)),
+            SizedBox(width: 8),
+            Text('Cancelar Reserva'),
+          ],
+        ),
+        content: Text(
+          'Deseja realmente cancelar sua reserva para o dia ${reserva.dataReserva} no assento ${reserva.cadeiraIdentificador} (${reserva.escritorioNome})?',
+          style: const TextStyle(fontSize: 14, color: Color(0xFF334155)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Voltar'),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildComprovanteLinha(String label, String value, {bool isDestacado = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-        ),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: isDestacado ? const Color(0xFF2563EB) : const Color(0xFF0F172A),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final res = await seatProvider.cancelarMinhaReserva(token, reserva.id);
+              if (mounted) {
+                if (res.success) {
+                  final comprovante = res.data?['codigoComprovante'] as String? ?? reserva.codigoComprovante ?? 'RES-CANCELADO';
+                  ComprovanteDialog.show(
+                    context,
+                    tipo: TipoComprovante.cancelamento,
+                    comprovante: comprovante,
+                    dataReserva: reserva.dataReserva,
+                    escritorioNome: reserva.escritorioNome,
+                    escritorioCidade: reserva.escritorioCidade,
+                    cadeiraIdentificador: reserva.cadeiraIdentificador,
+                    baiaNome: reserva.baiaNome,
+                    usuarioNome: auth.user?.nome,
+                    usuarioMatricula: auth.user?.matricula,
+                    dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(res.error ?? 'Falha ao cancelar reserva.'),
+                      backgroundColor: const Color(0xFFDC2626),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Sim, Cancelar'),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1344,18 +1223,45 @@ class _MapaScreenState extends State<MapaScreen> {
         if (cad != null) {
           final res = await seatProvider.reservarOuTrocar(token, cad.id);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(res.message ?? res.error ?? 'Operação concluída.'),
-                backgroundColor: res.success ? Colors.green.shade700 : Colors.red.shade700,
-              ),
-            );
+            if (res.success && res.data != null) {
+              final comprovante = res.data!['comprovante'] as String? ?? 'RES-CONFIRMADO';
+              final troca = res.data!['trocaRealizada'] == true;
+              ComprovanteDialog.show(
+                context,
+                tipo: troca ? TipoComprovante.troca : TipoComprovante.reserva,
+                comprovante: comprovante,
+                dataReserva: seatProvider.selectedDateIso,
+                escritorioNome: seatProvider.selectedEscritorio?.nome ?? 'Escritório',
+                escritorioCidade: seatProvider.selectedEscritorio?.cidade ?? 'SP',
+                cadeiraIdentificador: cad.identificador,
+                usuarioNome: currentUser.nome,
+                usuarioMatricula: currentUser.matricula,
+                dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(res.error ?? 'Falha ao processar reserva.'),
+                  backgroundColor: Colors.red.shade700,
+                ),
+              );
+            }
           }
+        }
+      },
+      onCancelBooking: (desk) async {
+        final cad = cadeiraPorNumero[desk.number];
+        final reserva = seatProvider.minhasReservas.where(
+          (r) => r.isAtiva && (r.cadeiraId == cad?.id || r.dataReserva == seatProvider.selectedDateIso)
+        ).firstOrNull;
+
+        if (reserva != null) {
+          _showCancelDialog(reserva, token);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Reserva solicitada para a Mesa ${desk.number}!'),
-              backgroundColor: Colors.green.shade700,
+            const SnackBar(
+              content: Text('Nenhuma reserva ativa encontrada para cancelamento.'),
+              backgroundColor: Colors.red,
             ),
           );
         }

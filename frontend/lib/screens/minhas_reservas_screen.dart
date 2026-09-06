@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/seat_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/seat_map_provider.dart';
+import '../widgets/comprovante_dialog.dart';
 
 class MinhasReservasScreen extends StatefulWidget {
   const MinhasReservasScreen({super.key});
@@ -27,6 +28,7 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
 
   void _showCancelDialog(ReservaModel reserva, String token) {
     final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
 
     showDialog(
       context: context,
@@ -57,14 +59,31 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
               ),
               onPressed: () async {
                 Navigator.pop(ctx);
-                final ok = await seatProvider.cancelarMinhaReserva(token, reserva.id);
+                final res = await seatProvider.cancelarMinhaReserva(token, reserva.id);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(ok ? 'Reserva cancelada com sucesso.' : 'Falha ao cancelar reserva.'),
-                      backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-                    ),
-                  );
+                  if (res.success) {
+                    final comprovante = res.data?['codigoComprovante'] as String? ?? reserva.codigoComprovante ?? 'RES-CANCELADO';
+                    ComprovanteDialog.show(
+                      context,
+                      tipo: TipoComprovante.cancelamento,
+                      comprovante: comprovante,
+                      dataReserva: reserva.dataReserva,
+                      escritorioNome: reserva.escritorioNome,
+                      escritorioCidade: reserva.escritorioCidade,
+                      cadeiraIdentificador: reserva.cadeiraIdentificador,
+                      baiaNome: reserva.baiaNome,
+                      usuarioNome: auth.user?.nome,
+                      usuarioMatricula: auth.user?.matricula,
+                      dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(res.error ?? 'Falha ao cancelar reserva.'),
+                        backgroundColor: const Color(0xFFDC2626),
+                      ),
+                    );
+                  }
                 }
               },
               child: const Text('Sim, Cancelar'),
@@ -391,13 +410,26 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                         const SizedBox(height: 6),
                         InkWell(
                           onTap: () {
-                            Clipboard.setData(ClipboardData(text: r.codigoComprovante!));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Comprovante ${r.codigoComprovante} copiado!'),
-                                duration: const Duration(seconds: 2),
-                                behavior: SnackBarBehavior.floating,
-                              ),
+                            final auth = Provider.of<AuthProvider>(context, listen: false);
+                            final tipo = r.checkinRealizado
+                                ? TipoComprovante.checkin
+                                : (r.isCancelada
+                                    ? TipoComprovante.cancelamento
+                                    : TipoComprovante.visualizacao);
+                            ComprovanteDialog.show(
+                              context,
+                              tipo: tipo,
+                              comprovante: r.codigoComprovante!,
+                              dataReserva: r.dataReserva,
+                              escritorioNome: r.escritorioNome,
+                              escritorioCidade: r.escritorioCidade,
+                              cadeiraIdentificador: r.cadeiraIdentificador,
+                              baiaNome: r.baiaNome,
+                              usuarioNome: auth.user?.nome,
+                              usuarioMatricula: auth.user?.matricula,
+                              dataHoraAcao: r.checkinEm != null
+                                  ? DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.tryParse(r.checkinEm!)?.toLocal() ?? DateTime.now())
+                                  : null,
                             );
                           },
                           borderRadius: BorderRadius.circular(4),
@@ -423,7 +455,7 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                const Icon(Icons.copy_rounded, size: 10, color: Color(0xFF94A3B8)),
+                                const Icon(Icons.open_in_new_rounded, size: 10, color: Color(0xFF94A3B8)),
                               ],
                             ),
                           ),
@@ -471,7 +503,32 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                       onPressed: () async {
                         if (token != null) {
                           final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
-                          await seatProvider.confirmarPresencaHoje(token);
+                          final auth = Provider.of<AuthProvider>(context, listen: false);
+                          final ok = await seatProvider.confirmarPresencaHoje(token);
+                          if (mounted) {
+                            if (ok) {
+                              ComprovanteDialog.show(
+                                context,
+                                tipo: TipoComprovante.checkin,
+                                comprovante: r.codigoComprovante ?? 'RES-CHECKIN',
+                                dataReserva: r.dataReserva,
+                                escritorioNome: r.escritorioNome,
+                                escritorioCidade: r.escritorioCidade,
+                                cadeiraIdentificador: r.cadeiraIdentificador,
+                                baiaNome: r.baiaNome,
+                                usuarioNome: auth.user?.nome,
+                                usuarioMatricula: auth.user?.matricula,
+                                dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(seatProvider.errorMessage ?? 'Falha ao confirmar presença.'),
+                                  backgroundColor: const Color(0xFFDC2626),
+                                ),
+                              );
+                            }
+                          }
                         }
                       },
                     ),

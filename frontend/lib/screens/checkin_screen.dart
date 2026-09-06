@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/seat_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/seat_map_provider.dart';
+import '../widgets/comprovante_dialog.dart';
 
 enum _TipoModal { sucesso, erro, alerta }
 
@@ -134,8 +135,9 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
 
     if (res.success) {
       final reservaAtualizada = seatProvider.reservaHoje ?? reservaHoje;
-      _mostrarModalComprovantePresenca(
-        titulo: 'Check-in Confirmado!',
+      ComprovanteDialog.show(
+        context,
+        tipo: TipoComprovante.checkin,
         comprovante: reservaAtualizada.codigoComprovante ?? reservaHoje.codigoComprovante ?? 'RES-CONFIRMADO',
         dataReserva: reservaAtualizada.dataReserva,
         escritorioNome: reservaAtualizada.escritorioNome,
@@ -144,7 +146,7 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
         cadeiraIdentificador: reservaAtualizada.cadeiraIdentificador,
         usuarioNome: auth.user?.nome,
         usuarioMatricula: auth.user?.matricula,
-        checkinEm: reservaAtualizada.checkinEm ?? DateTime.now().toIso8601String(),
+        dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
       );
     } else {
       _mostrarModalResultado(

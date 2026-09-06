@@ -397,10 +397,21 @@ export class ReservaController {
 
     try {
       const reservaRes = await pool.query(`
-        SELECT r.id, r.usuario_id, r.data_reserva, r.status, r.cadeira_id, b.escritorio_id
+        SELECT 
+          r.id, 
+          r.usuario_id, 
+          r.data_reserva, 
+          r.status, 
+          r.cadeira_id, 
+          r.codigo_comprovante,
+          b.escritorio_id,
+          c.identificador AS cadeira_identificador,
+          e.nome AS escritorio_nome,
+          e.cidade AS escritorio_cidade
         FROM reservas r
         JOIN cadeiras c ON r.cadeira_id = c.id
         JOIN baias b ON c.baia_id = b.id
+        JOIN escritorios e ON b.escritorio_id = e.id
         WHERE r.id = $1
       `, [reservaId]);
 
@@ -439,7 +450,18 @@ export class ReservaController {
         ocupante: null
       });
 
-      return res.status(200).json({ message: 'Reserva cancelada com sucesso.' });
+      return res.status(200).json({ 
+        message: 'Reserva cancelada com sucesso.',
+        data: {
+          id: reserva.id,
+          codigoComprovante: reserva.codigo_comprovante,
+          cadeiraIdentificador: reserva.cadeira_identificador,
+          escritorioNome: reserva.escritorio_nome,
+          escritorioCidade: reserva.escritorio_cidade,
+          dataReserva: dataIso,
+          canceladoEm: new Date().toISOString()
+        }
+      });
     } catch (error) {
       console.error('[ReservaController.cancelarReserva] Erro:', error);
       return res.status(500).json({ error: 'Erro ao cancelar reserva.' });

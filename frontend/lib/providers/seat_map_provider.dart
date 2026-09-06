@@ -363,7 +363,7 @@ class SeatMapProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> cancelarMinhaReserva(String token, int reservaId) async {
+  Future<ApiResponse<Map<String, dynamic>>> cancelarMinhaReserva(String token, int reservaId) async {
     _isLoading = true;
     notifyListeners();
 
@@ -374,12 +374,11 @@ class SeatMapProvider extends ChangeNotifier {
       await carregarMinhasReservas(token);
       await carregarMapa(token);
       notifyListeners();
-      return true;
     } else {
       _errorMessage = res.error;
       notifyListeners();
-      return false;
     }
+    return res;
   }
 
   @override

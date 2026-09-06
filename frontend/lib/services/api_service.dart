@@ -214,7 +214,7 @@ class ApiService {
     }
   }
 
-  Future<ApiResponse<String>> cancelarReserva(String token, int reservaId) async {
+  Future<ApiResponse<Map<String, dynamic>>> cancelarReserva(String token, int reservaId) async {
     try {
       final response = await http.delete(
         Uri.parse('${AppConstants.baseUrl}/reservas/$reservaId'),
@@ -223,7 +223,13 @@ class ApiService {
 
       final body = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        return ApiResponse(success: true, message: body['message'] ?? 'Reserva cancelada.', statusCode: response.statusCode);
+        final data = body['data'] != null ? Map<String, dynamic>.from(body['data']) : null;
+        return ApiResponse(
+          success: true,
+          data: data,
+          message: body['message'] ?? 'Reserva cancelada.',
+          statusCode: response.statusCode,
+        );
       } else {
         return ApiResponse(success: false, error: body['error'] ?? 'Erro ao cancelar reserva.', statusCode: response.statusCode);
       }

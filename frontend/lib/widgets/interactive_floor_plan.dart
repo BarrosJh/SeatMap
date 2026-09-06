@@ -10,6 +10,7 @@ class InteractiveFloorPlan extends StatefulWidget {
   final DeskModel? selectedDesk;
   final ValueChanged<DeskModel>? onDeskSelected;
   final Function(DeskModel desk)? onConfirmBooking;
+  final Function(DeskModel desk)? onCancelBooking;
   final String? officeName;
   final double? floorWidth;
   final double? floorHeight;
@@ -20,6 +21,7 @@ class InteractiveFloorPlan extends StatefulWidget {
     this.selectedDesk,
     this.onDeskSelected,
     this.onConfirmBooking,
+    this.onCancelBooking,
     this.officeName,
     this.floorWidth,
     this.floorHeight,
@@ -188,6 +190,10 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
         onConfirm: () {
           Navigator.pop(ctx);
           widget.onConfirmBooking?.call(desk);
+        },
+        onCancel: () {
+          Navigator.pop(ctx);
+          widget.onCancelBooking?.call(desk);
         },
       ),
     );
@@ -420,11 +426,13 @@ class _DeskDetailsDialog extends StatelessWidget {
   final DeskModel desk;
   final String escritorioNome;
   final VoidCallback onConfirm;
+  final VoidCallback? onCancel;
 
   const _DeskDetailsDialog({
     required this.desk,
     required this.escritorioNome,
     required this.onConfirm,
+    this.onCancel,
   });
 
   @override
@@ -507,8 +515,8 @@ class _DeskDetailsDialog extends StatelessWidget {
 
               const SizedBox(height: 24.0),
 
-              // Desk Occupant Details (if occupied or reserved)
-              if (desk.isOccupied || desk.isReserved) ...[
+              // Desk Occupant Details (if occupied or reserved or selected)
+              if (desk.isOccupied || desk.isReserved || desk.isSelected) ...[
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16.0),
@@ -580,6 +588,24 @@ class _DeskDetailsDialog extends StatelessWidget {
                         icon: const Icon(Icons.check_circle_outline_rounded),
                         label: const Text('Confirmar Reserva'),
                         style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else if (desk.isSelected && onCancel != null) ...[
+                    const SizedBox(width: 12.0),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton.icon(
+                        onPressed: onCancel,
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('Cancelar Reserva'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14.0),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12.0),
