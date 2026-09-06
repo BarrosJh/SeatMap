@@ -475,7 +475,7 @@ export class ReservaController {
       const result = await pool.query(`
         SELECT 
           r.id,
-          r.data_reserva,
+          to_char(r.data_reserva, 'YYYY-MM-DD') AS data_reserva,
           r.checkin_realizado,
           r.checkin_em,
           r.status,

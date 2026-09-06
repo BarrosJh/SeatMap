@@ -187,14 +187,63 @@ class ReservaModel {
     this.codigoComprovante,
   });
 
+  String get dataReservaIso => dataReserva.contains('T') ? dataReserva.split('T')[0] : dataReserva;
+
+  DateTime? get dataReservaDateTime => DateTime.tryParse(dataReservaIso);
+
+  String get dataFormatadaExtenso {
+    final dt = dataReservaDateTime;
+    if (dt == null) return dataReserva;
+    final formatado = DateFormat("EEEE, d 'de' MMMM 'de' yyyy", 'pt_BR').format(dt);
+    if (formatado.isEmpty) return dataReserva;
+    return formatado[0].toUpperCase() + formatado.substring(1);
+  }
+
+  String get dataFormatadaCurta {
+    final dt = dataReservaDateTime;
+    if (dt == null) return dataReserva;
+    return DateFormat('dd/MM/yyyy', 'pt_BR').format(dt);
+  }
+
+  String get diaSemanaExtenso {
+    final dt = dataReservaDateTime;
+    if (dt == null) return '';
+    final formatado = DateFormat('EEEE', 'pt_BR').format(dt);
+    return formatado.isNotEmpty ? formatado[0].toUpperCase() + formatado.substring(1) : '';
+  }
+
+  String get diaSemanaCurto {
+    final dt = dataReservaDateTime;
+    if (dt == null) return '';
+    return DateFormat('E', 'pt_BR').format(dt).toUpperCase();
+  }
+
   bool get isPassada {
     final hojeStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    return dataReserva.compareTo(hojeStr) < 0;
+    return dataReservaIso.compareTo(hojeStr) < 0;
   }
 
   bool get isHoje {
     final hojeStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    return dataReserva == hojeStr;
+    return dataReservaIso == hojeStr;
+  }
+
+  bool get isAmanha {
+    final amanhaStr = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
+    return dataReservaIso == amanhaStr;
+  }
+
+  bool get isOntem {
+    final ontemStr = DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(const Duration(days: 1)));
+    return dataReservaIso == ontemStr;
+  }
+
+  String get tagRelativa {
+    if (isHoje) return 'Hoje';
+    if (isAmanha) return 'Amanhã';
+    if (isOntem) return 'Ontem';
+    if (isPassada) return 'Passada';
+    return 'Futura';
   }
 
   bool get isAtiva => status == 'ATIVA' && !isNoShowPassado;
@@ -204,9 +253,14 @@ class ReservaModel {
   bool get isConcluida => (checkinRealizado && isPassada) || status == 'CONCLUIDA';
 
   factory ReservaModel.fromJson(Map<String, dynamic> json) {
+    final rawData = json['data_reserva'] ?? json['dataReserva'] ?? '';
+    final cleanData = rawData.toString().contains('T')
+        ? rawData.toString().split('T')[0]
+        : rawData.toString();
+
     return ReservaModel(
       id: json['id'] ?? 0,
-      dataReserva: json['data_reserva'] ?? json['dataReserva'] ?? '',
+      dataReserva: cleanData,
       checkinRealizado: json['checkin_realizado'] ?? json['checkinRealizado'] ?? false,
       checkinEm: json['checkin_em'] ?? json['checkinEm'],
       status: json['status'] ?? 'ATIVA',

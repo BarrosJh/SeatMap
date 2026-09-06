@@ -18,9 +18,9 @@ class SeatMapProvider extends ChangeNotifier {
   List<ReservaModel> _minhasReservas = [];
   ReservaModel? _reservaHoje;
   ReservaFiltro _filtroReservas = ReservaFiltro.ativas;
+  DateTime? _filtroData;
   List<OcupacaoEscritorioModel> _ocupacaoSemanal = [];
   bool _carregandoOcupacao = false;
-
   bool _isLoading = false;
   String? _errorMessage;
   StreamSubscription? _wsSubscription;
@@ -33,6 +33,8 @@ class SeatMapProvider extends ChangeNotifier {
   List<ReservaModel> get minhasReservas => _minhasReservas;
   ReservaModel? get reservaHoje => _reservaHoje;
   ReservaFiltro get filtroReservas => _filtroReservas;
+  DateTime? get filtroData => _filtroData;
+  String? get filtroDataIso => _filtroData != null ? DateFormat('yyyy-MM-dd').format(_filtroData!) : null;
   List<OcupacaoEscritorioModel> get ocupacaoSemanal => _ocupacaoSemanal;
   bool get carregandoOcupacao => _carregandoOcupacao;
   bool get isLoading => _isLoading;
@@ -43,19 +45,54 @@ class SeatMapProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setFiltroData(DateTime? data) {
+    _filtroData = data;
+    notifyListeners();
+  }
+
+  void limparFiltroData() {
+    _filtroData = null;
+    notifyListeners();
+  }
+
   List<ReservaModel> get minhasReservasFiltradas {
+    List<ReservaModel> lista;
     switch (_filtroReservas) {
       case ReservaFiltro.ativas:
-        return _minhasReservas.where((r) => r.isAtiva).toList();
+        lista = _minhasReservas.where((r) => r.isAtiva).toList();
+        break;
       case ReservaFiltro.concluidas:
-        return _minhasReservas.where((r) => r.isConcluida).toList();
+        lista = _minhasReservas.where((r) => r.isConcluida).toList();
+        break;
       case ReservaFiltro.canceladas:
-        return _minhasReservas.where((r) => r.isCancelada).toList();
+        lista = _minhasReservas.where((r) => r.isCancelada).toList();
+        break;
       case ReservaFiltro.naoComparecidas:
-        return _minhasReservas.where((r) => r.isExpirada).toList();
+        lista = _minhasReservas.where((r) => r.isExpirada).toList();
+        break;
       case ReservaFiltro.todas:
-        return _minhasReservas;
+        lista = _minhasReservas.toList();
+        break;
     }
+
+    if (_filtroData != null) {
+      final dataIso = DateFormat('yyyy-MM-dd').format(_filtroData!);
+      lista = lista.where((r) => r.dataReservaIso == dataIso).toList();
+    }
+
+    return lista;
+  }
+
+  Map<String, List<ReservaModel>> get minhasReservasAgrupadasPorData {
+    final agrupadas = <String, List<ReservaModel>>{};
+    for (final r in minhasReservasFiltradas) {
+      final chave = r.dataReservaIso;
+      if (!agrupadas.containsKey(chave)) {
+        agrupadas[chave] = [];
+      }
+      agrupadas[chave]!.add(r);
+    }
+    return agrupadas;
   }
 
   int get totalAtivas => _minhasReservas.where((r) => r.isAtiva).length;
