@@ -546,247 +546,263 @@ class _MapaScreenState extends State<MapaScreen> {
                   bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
                 ),
               ),
-              child: Column(
-                children: [
-                  // Linha Superior: Navegação de Semanas, Dias da Semana e Alternador de Visão
-                  Row(
-                    children: [
-                      // Controles de Navegação de Semana
-                      Builder(
-                        builder: (ctx) {
-                          final isRh = auth.user?.isAdmin == true;
-                          final isNextOpen = auth.user != null && _isDateOpenForBooking(_getBaseMonday(1), auth.user!);
-                          final canGoBack = isRh ? true : _weekOffset > 0;
-                          final canGoForward = isRh ? true : (_weekOffset < (isNextOpen ? 1 : 0));
+              child: LayoutBuilder(
+                builder: (context, headerConstraints) {
+                  final isCompact = headerConstraints.maxWidth < 780;
 
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                                  tooltip: canGoBack ? 'Semana Anterior' : null,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                                  color: canGoBack ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
-                                  onPressed: (canGoBack && auth.token != null) ? () => _changeWeek(-1, auth.token!) : null,
-                                ),
-                                InkWell(
-                                  onTap: auth.token != null ? () => _resetToCurrentWeek(auth.token!) : null,
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.date_range_rounded, size: 15, color: Color(0xFF2563EB)),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          _getWeekLabel(),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF1E293B),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                                  tooltip: canGoForward ? 'Próxima Semana' : null,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                                  color: canGoForward ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
-                                  onPressed: (canGoForward && auth.token != null) ? () => _changeWeek(1, auth.token!) : null,
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.calendar_month_outlined, size: 16, color: Color(0xFF64748B)),
-                                  tooltip: 'Escolher Data no Calendário',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                                  onPressed: auth.token != null ? () => _pickCustomDate(context, auth.token!) : null,
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                  final weekSelectorWidget = Builder(
+                    builder: (ctx) {
+                      final isRh = auth.user?.isAdmin == true;
+                      final isNextOpen = auth.user != null && _isDateOpenForBooking(_getBaseMonday(1), auth.user!);
+                      final canGoBack = isRh ? true : _weekOffset > 0;
+                      final canGoForward = isRh ? true : (_weekOffset < (isNextOpen ? 1 : 0));
 
-                      const SizedBox(width: 14),
-
-                      // Abas de Dias da Semana (Seg a Sex)
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: diasUteis.map((dia) {
-                              final isSelected = DateFormat('yyyy-MM-dd').format(dia) == seatProvider.selectedDateIso;
-                              final isToday = DateFormat('yyyy-MM-dd').format(dia) == DateFormat('yyyy-MM-dd').format(DateTime.now());
-                              final diaSemanaNome = DateFormat('EEE', 'pt_BR').format(dia).toUpperCase();
-                              final diaNumero = DateFormat('dd/MM').format(dia);
-
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: InkWell(
-                                  onTap: () {
-                                    if (auth.token != null) {
-                                      seatProvider.selecionarData(auth.token!, dia);
-                                    }
-                                  },
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 150),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFF8FAFC),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
-                                        width: isSelected ? 1.5 : 1.0,
-                                      ),
-                                      boxShadow: isSelected
-                                          ? [
-                                              BoxShadow(
-                                                color: const Color(0xFF2563EB).withValues(alpha: 0.25),
-                                                blurRadius: 6,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ]
-                                          : null,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment: CrossAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              diaSemanaNome,
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                                color: isSelected ? Colors.white70 : const Color(0xFF64748B),
-                                                letterSpacing: 0.5,
-                                              ),
-                                            ),
-                                            Text(
-                                              diaNumero,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: isSelected ? Colors.white : const Color(0xFF1E293B),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        if (isToday) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: isSelected ? Colors.white.withValues(alpha: 0.2) : const Color(0xFFDBEAFE),
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              'HOJE',
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                color: isSelected ? Colors.white : const Color(0xFF1D4ED8),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-
-                      if (seatProvider.isLoading)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 10),
-                          child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                        ),
-
-                      // Botão Alternador de Modo (Planta 2D / Lista)
-                      Container(
-                        padding: const EdgeInsets.all(3),
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildViewToggleButton(
-                              icon: Icons.map_rounded,
-                              label: 'Planta 2D',
-                              isSelected: _isFloorPlanView,
-                              onTap: () => setState(() => _isFloorPlanView = true),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                              tooltip: canGoBack ? 'Semana Anterior' : null,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                              color: canGoBack ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
+                              onPressed: (canGoBack && auth.token != null) ? () => _changeWeek(-1, auth.token!) : null,
                             ),
-                            _buildViewToggleButton(
-                              icon: Icons.view_agenda_rounded,
-                              label: 'Lista',
-                              isSelected: !_isFloorPlanView,
-                              onTap: () => setState(() => _isFloorPlanView = false),
+                            InkWell(
+                              onTap: auth.token != null ? () => _resetToCurrentWeek(auth.token!) : null,
+                              borderRadius: BorderRadius.circular(6),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.date_range_rounded, size: 14, color: Color(0xFF2563EB)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _getWeekLabel(),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                              tooltip: canGoForward ? 'Próxima Semana' : null,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                              color: canGoForward ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
+                              onPressed: (canGoForward && auth.token != null) ? () => _changeWeek(1, auth.token!) : null,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.calendar_month_outlined, size: 15, color: Color(0xFF64748B)),
+                              tooltip: 'Escolher Data no Calendário',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                              onPressed: auth.token != null ? () => _pickCustomDate(context, auth.token!) : null,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+
+                  final dayTabsWidget = SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: diasUteis.map((dia) {
+                        final isSelected = DateFormat('yyyy-MM-dd').format(dia) == seatProvider.selectedDateIso;
+                        final isToday = DateFormat('yyyy-MM-dd').format(dia) == DateFormat('yyyy-MM-dd').format(DateTime.now());
+                        final diaSemanaNome = DateFormat('EEE', 'pt_BR').format(dia).toUpperCase();
+                        final diaNumero = DateFormat('dd/MM').format(dia);
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () {
+                              if (auth.token != null) {
+                                seatProvider.selecionarData(auth.token!, dia);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                                  width: isSelected ? 1.5 : 1.0,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        diaSemanaNome,
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected ? Colors.white70 : const Color(0xFF64748B),
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      Text(
+                                        diaNumero,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected ? Colors.white : const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (isToday) ...[
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? Colors.white.withValues(alpha: 0.2) : const Color(0xFFDBEAFE),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'HOJE',
+                                        style: TextStyle(
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected ? Colors.white : const Color(0xFF1D4ED8),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  );
+
+                  final viewToggleWidget = Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildViewToggleButton(
+                          icon: Icons.map_rounded,
+                          label: 'Planta',
+                          isSelected: _isFloorPlanView,
+                          onTap: () => setState(() => _isFloorPlanView = true),
+                        ),
+                        _buildViewToggleButton(
+                          icon: Icons.view_agenda_rounded,
+                          label: 'Lista',
+                          isSelected: !_isFloorPlanView,
+                          onTap: () => setState(() => _isFloorPlanView = false),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  return Column(
+                    children: [
+                      if (isCompact) ...[
+                        // Mobile / Compact Layout
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(child: weekSelectorWidget),
+                            const SizedBox(width: 6),
+                            viewToggleWidget,
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: dayTabsWidget,
+                        ),
+                      ] else ...[
+                        // Desktop / Wide Layout
+                        Row(
+                          children: [
+                            weekSelectorWidget,
+                            const SizedBox(width: 12),
+                            Expanded(child: dayTabsWidget),
+                            if (seatProvider.isLoading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 8),
+                                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                              ),
+                            const SizedBox(width: 8),
+                            viewToggleWidget,
+                          ],
+                        ),
+                      ],
+
+                      const SizedBox(height: 8),
+                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      const SizedBox(height: 6),
+
+                      // Linha Inferior: KPIs Executivos e Legendas com scroll horizontal fluido
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildModernKpi(label: 'Total', value: totalAssentos, color: const Color(0xFF334155)),
+                            const SizedBox(width: 6),
+                            _buildModernKpi(label: 'Livres', value: totalLivres, color: const Color(0xFF16A34A)),
+                            const SizedBox(width: 6),
+                            _buildModernKpi(label: 'Ocupadas', value: totalOcupadas, color: const Color(0xFFDC2626)),
+                            const SizedBox(width: 6),
+                            _buildModernKpi(label: 'Minhas', value: totalMinhas, color: const Color(0xFF2563EB)),
+                            const SizedBox(width: 14),
+                            Container(width: 1, height: 16, color: const Color(0xFFE2E8F0)),
+                            const SizedBox(width: 14),
+                            _buildLegendDot(const Color(0xFF22C55E), 'Livre'),
+                            const SizedBox(width: 10),
+                            _buildLegendDot(const Color(0xFF2563EB), 'Sua Reserva'),
+                            const SizedBox(width: 10),
+                            _buildLegendDot(const Color(0xFFDC2626), 'Ocupada'),
+                            const SizedBox(width: 10),
+                            _buildLegendDot(const Color(0xFFD97706), 'Colega Depto'),
                           ],
                         ),
                       ),
                     ],
-                  ),
-
-                  const SizedBox(height: 10),
-                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  const SizedBox(height: 8),
-
-                  // Linha Inferior: KPIs Executivos e Legendas Integradas
-                  Row(
-                    children: [
-                      // KPIs Executivos
-                      Row(
-                        children: [
-                          _buildModernKpi(label: 'Total', value: totalAssentos, color: const Color(0xFF334155)),
-                          const SizedBox(width: 8),
-                          _buildModernKpi(label: 'Livres', value: totalLivres, color: const Color(0xFF16A34A)),
-                          const SizedBox(width: 8),
-                          _buildModernKpi(label: 'Ocupadas', value: totalOcupadas, color: const Color(0xFFDC2626)),
-                          const SizedBox(width: 8),
-                          _buildModernKpi(label: 'Minhas', value: totalMinhas, color: const Color(0xFF2563EB)),
-                        ],
-                      ),
-
-                      const Spacer(),
-
-                      // Legenda Executiva Compacta
-                      Row(
-                        children: [
-                          _buildLegendDot(const Color(0xFF22C55E), 'Livre'),
-                          const SizedBox(width: 14),
-                          _buildLegendDot(const Color(0xFF2563EB), 'Sua Reserva'),
-                          const SizedBox(width: 14),
-                          _buildLegendDot(const Color(0xFFDC2626), 'Ocupada'),
-                          const SizedBox(width: 14),
-                          _buildLegendDot(const Color(0xFFD97706), 'Colega Depto'),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
 

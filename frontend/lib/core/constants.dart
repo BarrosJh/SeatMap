@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  // URLs da API e WebSocket (suporte a ambiente local e Docker)
-  static const String baseUrl = 'http://localhost:3000/api';
-  static const String wsUrl = 'ws://localhost:3000/ws';
+  // URLs configuráveis dinamicamente via --dart-define ou fallback padrão
+  static const String _definedBaseUrl = String.fromEnvironment('API_URL');
+  static const String _definedWsUrl = String.fromEnvironment('WS_URL');
+
+  static String get baseUrl {
+    if (_definedBaseUrl.isNotEmpty) return _definedBaseUrl;
+    return 'http://localhost:3000/api';
+  }
+
+  static String get wsUrl {
+    if (_definedWsUrl.isNotEmpty) return _definedWsUrl;
+    return 'ws://localhost:3000/ws';
+  }
 
   // Chaves de SharedPreferences
   static const String keyToken = 'seatmap_jwt_token';
@@ -23,4 +33,3 @@ class AppConstants {
   static const Color backgroundColor = Color(0xFFF4F6F9);
   static const Color surfaceColor = Colors.white;
 }
-

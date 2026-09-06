@@ -304,21 +304,33 @@ class HomeDashboardScreen extends StatelessWidget {
             const SizedBox(height: 18),
 
             // Painéis das Duas Semanas
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Painel 1: Esta Semana
-                Expanded(
-                  child: _buildWeekSection('Esta Semana', escritorio.semanaAtual, escritorio),
-                ),
+            LayoutBuilder(
+              builder: (context, boxConstraints) {
+                final isMobileCard = boxConstraints.maxWidth < 520;
 
-                const SizedBox(width: 14),
+                if (isMobileCard) {
+                  return Column(
+                    children: [
+                      _buildWeekSection('Esta Semana', escritorio.semanaAtual, escritorio),
+                      const SizedBox(height: 14),
+                      _buildWeekSection('Próxima Semana', escritorio.proximaSemana, escritorio, isProximaSemana: true),
+                    ],
+                  );
+                }
 
-                // Painel 2: Próxima Semana
-                Expanded(
-                  child: _buildWeekSection('Próxima Semana', escritorio.proximaSemana, escritorio, isProximaSemana: true),
-                ),
-              ],
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _buildWeekSection('Esta Semana', escritorio.semanaAtual, escritorio),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: _buildWeekSection('Próxima Semana', escritorio.proximaSemana, escritorio, isProximaSemana: true),
+                    ),
+                  ],
+                );
+              },
             ),
 
             const SizedBox(height: 18),
@@ -419,15 +431,16 @@ class HomeDashboardScreen extends StatelessWidget {
           ),
           if (isBloqueada)
             Container(
-              height: 180,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              constraints: const BoxConstraints(minHeight: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               alignment: Alignment.center,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Icon(Icons.lock_clock_outlined, size: 30, color: Color(0xFF94A3B8)),
-                  const SizedBox(height: 10),
+                  const Icon(Icons.lock_clock_outlined, size: 28, color: Color(0xFF94A3B8)),
+                  const SizedBox(height: 8),
                   Text(
                     escritorio.mensagemBloqueioProximaSemana ?? 'A agenda da próxima semana abre na Sexta-feira.',
                     textAlign: TextAlign.center,
@@ -437,7 +450,7 @@ class HomeDashboardScreen extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'Período: ${dias.isNotEmpty ? "${dias.first.dataFormatada} a ${dias.last.dataFormatada}" : "Em breve"}',
                     style: const TextStyle(

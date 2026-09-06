@@ -36,11 +36,17 @@ class _MainNavigationState extends State<MainNavigation> {
     });
   }
 
-  void _onTabSelected(int index, bool isAdmin) {
+  void _onTabSelected(int index, bool isAdmin, {bool isDrawer = false}) {
+    if (isDrawer && Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
     setState(() => _currentIndex = index);
   }
 
-  void _selecionarEscritorio(String nomeEscritorio) {
+  void _selecionarEscritorio(String nomeEscritorio, {bool isDrawer = false}) {
+    if (isDrawer && Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
     setState(() => _currentIndex = 1);
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
@@ -68,13 +74,14 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
-  void _selecionarFiltroReservas(ReservaFiltro filtro) {
+  void _selecionarFiltroReservas(ReservaFiltro filtro, {bool isDrawer = false}) {
+    if (isDrawer && Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
     setState(() => _currentIndex = 3);
     final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
     seatProvider.setFiltroReservas(filtro);
   }
-
-
 
   void _confirmLogout() {
     showDialog(
@@ -128,367 +135,565 @@ class _MainNavigationState extends State<MainNavigation> {
       if (isAdmin) const AdminPanelScreen(),
     ];
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          // 1. Sidebar Corporativa com Submenus
-          _buildCorporateSidebar(context, user, isAdmin, activeIndex, seatProvider),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 850;
 
-          // 2. Área Principal de Conteúdo
-          Expanded(
-            child: Column(
-              children: [
-                // Top Header Corporativo (oculto na Home e no Painel do RH que possuem banner azul/navy próprio)
-                if (activeIndex != 0 && activeIndex != 4)
-                  _buildCorporateTopBar(context, user, activeIndex, seatProvider),
+        if (isMobile) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF8FAFC),
+            appBar: _buildMobileAppBar(context, user, activeIndex, seatProvider),
+            body: IndexedStack(
+              index: activeIndex,
+              children: screens,
+            ),
+            bottomNavigationBar: _buildMobileBottomBar(context, activeIndex, isAdmin, seatProvider),
+          );
+        }
 
-                // Conteúdo da Tela
-                Expanded(
-                  child: IndexedStack(
-                    index: activeIndex,
-                    children: screens,
+        // Layout Desktop / Tablet Grande (>= 850px)
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          body: Row(
+            children: [
+              // 1. Sidebar Corporativa Fixa com Submenus
+              Container(
+                width: 270,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0F172A),
+                  border: Border(
+                    right: BorderSide(color: Color(0xFF1E293B), width: 1.0),
                   ),
                 ),
-              ],
+                child: _buildCorporateSidebarContent(
+                  context,
+                  user,
+                  isAdmin,
+                  activeIndex,
+                  seatProvider,
+                  isDrawer: false,
+                ),
+              ),
+
+              // 2. Área Principal de Conteúdo
+              Expanded(
+                child: Column(
+                  children: [
+                    // Top Header Corporativo (oculto na Home e no Painel do RH)
+                    if (activeIndex != 0 && activeIndex != 4)
+                      _buildCorporateTopBar(context, user, activeIndex, seatProvider),
+
+                    // Conteúdo da Tela
+                    Expanded(
+                      child: IndexedStack(
+                        index: activeIndex,
+                        children: screens,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// AppBar Otimizada para Mobile
+  PreferredSizeWidget _buildMobileAppBar(
+    BuildContext context,
+    UserModel? user,
+    int activeIndex,
+    SeatMapProvider seatProvider,
+  ) {
+    String title = 'SeatMap';
+    if (activeIndex == 1) {
+      final esc = seatProvider.selectedEscritorio?.nome ?? 'Mapa';
+      title = 'Mapa ($esc)';
+    } else if (activeIndex == 2) {
+      title = 'Check-in QR';
+    } else if (activeIndex == 3) {
+      title = 'Minhas Reservas';
+    } else if (activeIndex == 4) {
+      title = 'Painel RH';
+    }
+
+    return AppBar(
+      backgroundColor: const Color(0xFF0F172A),
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      iconTheme: const IconThemeData(color: Colors.white),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Icon(Icons.domain_rounded, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
       ),
+      actions: [
+        if (user != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: user.isAdmin
+                      ? const Color(0xFF7C3AED)
+                      : (user.isGestao ? const Color(0xFF0F766E) : const Color(0xFF2563EB)),
+                  child: Text(
+                    user.nome.isNotEmpty ? user.nome[0].toUpperCase() : 'U',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded, color: Color(0xFF94A3B8), size: 18),
+                  tooltip: 'Encerrar Sessão',
+                  onPressed: _confirmLogout,
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
-  /// Sidebar Corporativa Desktop com Submenus
-  Widget _buildCorporateSidebar(
+  /// Barra de Navegação Inferior Mobile (Material 3 NavigationBar)
+  Widget _buildMobileBottomBar(
+    BuildContext context,
+    int activeIndex,
+    bool isAdmin,
+    SeatMapProvider seatProvider,
+  ) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F172A),
+        border: Border(
+          top: BorderSide(color: Color(0xFF1E293B), width: 1.0),
+        ),
+      ),
+      child: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF0F172A),
+          indicatorColor: const Color(0xFF2563EB),
+          labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold);
+            }
+            return const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.normal);
+          }),
+          iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const IconThemeData(color: Colors.white, size: 22);
+            }
+            return const IconThemeData(color: Color(0xFF94A3B8), size: 20);
+          }),
+        ),
+        child: NavigationBar(
+          selectedIndex: activeIndex,
+          onDestinationSelected: (index) => _onTabSelected(index, isAdmin),
+          destinations: [
+            const NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard_rounded),
+              label: 'Início',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.map_outlined),
+              selectedIcon: Icon(Icons.map_rounded),
+              label: 'Mapa',
+            ),
+            NavigationDestination(
+              icon: Badge(
+                isLabelVisible: seatProvider.reservaHoje != null,
+                backgroundColor: seatProvider.reservaHoje?.checkinRealizado == true
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFFEAB308),
+                child: const Icon(Icons.qr_code_scanner_outlined),
+              ),
+              selectedIcon: Badge(
+                isLabelVisible: seatProvider.reservaHoje != null,
+                backgroundColor: seatProvider.reservaHoje?.checkinRealizado == true
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFFEAB308),
+                child: const Icon(Icons.qr_code_scanner_rounded),
+              ),
+              label: 'Check-in',
+            ),
+            NavigationDestination(
+              icon: Badge(
+                label: Text('${seatProvider.totalAtivas}'),
+                isLabelVisible: seatProvider.totalAtivas > 0,
+                backgroundColor: const Color(0xFF2563EB),
+                child: const Icon(Icons.event_seat_outlined),
+              ),
+              selectedIcon: Badge(
+                label: Text('${seatProvider.totalAtivas}'),
+                isLabelVisible: seatProvider.totalAtivas > 0,
+                backgroundColor: const Color(0xFF2563EB),
+                child: const Icon(Icons.event_seat_rounded),
+              ),
+              label: 'Reservas',
+            ),
+            if (isAdmin)
+              const NavigationDestination(
+                icon: Icon(Icons.admin_panel_settings_outlined),
+                selectedIcon: Icon(Icons.admin_panel_settings_rounded),
+                label: 'Admin',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Conteúdo compartilhado da Sidebar Corporativa (usado tanto no Desktop quanto no Mobile Drawer)
+  Widget _buildCorporateSidebarContent(
     BuildContext context,
     UserModel? user,
     bool isAdmin,
     int activeIndex,
-    SeatMapProvider seatProvider,
-  ) {
+    SeatMapProvider seatProvider, {
+    required bool isDrawer,
+  }) {
     final escSelecionadoNome = seatProvider.selectedEscritorio?.nome.toLowerCase() ?? '';
     final isBerriniAtivo = activeIndex == 1 && escSelecionadoNome.contains('berrini');
     final isBarueriAtivo = activeIndex == 1 && escSelecionadoNome.contains('barueri');
     final filtroAtual = seatProvider.filtroReservas;
 
-    return Container(
-      width: 270,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A), // Deep Navy Slate Corporativo
-        border: Border(
-          right: BorderSide(color: Color(0xFF1E293B), width: 1.0),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header da Sidebar (Logo & Marca)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header da Sidebar (Logo & Marca)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.domain_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SeatMap',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.domain_rounded,
-                    color: Colors.white,
-                    size: 22,
+                  Text(
+                    'WORKSPACE SUITE',
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  child: Text(
+                    'PRINCIPAL',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SeatMap',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
+
+                // 0. Menu Item: Início (Visão Geral)
+                _buildSidebarNavItem(
+                  icon: Icons.dashboard_rounded,
+                  label: 'Início (Visão Geral)',
+                  isActive: activeIndex == 0,
+                  onTap: () => _onTabSelected(0, isAdmin, isDrawer: isDrawer),
+                ),
+
+                const SizedBox(height: 12),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  child: Text(
+                    'ESPAÇOS DE TRABALHO',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
                     ),
-                    Text(
-                      'WORKSPACE SUITE',
+                  ),
+                ),
+
+                // 1. Menu Pai: Mapa de Assentos
+                _buildParentMenuItem(
+                  icon: Icons.map_rounded,
+                  label: 'Mapa de Assentos',
+                  isActive: activeIndex == 1,
+                  isExpanded: _mapaExpanded,
+                  onTap: () {
+                    _onTabSelected(1, isAdmin, isDrawer: isDrawer);
+                    setState(() => _mapaExpanded = !_mapaExpanded);
+                  },
+                  onExpandToggle: () => setState(() => _mapaExpanded = !_mapaExpanded),
+                ),
+
+                // Submenus de Escritórios
+                if (_mapaExpanded) ...[
+                  _buildSubmenuItem(
+                    icon: Icons.business_outlined,
+                    label: 'Escritório Berrini',
+                    badgeText: '102 Assentos',
+                    badgeColor: const Color(0xFF38BDF8),
+                    isActive: isBerriniAtivo,
+                    onTap: () => _selecionarEscritorio('Berrini', isDrawer: isDrawer),
+                  ),
+                  _buildSubmenuItem(
+                    icon: Icons.apartment_outlined,
+                    label: 'Escritório Barueri',
+                    badgeText: '66 Assentos',
+                    badgeColor: const Color(0xFF38BDF8),
+                    isActive: isBarueriAtivo,
+                    onTap: () => _selecionarEscritorio('Barueri', isDrawer: isDrawer),
+                  ),
+                ],
+
+                const SizedBox(height: 12),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  child: Text(
+                    'MINHA JORNADA',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+
+                // 2. Menu Item: Check-in QR Code
+                _buildSidebarNavItem(
+                  icon: Icons.qr_code_scanner_rounded,
+                  label: 'Check-in QR Code',
+                  badgeText: seatProvider.reservaHoje != null
+                      ? (seatProvider.reservaHoje!.checkinRealizado ? 'Confirmado' : 'Hoje')
+                      : null,
+                  badgeColor: seatProvider.reservaHoje != null
+                      ? (seatProvider.reservaHoje!.checkinRealizado ? const Color(0xFF16A34A) : const Color(0xFFEAB308))
+                      : null,
+                  isActive: activeIndex == 2,
+                  onTap: () => _onTabSelected(2, isAdmin, isDrawer: isDrawer),
+                ),
+
+                const SizedBox(height: 4),
+
+                // 3. Menu Pai: Minhas Reservas
+                _buildParentMenuItem(
+                  icon: Icons.event_seat_rounded,
+                  label: 'Minhas Reservas',
+                  isActive: activeIndex == 3,
+                  isExpanded: _reservasExpanded,
+                  count: seatProvider.minhasReservas.length,
+                  onTap: () {
+                    _onTabSelected(3, isAdmin, isDrawer: isDrawer);
+                    setState(() => _reservasExpanded = !_reservasExpanded);
+                  },
+                  onExpandToggle: () => setState(() => _reservasExpanded = !_reservasExpanded),
+                ),
+
+                // Submenus de Filtros de Reserva
+                if (_reservasExpanded) ...[
+                  _buildSubmenuItem(
+                    icon: Icons.check_circle_outline,
+                    iconColor: const Color(0xFF16A34A),
+                    label: 'Reservas Ativas',
+                    count: seatProvider.totalAtivas,
+                    badgeColor: const Color(0xFF16A34A),
+                    isActive: activeIndex == 3 && filtroAtual == ReservaFiltro.ativas,
+                    onTap: () => _selecionarFiltroReservas(ReservaFiltro.ativas, isDrawer: isDrawer),
+                  ),
+                  _buildSubmenuItem(
+                    icon: Icons.task_alt_rounded,
+                    iconColor: const Color(0xFF2563EB),
+                    label: 'Reservas Concluídas',
+                    count: seatProvider.totalConcluidas,
+                    badgeColor: const Color(0xFF2563EB),
+                    isActive: activeIndex == 3 && filtroAtual == ReservaFiltro.concluidas,
+                    onTap: () => _selecionarFiltroReservas(ReservaFiltro.concluidas, isDrawer: isDrawer),
+                  ),
+                  _buildSubmenuItem(
+                    icon: Icons.cancel_outlined,
+                    iconColor: const Color(0xFF64748B),
+                    label: 'Reservas Canceladas',
+                    count: seatProvider.totalCanceladas,
+                    badgeColor: const Color(0xFF64748B),
+                    isActive: activeIndex == 3 && filtroAtual == ReservaFiltro.canceladas,
+                    onTap: () => _selecionarFiltroReservas(ReservaFiltro.canceladas, isDrawer: isDrawer),
+                  ),
+                  _buildSubmenuItem(
+                    icon: Icons.person_off_outlined,
+                    iconColor: const Color(0xFFDC2626),
+                    label: 'Não Comparecidas',
+                    count: seatProvider.totalNaoComparecidas,
+                    badgeColor: const Color(0xFFDC2626),
+                    isActive: activeIndex == 3 && filtroAtual == ReservaFiltro.naoComparecidas,
+                    onTap: () => _selecionarFiltroReservas(ReservaFiltro.naoComparecidas, isDrawer: isDrawer),
+                  ),
+                ],
+
+                // 4. Menu de Administração RH
+                if (isAdmin) ...[
+                  const SizedBox(height: 16),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    child: Text(
+                      'ADMINISTRAÇÃO',
                       style: TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
                       ),
                     ),
-                  ],
+                  ),
+                  _buildSidebarNavItem(
+                    icon: Icons.admin_panel_settings_rounded,
+                    label: 'Painel RH & Gestão',
+                    isActive: activeIndex == 4,
+                    onTap: () => _onTabSelected(4, isAdmin, isDrawer: isDrawer),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+
+        // Card do Usuário Logado no Rodapé da Sidebar
+        if (user != null)
+          Container(
+            margin: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 17,
+                  backgroundColor: user.isAdmin
+                      ? const Color(0xFF7C3AED)
+                      : (user.isGestao ? const Color(0xFF0F766E) : const Color(0xFF2563EB)),
+                  child: Text(
+                    user.nome.isNotEmpty ? user.nome[0].toUpperCase() : 'U',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.nome,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        user.perfil,
+                        style: TextStyle(
+                          color: user.isAdmin
+                              ? const Color(0xFFA78BFA)
+                              : (user.isGestao ? const Color(0xFF5EEAD4) : const Color(0xFF93C5FD)),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded, color: Color(0xFF94A3B8), size: 18),
+                  tooltip: 'Encerrar Sessão',
+                  onPressed: _confirmLogout,
                 ),
               ],
             ),
           ),
-
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                    child: Text(
-                      'PRINCIPAL',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ),
-
-                  // 0. Menu Item: Início (Visão Geral)
-                  _buildSidebarNavItem(
-                    icon: Icons.dashboard_rounded,
-                    label: 'Início (Visão Geral)',
-                    isActive: activeIndex == 0,
-                    onTap: () => _onTabSelected(0, isAdmin),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                    child: Text(
-                      'ESPAÇOS DE TRABALHO',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ),
-
-                  // 1. Menu Pai: Mapa de Assentos
-                  _buildParentMenuItem(
-                    icon: Icons.map_rounded,
-                    label: 'Mapa de Assentos',
-                    isActive: activeIndex == 1,
-                    isExpanded: _mapaExpanded,
-                    onTap: () {
-                      _onTabSelected(1, isAdmin);
-                      setState(() => _mapaExpanded = !_mapaExpanded);
-                    },
-                    onExpandToggle: () => setState(() => _mapaExpanded = !_mapaExpanded),
-                  ),
-
-                  // Submenus de Escritórios
-                  if (_mapaExpanded) ...[
-                    _buildSubmenuItem(
-                      icon: Icons.business_outlined,
-                      label: 'Escritório Berrini',
-                      badgeText: '102 Assentos',
-                      badgeColor: const Color(0xFF38BDF8),
-                      isActive: isBerriniAtivo,
-                      onTap: () => _selecionarEscritorio('Berrini'),
-                    ),
-                    _buildSubmenuItem(
-                      icon: Icons.apartment_outlined,
-                      label: 'Escritório Barueri',
-                      badgeText: '66 Assentos',
-                      badgeColor: const Color(0xFF38BDF8),
-                      isActive: isBarueriAtivo,
-                      onTap: () => _selecionarEscritorio('Barueri'),
-                    ),
-                  ],
-
-                  const SizedBox(height: 12),
-
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                    child: Text(
-                      'MINHA JORNADA',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ),
-
-                  // 2. Menu Item: Check-in QR Code
-                  _buildSidebarNavItem(
-                    icon: Icons.qr_code_scanner_rounded,
-                    label: 'Check-in QR Code',
-                    badgeText: seatProvider.reservaHoje != null
-                        ? (seatProvider.reservaHoje!.checkinRealizado ? 'Confirmado' : 'Hoje')
-                        : null,
-                    badgeColor: seatProvider.reservaHoje != null
-                        ? (seatProvider.reservaHoje!.checkinRealizado ? const Color(0xFF16A34A) : const Color(0xFFEAB308))
-                        : null,
-                    isActive: activeIndex == 2,
-                    onTap: () => _onTabSelected(2, isAdmin),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  // 3. Menu Pai: Minhas Reservas
-                  _buildParentMenuItem(
-                    icon: Icons.event_seat_rounded,
-                    label: 'Minhas Reservas',
-                    isActive: activeIndex == 3,
-                    isExpanded: _reservasExpanded,
-                    count: seatProvider.minhasReservas.length,
-                    onTap: () {
-                      _onTabSelected(3, isAdmin);
-                      setState(() => _reservasExpanded = !_reservasExpanded);
-                    },
-                    onExpandToggle: () => setState(() => _reservasExpanded = !_reservasExpanded),
-                  ),
-
-                  // Submenus de Filtros de Reserva
-                  if (_reservasExpanded) ...[
-                    _buildSubmenuItem(
-                      icon: Icons.check_circle_outline,
-                      iconColor: const Color(0xFF16A34A),
-                      label: 'Reservas Ativas',
-                      count: seatProvider.totalAtivas,
-                      badgeColor: const Color(0xFF16A34A),
-                      isActive: activeIndex == 3 && filtroAtual == ReservaFiltro.ativas,
-                      onTap: () => _selecionarFiltroReservas(ReservaFiltro.ativas),
-                    ),
-                    _buildSubmenuItem(
-                      icon: Icons.task_alt_rounded,
-                      iconColor: const Color(0xFF2563EB),
-                      label: 'Reservas Concluídas',
-                      count: seatProvider.totalConcluidas,
-                      badgeColor: const Color(0xFF2563EB),
-                      isActive: activeIndex == 3 && filtroAtual == ReservaFiltro.concluidas,
-                      onTap: () => _selecionarFiltroReservas(ReservaFiltro.concluidas),
-                    ),
-                    _buildSubmenuItem(
-                      icon: Icons.cancel_outlined,
-                      iconColor: const Color(0xFF64748B),
-                      label: 'Reservas Canceladas',
-                      count: seatProvider.totalCanceladas,
-                      badgeColor: const Color(0xFF64748B),
-                      isActive: activeIndex == 3 && filtroAtual == ReservaFiltro.canceladas,
-                      onTap: () => _selecionarFiltroReservas(ReservaFiltro.canceladas),
-                    ),
-                    _buildSubmenuItem(
-                      icon: Icons.person_off_outlined,
-                      iconColor: const Color(0xFFDC2626),
-                      label: 'Não Comparecidas',
-                      count: seatProvider.totalNaoComparecidas,
-                      badgeColor: const Color(0xFFDC2626),
-                      isActive: activeIndex == 3 && filtroAtual == ReservaFiltro.naoComparecidas,
-                      onTap: () => _selecionarFiltroReservas(ReservaFiltro.naoComparecidas),
-                    ),
-                  ],
-
-                  // 4. Menu de Administração RH
-                  if (isAdmin) ...[
-                    const SizedBox(height: 16),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                      child: Text(
-                        'ADMINISTRAÇÃO',
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                    _buildSidebarNavItem(
-                      icon: Icons.admin_panel_settings_rounded,
-                      label: 'Painel RH & Gestão',
-                      isActive: activeIndex == 4,
-                      onTap: () => _onTabSelected(4, isAdmin),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-
-          // Card do Usuário Logado no Rodapé da Sidebar
-          if (user != null)
-            Container(
-              margin: const EdgeInsets.all(14),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 17,
-                    backgroundColor: user.isAdmin
-                        ? const Color(0xFF7C3AED)
-                        : (user.isGestao ? const Color(0xFF0F766E) : const Color(0xFF2563EB)),
-                    child: Text(
-                      user.nome.isNotEmpty ? user.nome[0].toUpperCase() : 'U',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.nome,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          user.perfil,
-                          style: TextStyle(
-                            color: user.isAdmin
-                                ? const Color(0xFFA78BFA)
-                                : (user.isGestao ? const Color(0xFF5EEAD4) : const Color(0xFF93C5FD)),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.logout_rounded, color: Color(0xFF94A3B8), size: 18),
-                    tooltip: 'Encerrar Sessão',
-                    onPressed: _confirmLogout,
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -722,7 +927,7 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
-  /// Top Bar Corporativa Superior Contextual
+  /// Top Bar Corporativa Superior Contextual Desktop
   Widget _buildCorporateTopBar(
     BuildContext context,
     UserModel? user,

@@ -960,7 +960,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   // ==========================================
   Widget _buildTabUsuarios() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
@@ -971,100 +971,141 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                 elevation: 1,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
+                  padding: const EdgeInsets.all(14),
+                  child: LayoutBuilder(
+                    builder: (context, filterConstraints) {
+                      final isMobileFilter = filterConstraints.maxWidth < 650;
+
+                      final searchField = TextField(
+                        controller: _searchUsuarioController,
+                        decoration: const InputDecoration(
+                          hintText: 'Buscar por nome, e-mail ou matrícula...',
+                          prefixIcon: Icon(Icons.search),
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        onSubmitted: (_) => _carregarUsuarios(),
+                      );
+
+                      final btnBuscar = ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                        icon: const Icon(Icons.search),
+                        label: const Text('Buscar'),
+                        onPressed: _carregarUsuarios,
+                      );
+
+                      final btnNovo = ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F172A),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                        icon: const Icon(Icons.person_add),
+                        label: const Text('Novo Usuário'),
+                        onPressed: () => _abrirModalUsuario(),
+                      );
+
+                      final dropDepto = DropdownButtonFormField<String>(
+                        initialValue: _filtroDepUsuario,
+                        decoration: const InputDecoration(labelText: 'Departamento', isDense: true, border: OutlineInputBorder()),
+                        items: [
+                          const DropdownMenuItem(value: 'todos', child: Text('Todos os Departamentos', overflow: TextOverflow.ellipsis)),
+                          ..._departamentos.map((d) => DropdownMenuItem(value: d.id.toString(), child: Text(d.nome, overflow: TextOverflow.ellipsis))),
+                        ],
+                        onChanged: (v) {
+                          setState(() => _filtroDepUsuario = v ?? 'todos');
+                          _carregarUsuarios();
+                        },
+                      );
+
+                      final dropPerfil = DropdownButtonFormField<String>(
+                        initialValue: _filtroPerfilUsuario,
+                        decoration: const InputDecoration(labelText: 'Perfil', isDense: true, border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: 'todos', child: Text('Todos os Perfis')),
+                          DropdownMenuItem(value: 'COLABORADOR', child: Text('Colaborador')),
+                          DropdownMenuItem(value: 'GESTAO', child: Text('Gestão')),
+                          DropdownMenuItem(value: 'ADMIN_RH', child: Text('Administrador RH')),
+                        ],
+                        onChanged: (v) {
+                          setState(() => _filtroPerfilUsuario = v ?? 'todos');
+                          _carregarUsuarios();
+                        },
+                      );
+
+                      final dropStatus = DropdownButtonFormField<String>(
+                        initialValue: _filtroStatusUsuario,
+                        decoration: const InputDecoration(labelText: 'Status', isDense: true, border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: 'todos', child: Text('Todos os Status')),
+                          DropdownMenuItem(value: 'true', child: Text('Apenas Ativos')),
+                          DropdownMenuItem(value: 'false', child: Text('Apenas Inativos')),
+                        ],
+                        onChanged: (v) {
+                          setState(() => _filtroStatusUsuario = v ?? 'todos');
+                          _carregarUsuarios();
+                        },
+                      );
+
+                      if (isMobileFilter) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(child: searchField),
+                                const SizedBox(width: 8),
+                                IconButton.filled(
+                                  style: IconButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+                                  icon: const Icon(Icons.search, color: Colors.white),
+                                  onPressed: _carregarUsuarios,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            btnNovo,
+                            const SizedBox(height: 12),
+                            dropDepto,
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(child: dropPerfil),
+                                const SizedBox(width: 10),
+                                Expanded(child: dropStatus),
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Column(
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _searchUsuarioController,
-                              decoration: const InputDecoration(
-                                hintText: 'Buscar por nome, e-mail ou matrícula...',
-                                prefixIcon: Icon(Icons.search),
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                              ),
-                              onSubmitted: (_) => _carregarUsuarios(),
-                            ),
+                          Row(
+                            children: [
+                              Expanded(child: searchField),
+                              const SizedBox(width: 12),
+                              btnBuscar,
+                              const SizedBox(width: 12),
+                              btnNovo,
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConstants.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            ),
-                            icon: const Icon(Icons.search),
-                            label: const Text('Buscar'),
-                            onPressed: _carregarUsuarios,
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F172A),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            ),
-                            icon: const Icon(Icons.person_add),
-                            label: const Text('Novo Usuário'),
-                            onPressed: () => _abrirModalUsuario(),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: dropDepto),
+                              const SizedBox(width: 12),
+                              Expanded(child: dropPerfil),
+                              const SizedBox(width: 12),
+                              Expanded(child: dropStatus),
+                            ],
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                    initialValue: _filtroDepUsuario,
-                              decoration: const InputDecoration(labelText: 'Departamento', isDense: true, border: OutlineInputBorder()),
-                              items: [
-                                const DropdownMenuItem(value: 'todos', child: Text('Todos os Departamentos')),
-                                ..._departamentos.map((d) => DropdownMenuItem(value: d.id.toString(), child: Text(d.nome))),
-                              ],
-                              onChanged: (v) {
-                                setState(() => _filtroDepUsuario = v ?? 'todos');
-                                _carregarUsuarios();
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                    initialValue: _filtroPerfilUsuario,
-                              decoration: const InputDecoration(labelText: 'Perfil', isDense: true, border: OutlineInputBorder()),
-                              items: const [
-                                DropdownMenuItem(value: 'todos', child: Text('Todos os Perfis')),
-                                DropdownMenuItem(value: 'COLABORADOR', child: Text('Colaborador')),
-                                DropdownMenuItem(value: 'GESTAO', child: Text('Gestão')),
-                                DropdownMenuItem(value: 'ADMIN_RH', child: Text('Administrador RH')),
-                              ],
-                              onChanged: (v) {
-                                setState(() => _filtroPerfilUsuario = v ?? 'todos');
-                                _carregarUsuarios();
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                    initialValue: _filtroStatusUsuario,
-                              decoration: const InputDecoration(labelText: 'Status', isDense: true, border: OutlineInputBorder()),
-                              items: const [
-                                DropdownMenuItem(value: 'todos', child: Text('Todos os Status')),
-                                DropdownMenuItem(value: 'true', child: Text('Apenas Ativos')),
-                                DropdownMenuItem(value: 'false', child: Text('Apenas Inativos')),
-                              ],
-                              onChanged: (v) {
-                                setState(() => _filtroStatusUsuario = v ?? 'todos');
-                                _carregarUsuarios();
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -1101,15 +1142,25 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                         itemBuilder: (ctx, i) {
                           final u = _usuarios[i];
                           return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                             leading: CircleAvatar(
                               backgroundColor: u.ativo ? const Color(0xFF0F172A) : Colors.grey.shade400,
                               foregroundColor: Colors.white,
                               child: Text(u.nome.isNotEmpty ? u.nome[0].toUpperCase() : 'U'),
                             ),
-                            title: Row(
+                            title: Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Text(u.nome, style: TextStyle(fontWeight: FontWeight.bold, color: u.ativo ? Colors.black87 : Colors.grey)),
-                                const SizedBox(width: 8),
+                                Text(
+                                  u.nome,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: u.ativo ? const Color(0xFF0F172A) : Colors.grey,
+                                  ),
+                                ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -1129,7 +1180,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                                   ),
                                 ),
                                 if (u.permissaoRh) ...[
-                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -1154,7 +1204,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                                     ),
                                   ),
                                 ],
-                                const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -1173,26 +1222,32 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                                 ),
                               ],
                             ),
-                            subtitle: Text(
-                              'Matrícula: ${u.matricula} | E-mail: ${u.email} | Depto: ${u.departamentoNome ?? "Geral"} | Reservas Ativas: ${u.totalReservasAtivas}',
-                              style: const TextStyle(fontSize: 12),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Matrícula: ${u.matricula} | Depto: ${u.departamentoNome ?? "Geral"}\nE-mail: ${u.email}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              ),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 20),
+                                  icon: const Icon(Icons.edit_outlined, size: 18),
                                   tooltip: 'Editar Usuário',
                                   onPressed: () => _abrirModalUsuario(usuario: u),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.lock_reset, size: 20),
+                                  icon: const Icon(Icons.lock_reset, size: 18),
                                   tooltip: 'Redefinir Senha',
                                   onPressed: () => _abrirModalResetSenha(u),
                                 ),
                                 IconButton(
-                                  icon: Icon(u.ativo ? Icons.person_off_outlined : Icons.person_outline,
-                                      size: 20, color: u.ativo ? Colors.red.shade600 : Colors.green.shade700),
+                                  icon: Icon(
+                                    u.ativo ? Icons.person_off_outlined : Icons.person_outline,
+                                    size: 18,
+                                    color: u.ativo ? Colors.red.shade600 : Colors.green.shade700,
+                                  ),
                                   tooltip: u.ativo ? 'Desativar Usuário' : 'Reativar Usuário',
                                   onPressed: () => _toggleStatusUsuario(u),
                                 ),
@@ -1374,7 +1429,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   // ==========================================
   Widget _buildTabReservas() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100),
@@ -1385,112 +1440,155 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                 elevation: 1,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
+                  padding: const EdgeInsets.all(14),
+                  child: LayoutBuilder(
+                    builder: (context, filterConstraints) {
+                      final isMobileFilter = filterConstraints.maxWidth < 700;
+
+                      final searchField = TextField(
+                        controller: _searchReservaController,
+                        decoration: const InputDecoration(
+                          hintText: 'Buscar por colaborador, matrícula ou assento...',
+                          prefixIcon: Icon(Icons.search),
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        onSubmitted: (_) => _carregarReservas(),
+                      );
+
+                      final btnFiltrar = ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                        icon: const Icon(Icons.search),
+                        label: const Text('Filtrar'),
+                        onPressed: _carregarReservas,
+                      );
+
+                      final btnDataInicio = OutlinedButton.icon(
+                        icon: const Icon(Icons.date_range, size: 16),
+                        label: Text('De: ${DateFormat("dd/MM/yyyy").format(_filtroDataInicio)}', style: const TextStyle(fontSize: 12)),
+                        onPressed: () async {
+                          final p = await showDatePicker(
+                            context: context,
+                            initialDate: _filtroDataInicio,
+                            firstDate: DateTime(2025),
+                            lastDate: DateTime(2030),
+                          );
+                          if (p != null) {
+                            setState(() => _filtroDataInicio = p);
+                            _carregarReservas();
+                          }
+                        },
+                      );
+
+                      final btnDataFim = OutlinedButton.icon(
+                        icon: const Icon(Icons.date_range, size: 16),
+                        label: Text('Até: ${DateFormat("dd/MM/yyyy").format(_filtroDataFim)}', style: const TextStyle(fontSize: 12)),
+                        onPressed: () async {
+                          final p = await showDatePicker(
+                            context: context,
+                            initialDate: _filtroDataFim,
+                            firstDate: DateTime(2025),
+                            lastDate: DateTime(2030),
+                          );
+                          if (p != null) {
+                            setState(() => _filtroDataFim = p);
+                            _carregarReservas();
+                          }
+                        },
+                      );
+
+                      final dropEscritorio = DropdownButtonFormField<String>(
+                        initialValue: _filtroEscritorioReserva,
+                        decoration: const InputDecoration(labelText: 'Escritório', isDense: true, border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: 'todos', child: Text('Todos os Escritórios', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: '1', child: Text('Berrini')),
+                          DropdownMenuItem(value: '2', child: Text('Barueri')),
+                        ],
+                        onChanged: (v) {
+                          setState(() => _filtroEscritorioReserva = v ?? 'todos');
+                          _carregarReservas();
+                        },
+                      );
+
+                      final dropStatus = DropdownButtonFormField<String>(
+                        initialValue: _filtroStatusReserva,
+                        decoration: const InputDecoration(labelText: 'Status', isDense: true, border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: 'todos', child: Text('Todos os Status')),
+                          DropdownMenuItem(value: 'ATIVA', child: Text('Ativa')),
+                          DropdownMenuItem(value: 'CANCELADA', child: Text('Cancelada')),
+                          DropdownMenuItem(value: 'EXPIRADA_NOSHOW', child: Text('No-Show')),
+                        ],
+                        onChanged: (v) {
+                          setState(() => _filtroStatusReserva = v ?? 'todos');
+                          _carregarReservas();
+                        },
+                      );
+
+                      if (isMobileFilter) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(child: searchField),
+                                const SizedBox(width: 8),
+                                IconButton.filled(
+                                  style: IconButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+                                  icon: const Icon(Icons.search, color: Colors.white),
+                                  onPressed: _carregarReservas,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(child: btnDataInicio),
+                                const SizedBox(width: 8),
+                                Expanded(child: btnDataFim),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(child: dropEscritorio),
+                                const SizedBox(width: 8),
+                                Expanded(child: dropStatus),
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Column(
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _searchReservaController,
-                              decoration: const InputDecoration(
-                                hintText: 'Buscar por colaborador, matrícula ou assento...',
-                                prefixIcon: Icon(Icons.search),
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                              ),
-                              onSubmitted: (_) => _carregarReservas(),
-                            ),
+                          Row(
+                            children: [
+                              Expanded(child: searchField),
+                              const SizedBox(width: 12),
+                              btnFiltrar,
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConstants.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            ),
-                            icon: const Icon(Icons.search),
-                            label: const Text('Filtrar'),
-                            onPressed: _carregarReservas,
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: btnDataInicio),
+                              const SizedBox(width: 8),
+                              Expanded(child: btnDataFim),
+                              const SizedBox(width: 8),
+                              Expanded(child: dropEscritorio),
+                              const SizedBox(width: 8),
+                              Expanded(child: dropStatus),
+                            ],
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.date_range, size: 18),
-                              label: Text('De: ${DateFormat("dd/MM/yyyy").format(_filtroDataInicio)}'),
-                              onPressed: () async {
-                                final p = await showDatePicker(
-                                  context: context,
-                                  initialDate: _filtroDataInicio,
-                                  firstDate: DateTime(2025),
-                                  lastDate: DateTime(2030),
-                                );
-                                if (p != null) {
-                                  setState(() => _filtroDataInicio = p);
-                                  _carregarReservas();
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.date_range, size: 18),
-                              label: Text('Até: ${DateFormat("dd/MM/yyyy").format(_filtroDataFim)}'),
-                              onPressed: () async {
-                                final p = await showDatePicker(
-                                  context: context,
-                                  initialDate: _filtroDataFim,
-                                  firstDate: DateTime(2025),
-                                  lastDate: DateTime(2030),
-                                );
-                                if (p != null) {
-                                  setState(() => _filtroDataFim = p);
-                                  _carregarReservas();
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                    initialValue: _filtroEscritorioReserva,
-                              decoration: const InputDecoration(labelText: 'Escritório', isDense: true, border: OutlineInputBorder()),
-                              items: const [
-                                DropdownMenuItem(value: 'todos', child: Text('Todos os Escritórios')),
-                                DropdownMenuItem(value: '1', child: Text('Berrini')),
-                                DropdownMenuItem(value: '2', child: Text('Barueri')),
-                              ],
-                              onChanged: (v) {
-                                setState(() => _filtroEscritorioReserva = v ?? 'todos');
-                                _carregarReservas();
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                    initialValue: _filtroStatusReserva,
-                              decoration: const InputDecoration(labelText: 'Status', isDense: true, border: OutlineInputBorder()),
-                              items: const [
-                                DropdownMenuItem(value: 'todos', child: Text('Todos os Status')),
-                                DropdownMenuItem(value: 'ATIVA', child: Text('Ativa')),
-                                DropdownMenuItem(value: 'CANCELADA', child: Text('Cancelada')),
-                                DropdownMenuItem(value: 'EXPIRADA_NOSHOW', child: Text('No-Show')),
-                              ],
-                              onChanged: (v) {
-                                setState(() => _filtroStatusReserva = v ?? 'todos');
-                                _carregarReservas();
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -1528,8 +1626,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                           final r = _reservas[i];
                           final isAtiva = r.status == 'ATIVA';
                           return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                             leading: Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                               decoration: BoxDecoration(
                                 color: isAtiva ? const Color(0xFF0F172A) : Colors.grey.shade300,
                                 borderRadius: BorderRadius.circular(8),
@@ -1539,10 +1638,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                                 style: TextStyle(fontWeight: FontWeight.bold, color: isAtiva ? Colors.white : Colors.grey.shade700),
                               ),
                             ),
-                            title: Row(
+                            title: Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                Text(r.usuarioNome, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 8),
+                                Text(r.usuarioNome, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
@@ -1568,7 +1669,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                                   ),
                                 ),
                                 if (r.checkinRealizado) ...[
-                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -1584,21 +1684,17 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                                 ],
                               ],
                             ),
-                            subtitle: Text(
-                              'Data: ${r.dataReserva} | Local: ${r.escritorioNome} - ${r.baiaNome} | Matrícula: ${r.matricula} | Depto: ${r.departamentoNome ?? "Geral"}',
-                              style: const TextStyle(fontSize: 12),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Data: ${r.dataReserva} | Local: ${r.escritorioNome} - ${r.baiaNome}\nMatrícula: ${r.matricula} | Depto: ${r.departamentoNome ?? "Geral"}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              ),
                             ),
                             trailing: isAtiva
-                                ? ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade50,
-                                      foregroundColor: Colors.red.shade700,
-                                      elevation: 0,
-                                      side: BorderSide(color: Colors.red.shade200),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    ),
-                                    icon: const Icon(Icons.cancel_outlined, size: 16),
-                                    label: const Text('Cancelar Reserva', style: TextStyle(fontSize: 12)),
+                                ? IconButton(
+                                    icon: const Icon(Icons.cancel_outlined, size: 20, color: Colors.red),
+                                    tooltip: 'Cancelar Reserva',
                                     onPressed: () => _abrirModalCancelarReserva(r),
                                   )
                                 : null,
