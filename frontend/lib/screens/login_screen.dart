@@ -449,6 +449,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             backgroundColor: const Color(0xFF7C3AED),
                             onPressed: () => _prefillUser('admin@seatmap.local', '123456'),
                           ),
+                          ActionChip(
+                            avatar: const Icon(Icons.terminal, size: 16, color: Colors.white),
+                            label: const Text('Admin TI', style: TextStyle(color: Colors.white, fontSize: 12)),
+                            backgroundColor: const Color(0xFF0F172A),
+                            onPressed: () => _prefillUser('ti@seatmap.local', '123456'),
+                          ),
                         ],
                       ),
                     ],

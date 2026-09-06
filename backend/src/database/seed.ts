@@ -39,12 +39,13 @@ async function runSeed() {
     // 4. Inserir Usuários de Teste
     const defaultPasswordHash = await bcrypt.hash('123456', 10);
     const resUsers = await client.query(`
-      INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, ativo) VALUES
-      ('Carlos Silva', 'colaborador@seatmap.local', 'COLAB001', $1, $2, 'COLABORADOR', true),
-      ('Mariana Costa', 'gestao@seatmap.local', 'GEST001', $1, $3, 'GESTAO', true),
-      ('Fernanda Lima', 'admin@seatmap.local', 'ADMIN001', $1, $4, 'ADMIN_RH', true),
-      ('Lucas Mendes', 'lucas.ti@seatmap.local', 'COLAB002', $1, $2, 'COLABORADOR', true),
-      ('Beatriz Rocha', 'beatriz.jur@seatmap.local', 'COLAB003', $1, $5, 'COLABORADOR', true)
+      INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, permissao_ti, ativo) VALUES
+      ('Carlos Silva', 'colaborador@seatmap.local', 'COLAB001', $1, $2, 'COLABORADOR', false, false, true),
+      ('Mariana Costa', 'gestao@seatmap.local', 'GEST001', $1, $3, 'GESTAO', false, false, true),
+      ('Fernanda Lima', 'admin@seatmap.local', 'ADMIN001', $1, $4, 'ADMIN_RH', true, false, true),
+      ('Administrador TI', 'ti@seatmap.local', 'TI001', $1, $2, 'ADMIN_TI', false, true, true),
+      ('Lucas Mendes', 'lucas.ti@seatmap.local', 'COLAB002', $1, $2, 'COLABORADOR', false, false, true),
+      ('Beatriz Rocha', 'beatriz.jur@seatmap.local', 'COLAB003', $1, $5, 'COLABORADOR', false, false, true)
       RETURNING id, nome, email, perfil;
     `, [defaultPasswordHash, tiId, operacoesId, rhId, juridicoId]);
     console.log(`[Seed] Inseridos ${resUsers.rowCount} usuários de teste.`);
@@ -314,6 +315,12 @@ async function runSeed() {
       ('AVISO_GLOBAL_SISTEMA', '', 'Mensagem institucional de aviso em tempo real exibida no topo do app'),
       ('MFA_EXPIRACAO_MINUTOS', '10', 'Tempo de validade do código MFA enviado por e-mail (em minutos)'),
       ('MFA_MAX_TENTATIVAS', '3', 'Quantidade máxima de tentativas inválidas de MFA antes de bloquear o código'),
+      ('SMTP_HOST', '', 'Servidor SMTP para envio de e-mails'),
+      ('SMTP_PORT', '587', 'Porta do servidor SMTP (ex: 587, 465, 2525)'),
+      ('SMTP_SECURE', 'false', 'Utilizar SSL/TLS direto (true para porta 465, false para 587/STARTTLS)'),
+      ('SMTP_USER', '', 'Usuário ou e-mail de autenticação SMTP'),
+      ('SMTP_PASS', '', 'Senha de aplicativo ou token de autenticação SMTP'),
+      ('EMAIL_FROM', '"SeatMap Corporativo" <nao-responda@seatmap.local>', 'Nome e e-mail remetente padrão'),
       ('TIMEZONE', 'America/Sao_Paulo', 'Fuso horário oficial do sistema')
       ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, descricao = EXCLUDED.descricao;
     `);

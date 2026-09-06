@@ -9,8 +9,6 @@ class TabPoliticasRelatorios extends StatelessWidget {
   final TextEditingController horarioInicioCheckinController;
   final TextEditingController horarioCheckinController;
   final TextEditingController avisoGlobalController;
-  final TextEditingController mfaExpiracaoController;
-  final TextEditingController mfaTentativasController;
   final String diaGestao;
   final String diaColab;
   final bool permitirTroca;
@@ -33,8 +31,6 @@ class TabPoliticasRelatorios extends StatelessWidget {
     required this.horarioInicioCheckinController,
     required this.horarioCheckinController,
     required this.avisoGlobalController,
-    required this.mfaExpiracaoController,
-    required this.mfaTentativasController,
     required this.diaGestao,
     required this.diaColab,
     required this.permitirTroca,
@@ -311,93 +307,22 @@ class TabPoliticasRelatorios extends StatelessWidget {
                           border: OutlineInputBorder(),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0F172A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.save_rounded, size: 18),
+                          label: const Text('Salvar Parâmetros e Políticas', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: onSalvarParametros,
+                        ),
+                      ),
                     ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // 4. CARD: SEGURANÇA E MFA STEP-UP
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: LayoutBuilder(
-                    builder: (context, secConstraints) {
-                      final isMobile = secConstraints.maxWidth < 620;
-
-                      final inputMfaExp = TextFormField(
-                        controller: mfaExpiracaoController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Expiração MFA (Minutos)',
-                          hintText: '10',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.timer_outlined, size: 20),
-                        ),
-                      );
-
-                      final inputMfaTent = TextFormField(
-                        controller: mfaTentativasController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Máximo de Tentativas MFA',
-                          hintText: '3',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.shield_outlined, size: 20),
-                        ),
-                      );
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.security_rounded, color: Color(0xFF7C3AED), size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Segurança & Autenticação Step-Up (MFA)',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          if (isMobile) ...[
-                            inputMfaExp,
-                            const SizedBox(height: 12),
-                            inputMfaTent,
-                          ] else ...[
-                            Row(
-                              children: [
-                                Expanded(child: inputMfaExp),
-                                const SizedBox(width: 12),
-                                Expanded(child: inputMfaTent),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 20),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0F172A),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              icon: const Icon(Icons.save_rounded, size: 18),
-                              label: const Text('Salvar Todas as Configurações', style: TextStyle(fontWeight: FontWeight.bold)),
-                              onPressed: onSalvarParametros,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
                   ),
                 ),
               ),

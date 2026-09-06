@@ -148,6 +148,17 @@ export class WsManager {
       }
     });
   }
+
+  public getClientCount(): number {
+    return this.wss ? this.wss.clients.size : 0;
+  }
+
+  public getRoomsInfo(): { totalClients: number; activeRooms: number } {
+    return {
+      totalClients: this.wss ? this.wss.clients.size : 0,
+      activeRooms: this.rooms.size
+    };
+  }
 }
 
 export const wsManager = WsManager.getInstance();

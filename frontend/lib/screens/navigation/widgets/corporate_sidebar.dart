@@ -6,6 +6,9 @@ import '../../../providers/seat_map_provider.dart';
 class CorporateSidebar extends StatelessWidget {
   final UserModel? user;
   final bool isAdmin;
+  final bool isTi;
+  final int? adminTabIndex;
+  final int? tiTabIndex;
   final int activeIndex;
   final SeatMapProvider seatProvider;
   final bool mapaExpanded;
@@ -22,6 +25,9 @@ class CorporateSidebar extends StatelessWidget {
     super.key,
     required this.user,
     required this.isAdmin,
+    this.isTi = false,
+    this.adminTabIndex,
+    this.tiTabIndex,
     required this.activeIndex,
     required this.seatProvider,
     required this.mapaExpanded,
@@ -261,13 +267,13 @@ class CorporateSidebar extends StatelessWidget {
                   ),
                 ],
 
-                // 4. Menu de Administração RH
-                if (isAdmin) ...[
+                // 4. Menu de Administração RH e TI
+                if (isAdmin || isTi) ...[
                   const SizedBox(height: 16),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                     child: Text(
-                      'ADMINISTRAÇÃO',
+                      'ADMINISTRAÇÃO & TI',
                       style: TextStyle(
                         color: Color(0xFF64748B),
                         fontSize: 10,
@@ -276,12 +282,20 @@ class CorporateSidebar extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _buildSidebarNavItem(
-                    icon: Icons.admin_panel_settings_rounded,
-                    label: 'Painel RH & Gestão',
-                    isActive: activeIndex == 4,
-                    onTap: () => onSelectTab(4),
-                  ),
+                  if (isAdmin && adminTabIndex != null)
+                    _buildSidebarNavItem(
+                      icon: Icons.admin_panel_settings_rounded,
+                      label: 'Painel RH & Gestão',
+                      isActive: activeIndex == adminTabIndex,
+                      onTap: () => onSelectTab(adminTabIndex!),
+                    ),
+                  if (isTi && tiTabIndex != null)
+                    _buildSidebarNavItem(
+                      icon: Icons.terminal_rounded,
+                      label: 'Painel de TI & Infra',
+                      isActive: activeIndex == tiTabIndex,
+                      onTap: () => onSelectTab(tiTabIndex!),
+                    ),
                 ],
               ],
             ),

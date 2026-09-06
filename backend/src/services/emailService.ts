@@ -1,4 +1,5 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import { ConfigService } from './configService';
 
 export interface ComprovanteEmailData {
   escritorioNome: string;
@@ -14,13 +15,19 @@ export interface ComprovanteEmailData {
 export class EmailService {
   private static transporter: Transporter | null = null;
 
-  private static getTransporter(): Transporter {
+  public static resetTransporter(): void {
+    this.transporter = null;
+  }
+
+  private static async getTransporter(): Promise<Transporter> {
     if (!this.transporter) {
-      const host = process.env.SMTP_HOST;
-      const port = parseInt(process.env.SMTP_PORT || '587', 10);
-      const user = process.env.SMTP_USER;
-      const pass = process.env.SMTP_PASS;
-      const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+      const host = (await ConfigService.get('SMTP_HOST')) || process.env.SMTP_HOST;
+      const portStr = (await ConfigService.get('SMTP_PORT')) || process.env.SMTP_PORT || '587';
+      const port = parseInt(portStr, 10);
+      const user = (await ConfigService.get('SMTP_USER')) || process.env.SMTP_USER;
+      const pass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS;
+      const secureStr = (await ConfigService.get('SMTP_SECURE')) || process.env.SMTP_SECURE;
+      const secure = secureStr === 'true' || port === 465;
 
       if (host && user && pass) {
         this.transporter = nodemailer.createTransport({
@@ -40,8 +47,9 @@ export class EmailService {
     return this.transporter;
   }
 
-  private static getFromAddress(): string {
-    return process.env.EMAIL_FROM || '"SeatMap Corporativo" <nao-responda@seatmap.local>';
+  private static async getFromAddress(): Promise<string> {
+    const from = await ConfigService.get('EMAIL_FROM');
+    return from || process.env.EMAIL_FROM || '"SeatMap Corporativo" <nao-responda@seatmap.local>';
   }
 
   /**
@@ -246,6 +254,94 @@ export class EmailService {
   }
 
   /**
+   * 4. Envio de E-mail de Teste da TI
+   */
+  public static async enviarEmailTeste(
+    para: string,
+    nomeOperador: string
+  ): Promise<{ success: boolean; message: string; detalhes?: any }> {
+    const timestamp = new Date().toLocaleString('pt-BR');
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8FAFC; margin: 0; padding: 20px; }
+          .container { max-width: 560px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; overflow: hidden; }
+          .header { background: #0F172A; padding: 24px; text-align: center; }
+          .header h1 { color: #FFFFFF; font-size: 20px; margin: 0; }
+          .content { padding: 28px 24px; }
+          .success-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 16px; margin: 20px 0; color: #166534; font-size: 14px; }
+          .details { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; font-size: 13px; color: #475569; }
+          .footer { background: #F8FAFC; padding: 16px; text-align: center; border-top: 1px solid #E2E8F0; font-size: 11px; color: #94A3B8; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>SeatMap TI - Teste de Conexão SMTP</h1>
+          </div>
+          <div class="content">
+            <h2 style="margin: 0 0 10px 0; color: #1E293B; font-size: 18px;">Teste de Conectividade SMTP Concluído com Sucesso!</h2>
+            <p style="color: #475569; font-size: 14px; margin: 0;">
+              Olá, <strong>${nomeOperador}</strong>. Se você está lendo esta mensagem, o servidor SMTP e os parâmetros de envio de e-mail do SeatMap estão funcionando perfeitamente.
+            </p>
+
+            <div class="success-box">
+              ✔ <strong>Status:</strong> Conexão estabelecida e autenticada com sucesso.<br>
+              ✔ <strong>Disparado em:</strong> ${timestamp}
+            </div>
+
+            <div class="details">
+              <strong>Informações de Diagnóstico:</strong><br>
+              • Destinatário: ${para}<br>
+              • Sistema: SeatMap Corporate Engine<br>
+              • Autenticação: Verificada
+            </div>
+          </div>
+          <div class="footer">
+            © ${new Date().getFullYear()} SeatMap Corporate. Mensagem gerada pelo Painel de TI.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    try {
+      const transporter = await this.getTransporter();
+      const from = await this.getFromAddress();
+      const mailOptions = {
+        from,
+        to: para,
+        subject: `[SeatMap TI] Teste de Disparo de E-mail (${timestamp})`,
+        html
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      return {
+        success: true,
+        message: 'E-mail de teste despachado com sucesso!',
+        detalhes: {
+          messageId: info.messageId,
+          response: info.response || 'OK'
+        }
+      };
+    } catch (error: any) {
+      console.error('[EmailService Teste Error]:', error);
+      return {
+        success: false,
+        message: error.message || 'Falha ao conectar ou enviar via SMTP',
+        detalhes: {
+          code: error.code,
+          command: error.command,
+          response: error.response
+        }
+      };
+    }
+  }
+
+  /**
    * Despachador assíncrono seguro com logs e tratamento de erros
    */
   private static async despacharEmail(opts: {
@@ -256,9 +352,10 @@ export class EmailService {
     codigoDebug?: string;
   }): Promise<boolean> {
     try {
-      const transporter = this.getTransporter();
+      const transporter = await this.getTransporter();
+      const from = await this.getFromAddress();
       const mailOptions = {
-        from: this.getFromAddress(),
+        from,
         to: opts.to,
         subject: opts.subject,
         html: opts.html

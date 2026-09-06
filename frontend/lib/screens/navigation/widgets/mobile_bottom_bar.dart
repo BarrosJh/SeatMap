@@ -4,6 +4,7 @@ import '../../../providers/seat_map_provider.dart';
 class MobileBottomBar extends StatelessWidget {
   final int activeIndex;
   final bool isAdmin;
+  final bool isTi;
   final SeatMapProvider seatProvider;
   final Function(int index) onDestinationSelected;
 
@@ -11,6 +12,7 @@ class MobileBottomBar extends StatelessWidget {
     super.key,
     required this.activeIndex,
     required this.isAdmin,
+    this.isTi = false,
     required this.seatProvider,
     required this.onDestinationSelected,
   });
@@ -91,7 +93,13 @@ class MobileBottomBar extends StatelessWidget {
               const NavigationDestination(
                 icon: Icon(Icons.admin_panel_settings_outlined),
                 selectedIcon: Icon(Icons.admin_panel_settings_rounded),
-                label: 'Admin',
+                label: 'RH',
+              ),
+            if (isTi)
+              const NavigationDestination(
+                icon: Icon(Icons.terminal_outlined),
+                selectedIcon: Icon(Icons.terminal_rounded),
+                label: 'TI',
               ),
           ],
         ),

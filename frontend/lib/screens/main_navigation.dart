@@ -10,6 +10,7 @@ import 'mapa_screen.dart';
 import 'checkin_screen.dart';
 import 'minhas_reservas_screen.dart';
 import 'admin_panel_screen.dart';
+import 'ti_panel_screen.dart';
 import 'navigation/widgets/corporate_sidebar.dart';
 import 'navigation/widgets/corporate_top_bar.dart';
 import 'navigation/widgets/mobile_app_bar.dart';
@@ -24,7 +25,7 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0; // 0 = Início, 1 = Mapa, 2 = Check-in, 3 = Minhas Reservas, 4 = Admin
+  int _currentIndex = 0; // 0 = Início, 1 = Mapa, 2 = Check-in, 3 = Minhas Reservas, 4 = Admin/TI
   bool _mapaExpanded = true;
   bool _reservasExpanded = true;
 
@@ -40,7 +41,7 @@ class _MainNavigationState extends State<MainNavigation> {
     });
   }
 
-  void _onTabSelected(int index, bool isAdmin, {bool isDrawer = false}) {
+  void _onTabSelected(int index, {bool isDrawer = false}) {
     if (isDrawer && Navigator.canPop(context)) {
       Navigator.pop(context);
     }
@@ -120,8 +121,20 @@ class _MainNavigationState extends State<MainNavigation> {
     final auth = Provider.of<AuthProvider>(context);
     final user = auth.user;
     final isAdmin = user?.isAdmin ?? false;
+    final isTi = user?.isTi ?? false;
     final seatProvider = Provider.of<SeatMapProvider>(context);
-    final totalTabs = 4 + (isAdmin ? 1 : 0);
+
+    int? adminTabIndex;
+    int? tiTabIndex;
+    int nextTab = 4;
+    if (isAdmin) {
+      adminTabIndex = nextTab++;
+    }
+    if (isTi) {
+      tiTabIndex = nextTab++;
+    }
+
+    final totalTabs = nextTab;
     final activeIndex = _currentIndex >= totalTabs ? 0 : _currentIndex;
 
     final List<Widget> screens = [
@@ -137,7 +150,11 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       const MinhasReservasScreen(),
       if (isAdmin) const AdminPanelScreen(),
+      if (isTi) const TiPanelScreen(),
     ];
+
+    final isSpecialPanel = (adminTabIndex != null && activeIndex == adminTabIndex) ||
+                           (tiTabIndex != null && activeIndex == tiTabIndex);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -160,9 +177,10 @@ class _MainNavigationState extends State<MainNavigation> {
             bottomNavigationBar: MobileBottomBar(
               activeIndex: activeIndex,
               isAdmin: isAdmin,
+              isTi: isTi,
               seatProvider: seatProvider,
               onDestinationSelected: (index) {
-                _onTabSelected(index, isAdmin);
+                _onTabSelected(index);
                 if (index == 1) {
                   OfficeSelectorSheet.show(context, _selecionarEscritorio);
                 }
@@ -188,13 +206,16 @@ class _MainNavigationState extends State<MainNavigation> {
                 child: CorporateSidebar(
                   user: user,
                   isAdmin: isAdmin,
+                  isTi: isTi,
+                  adminTabIndex: adminTabIndex,
+                  tiTabIndex: tiTabIndex,
                   activeIndex: activeIndex,
                   seatProvider: seatProvider,
                   mapaExpanded: _mapaExpanded,
                   reservasExpanded: _reservasExpanded,
                   onToggleMapaExpanded: () => setState(() => _mapaExpanded = !_mapaExpanded),
                   onToggleReservasExpanded: () => setState(() => _reservasExpanded = !_reservasExpanded),
-                  onSelectTab: (idx) => _onTabSelected(idx, isAdmin),
+                  onSelectTab: (idx) => _onTabSelected(idx),
                   onSelectEscritorio: (nome) => _selecionarEscritorio(nome),
                   onSelectFiltroReservas: (filtro) => _selecionarFiltroReservas(filtro),
                   onLogout: _confirmLogout,
@@ -206,8 +227,8 @@ class _MainNavigationState extends State<MainNavigation> {
               Expanded(
                 child: Column(
                   children: [
-                    // Top Header Corporativo (oculto na Home e no Painel do RH)
-                    if (activeIndex != 0 && activeIndex != 4)
+                    // Top Header Corporativo (oculto na Home e nos Painéis de Gestão/TI)
+                    if (activeIndex != 0 && !isSpecialPanel)
                       CorporateTopBar(
                         user: user,
                         activeIndex: activeIndex,

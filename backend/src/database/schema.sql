@@ -24,10 +24,15 @@ CREATE TABLE IF NOT EXISTS usuarios (
     matricula VARCHAR(100) NOT NULL UNIQUE,
     senha_hash VARCHAR(255) NOT NULL,
     departamento_id INT REFERENCES departamentos(id) ON DELETE SET NULL,
-    perfil VARCHAR(50) NOT NULL CHECK (perfil IN ('COLABORADOR', 'GESTAO', 'ADMIN_RH')),
+    perfil VARCHAR(50) NOT NULL CHECK (perfil IN ('COLABORADOR', 'GESTAO', 'ADMIN_RH', 'ADMIN_TI')),
     permissao_rh BOOLEAN DEFAULT false,
+    permissao_ti BOOLEAN DEFAULT false,
     ativo BOOLEAN DEFAULT true
 );
+
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permissao_ti BOOLEAN DEFAULT false;
+ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_perfil_check;
+ALTER TABLE usuarios ADD CONSTRAINT usuarios_perfil_check CHECK (perfil IN ('COLABORADOR', 'GESTAO', 'ADMIN_RH', 'ADMIN_TI'));
 
 -- Tabela: baias
 CREATE TABLE IF NOT EXISTS baias (

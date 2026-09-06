@@ -59,8 +59,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   final _horarioInicioCheckinController = TextEditingController();
   final _horarioCheckinController = TextEditingController();
   final _avisoGlobalController = TextEditingController();
-  final _mfaExpiracaoController = TextEditingController();
-  final _mfaTentativasController = TextEditingController();
   String _diaGestao = '5';
   String _diaColab = '5';
   bool _permitirTroca = true;
@@ -88,8 +86,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     _horarioInicioCheckinController.dispose();
     _horarioCheckinController.dispose();
     _avisoGlobalController.dispose();
-    _mfaExpiracaoController.dispose();
-    _mfaTentativasController.dispose();
     super.dispose();
   }
 
@@ -195,8 +191,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
         if (chave == 'PERMITIR_TROCA_MESMO_DIA') _permitirTroca = (valor == 'true');
         if (chave == 'CHECKIN_AUTOMATICO_GESTAO') _checkinAutoGestao = (valor == 'true');
         if (chave == 'AVISO_GLOBAL_SISTEMA') _avisoGlobalController.text = valor;
-        if (chave == 'MFA_EXPIRACAO_MINUTOS') _mfaExpiracaoController.text = valor;
-        if (chave == 'MFA_MAX_TENTATIVAS') _mfaTentativasController.text = valor;
       }
       setState(() {});
     }
@@ -811,8 +805,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       {'chave': 'PERMITIR_TROCA_MESMO_DIA', 'valor': _permitirTroca.toString()},
       {'chave': 'CHECKIN_AUTOMATICO_GESTAO', 'valor': _checkinAutoGestao.toString()},
       {'chave': 'AVISO_GLOBAL_SISTEMA', 'valor': _avisoGlobalController.text.trim()},
-      {'chave': 'MFA_EXPIRACAO_MINUTOS', 'valor': _mfaExpiracaoController.text.trim()},
-      {'chave': 'MFA_MAX_TENTATIVAS', 'valor': _mfaTentativasController.text.trim()},
     ];
 
     final res = await _apiService.updateParametros(auth.token!, auth.adminToken!, payload);
@@ -1046,8 +1038,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                   horarioInicioCheckinController: _horarioInicioCheckinController,
                   horarioCheckinController: _horarioCheckinController,
                   avisoGlobalController: _avisoGlobalController,
-                  mfaExpiracaoController: _mfaExpiracaoController,
-                  mfaTentativasController: _mfaTentativasController,
                   diaGestao: _diaGestao,
                   diaColab: _diaColab,
                   permitirTroca: _permitirTroca,

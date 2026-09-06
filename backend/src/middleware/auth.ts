@@ -6,8 +6,9 @@ export interface AuthUser {
   nome: string;
   email: string;
   matricula: string;
-  perfil: 'COLABORADOR' | 'GESTAO' | 'ADMIN_RH';
+  perfil: 'COLABORADOR' | 'GESTAO' | 'ADMIN_RH' | 'ADMIN_TI';
   permissaoRh?: boolean;
+  permissaoTi?: boolean;
   is_admin?: boolean;
   departamentoId: number | null;
   departamentoNome?: string;
@@ -38,10 +39,20 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
   });
 };
 
+export const authMiddleware = authenticateToken;
+
 export const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const hasAdminAccess = req.user?.permissaoRh === true || req.user?.is_admin === true || req.user?.perfil === 'ADMIN_RH';
   if (!req.user || !hasAdminAccess) {
     return res.status(403).json({ error: 'Acesso restrito à equipe de gestão e administração de RH' });
+  }
+  next();
+};
+
+export const requireTi = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const hasTiAccess = req.user?.permissaoTi === true || req.user?.perfil === 'ADMIN_TI';
+  if (!req.user || !hasTiAccess) {
+    return res.status(403).json({ error: 'Acesso restrito à equipe de Administração de TI e Infraestrutura' });
   }
   next();
 };

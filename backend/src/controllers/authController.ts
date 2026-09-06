@@ -23,7 +23,9 @@ export class AuthController {
     try {
       const userRes = await pool.query(`
         SELECT u.id, u.nome, u.email, u.matricula, u.senha_hash, u.perfil, 
-               COALESCE(u.permissao_rh, false) AS permissao_rh, u.ativo,
+               COALESCE(u.permissao_rh, false) AS permissao_rh,
+               COALESCE(u.permissao_ti, false) AS permissao_ti,
+               u.ativo,
                u.departamento_id, d.nome AS departamento_nome
         FROM usuarios u
         LEFT JOIN departamentos d ON u.departamento_id = d.id
@@ -48,6 +50,7 @@ export class AuthController {
         matricula: user.matricula,
         perfil: user.perfil,
         permissaoRh: user.permissao_rh === true || user.perfil === 'ADMIN_RH',
+        permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
         departamentoId: user.departamento_id,
         departamentoNome: user.departamento_nome
       }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
@@ -61,6 +64,7 @@ export class AuthController {
           matricula: user.matricula,
           perfil: user.perfil,
           permissaoRh: user.permissao_rh === true || user.perfil === 'ADMIN_RH',
+          permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
           departamentoId: user.departamento_id,
           departamentoNome: user.departamento_nome
         }

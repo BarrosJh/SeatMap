@@ -188,6 +188,7 @@ export class AdminController {
           u.matricula,
           u.perfil,
           COALESCE(u.permissao_rh, false) AS permissao_rh,
+          COALESCE(u.permissao_ti, false) AS permissao_ti,
           u.ativo,
           u.departamento_id,
           d.nome AS departamento_nome,
@@ -225,6 +226,8 @@ export class AdminController {
         perfil = 'COLABORADOR', 
         permissaoRh, 
         permissao_rh, 
+        permissaoTi,
+        permissao_ti,
         ativo = true 
       } = req.body;
 
@@ -232,14 +235,17 @@ export class AdminController {
         return res.status(400).json({ error: 'Nome, e-mail, matrícula e senha são obrigatórios.' });
       }
 
-      if (!['COLABORADOR', 'GESTAO', 'ADMIN_RH'].includes(perfil)) {
-        return res.status(400).json({ error: 'Perfil inválido. Deve ser COLABORADOR ou GESTAO.' });
+      if (!['COLABORADOR', 'GESTAO', 'ADMIN_RH', 'ADMIN_TI'].includes(perfil)) {
+        return res.status(400).json({ error: 'Perfil inválido. Deve ser COLABORADOR, GESTAO, ADMIN_RH ou ADMIN_TI.' });
       }
 
       const hasRh = permissaoRh !== undefined 
         ? Boolean(permissaoRh) 
         : (permissao_rh !== undefined ? Boolean(permissao_rh) : perfil === 'ADMIN_RH');
-      const perfilFinal = perfil === 'ADMIN_RH' ? 'GESTAO' : perfil;
+      const hasTi = permissaoTi !== undefined
+        ? Boolean(permissaoTi)
+        : (permissao_ti !== undefined ? Boolean(permissao_ti) : perfil === 'ADMIN_TI');
+      const perfilFinal = perfil === 'ADMIN_RH' ? 'GESTAO' : (perfil === 'ADMIN_TI' ? 'ADMIN_TI' : perfil);
 
       // Checar duplicidade
       const checkExists = await pool.query(`
@@ -253,9 +259,9 @@ export class AdminController {
       const senhaHash = await bcrypt.hash(senha, 10);
 
       const insertRes = await pool.query(`
-        INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, ativo)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING id, nome, email, matricula, departamento_id, perfil, permissao_rh, ativo
+        INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, permissao_ti, ativo)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id, nome, email, matricula, departamento_id, perfil, permissao_rh, permissao_ti, ativo
       `, [
         nome.trim(),
         email.trim().toLowerCase(),
@@ -264,6 +270,7 @@ export class AdminController {
         departamentoId ? parseInt(departamentoId, 10) : null,
         perfilFinal,
         hasRh,
+        hasTi,
         ativo !== undefined ? Boolean(ativo) : true
       ]);
 
@@ -290,6 +297,8 @@ export class AdminController {
         perfil, 
         permissaoRh, 
         permissao_rh, 
+        permissaoTi,
+        permissao_ti,
         ativo 
       } = req.body;
 
@@ -312,7 +321,10 @@ export class AdminController {
       const hasRh = permissaoRh !== undefined 
         ? Boolean(permissaoRh) 
         : (permissao_rh !== undefined ? Boolean(permissao_rh) : (perfil === 'ADMIN_RH' ? true : null));
-      const perfilFinal = perfil === 'ADMIN_RH' ? 'GESTAO' : (perfil || null);
+      const hasTi = permissaoTi !== undefined
+        ? Boolean(permissaoTi)
+        : (permissao_ti !== undefined ? Boolean(permissao_ti) : (perfil === 'ADMIN_TI' ? true : null));
+      const perfilFinal = perfil === 'ADMIN_RH' ? 'GESTAO' : (perfil === 'ADMIN_TI' ? 'ADMIN_TI' : (perfil || null));
 
       const updateRes = await pool.query(`
         UPDATE usuarios
@@ -323,9 +335,10 @@ export class AdminController {
           departamento_id = CASE WHEN $4::text IS NOT NULL THEN $5::int ELSE departamento_id END,
           perfil = COALESCE($6, perfil),
           permissao_rh = COALESCE($7, permissao_rh),
-          ativo = COALESCE($8, ativo)
-        WHERE id = $9
-        RETURNING id, nome, email, matricula, departamento_id, perfil, permissao_rh, ativo
+          permissao_ti = COALESCE($8, permissao_ti),
+          ativo = COALESCE($9, ativo)
+        WHERE id = $10
+        RETURNING id, nome, email, matricula, departamento_id, perfil, permissao_rh, permissao_ti, ativo
       `, [
         nome ? nome.trim() : null,
         email ? email.trim().toLowerCase() : null,
@@ -334,6 +347,7 @@ export class AdminController {
         departamentoId ? parseInt(departamentoId, 10) : null,
         perfilFinal,
         hasRh,
+        hasTi,
         ativo !== undefined ? Boolean(ativo) : null,
         id
       ]);

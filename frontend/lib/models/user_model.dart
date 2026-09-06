@@ -5,8 +5,9 @@ class UserModel {
   final String nome;
   final String email;
   final String matricula;
-  final String perfil; // 'COLABORADOR' | 'GESTAO' | 'ADMIN_RH'
+  final String perfil; // 'COLABORADOR' | 'GESTAO' | 'ADMIN_RH' | 'ADMIN_TI'
   final bool permissaoRh;
+  final bool permissaoTi;
   final int? departamentoId;
   final String? departamentoNome;
 
@@ -17,11 +18,13 @@ class UserModel {
     required this.matricula,
     required this.perfil,
     this.permissaoRh = false,
+    this.permissaoTi = false,
     this.departamentoId,
     this.departamentoNome,
   });
 
   bool get isAdmin => permissaoRh || perfil == 'ADMIN_RH';
+  bool get isTi => permissaoTi || perfil == 'ADMIN_TI';
   bool get isGestao => perfil == 'GESTAO';
   bool get isColaborador => perfil == 'COLABORADOR';
 
@@ -31,6 +34,9 @@ class UserModel {
                   json['permissao_rh'] == true || 
                   json['is_admin'] == true || 
                   perfilStr == 'ADMIN_RH';
+    final hasTi = json['permissaoTi'] == true ||
+                  json['permissao_ti'] == true ||
+                  perfilStr == 'ADMIN_TI';
 
     return UserModel(
       userId: json['userId'] ?? json['id'] ?? 0,
@@ -39,6 +45,7 @@ class UserModel {
       matricula: json['matricula'] ?? '',
       perfil: perfilStr,
       permissaoRh: hasRh,
+      permissaoTi: hasTi,
       departamentoId: json['departamentoId'] ?? json['departamento_id'],
       departamentoNome: json['departamentoNome'] ?? json['departamento_nome'],
     );
@@ -53,6 +60,8 @@ class UserModel {
       'perfil': perfil,
       'permissaoRh': permissaoRh,
       'permissao_rh': permissaoRh,
+      'permissaoTi': permissaoTi,
+      'permissao_ti': permissaoTi,
       'is_admin': permissaoRh,
       'departamentoId': departamentoId,
       'departamentoNome': departamentoNome,
