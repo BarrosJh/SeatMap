@@ -756,7 +756,8 @@ class _MapaScreenState extends State<MapaScreen> {
                   return Column(
                     children: [
                       if (isCompact) ...[
-                        // Mobile / Compact Layout: Linha 1 = Seletor de Semana Full Width
+                        // Mobile / Compact Layout:
+                        // Linha 1 = Seletor de Semana Full Width
                         SizedBox(
                           width: double.infinity,
                           child: weekSelectorWidget,
@@ -769,6 +770,35 @@ class _MapaScreenState extends State<MapaScreen> {
                             const SizedBox(width: 6),
                             viewToggleWidget,
                           ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        const SizedBox(height: 6),
+                        // Linha 3 = KPIs Executivos (Total, Livres, Ocupadas, Minhas)
+                        Row(
+                          children: [
+                            Expanded(child: _buildModernKpi(label: 'Total', value: totalAssentos, color: const Color(0xFF334155))),
+                            const SizedBox(width: 4),
+                            Expanded(child: _buildModernKpi(label: 'Livres', value: totalLivres, color: const Color(0xFF16A34A))),
+                            const SizedBox(width: 4),
+                            Expanded(child: _buildModernKpi(label: 'Ocupadas', value: totalOcupadas, color: const Color(0xFFDC2626))),
+                            const SizedBox(width: 4),
+                            Expanded(child: _buildModernKpi(label: 'Minhas', value: totalMinhas, color: const Color(0xFF2563EB))),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Linha 4 = Legenda direta abaixo dos KPIs (Sem necessidade de scroll)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildLegendDot(const Color(0xFF22C55E), 'Livre'),
+                              _buildLegendDot(const Color(0xFF2563EB), 'Sua Reserva'),
+                              _buildLegendDot(const Color(0xFFDC2626), 'Ocupada'),
+                              _buildLegendDot(const Color(0xFFD97706), 'Colega Depto'),
+                            ],
+                          ),
                         ),
                       ] else ...[
                         // Desktop / Wide Layout
@@ -786,37 +816,34 @@ class _MapaScreenState extends State<MapaScreen> {
                             viewToggleWidget,
                           ],
                         ),
-                      ],
-
-                      const SizedBox(height: 8),
-                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                      const SizedBox(height: 6),
-
-                      // Linha Inferior: KPIs Executivos e Legendas com scroll horizontal fluido
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildModernKpi(label: 'Total', value: totalAssentos, color: const Color(0xFF334155)),
-                            const SizedBox(width: 6),
-                            _buildModernKpi(label: 'Livres', value: totalLivres, color: const Color(0xFF16A34A)),
-                            const SizedBox(width: 6),
-                            _buildModernKpi(label: 'Ocupadas', value: totalOcupadas, color: const Color(0xFFDC2626)),
-                            const SizedBox(width: 6),
-                            _buildModernKpi(label: 'Minhas', value: totalMinhas, color: const Color(0xFF2563EB)),
-                            const SizedBox(width: 14),
-                            Container(width: 1, height: 16, color: const Color(0xFFE2E8F0)),
-                            const SizedBox(width: 14),
-                            _buildLegendDot(const Color(0xFF22C55E), 'Livre'),
-                            const SizedBox(width: 10),
-                            _buildLegendDot(const Color(0xFF2563EB), 'Sua Reserva'),
-                            const SizedBox(width: 10),
-                            _buildLegendDot(const Color(0xFFDC2626), 'Ocupada'),
-                            const SizedBox(width: 10),
-                            _buildLegendDot(const Color(0xFFD97706), 'Colega Depto'),
-                          ],
+                        const SizedBox(height: 8),
+                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        const SizedBox(height: 6),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildModernKpi(label: 'Total', value: totalAssentos, color: const Color(0xFF334155)),
+                              const SizedBox(width: 6),
+                              _buildModernKpi(label: 'Livres', value: totalLivres, color: const Color(0xFF16A34A)),
+                              const SizedBox(width: 6),
+                              _buildModernKpi(label: 'Ocupadas', value: totalOcupadas, color: const Color(0xFFDC2626)),
+                              const SizedBox(width: 6),
+                              _buildModernKpi(label: 'Minhas', value: totalMinhas, color: const Color(0xFF2563EB)),
+                              const SizedBox(width: 14),
+                              Container(width: 1, height: 16, color: const Color(0xFFE2E8F0)),
+                              const SizedBox(width: 14),
+                              _buildLegendDot(const Color(0xFF22C55E), 'Livre'),
+                              const SizedBox(width: 10),
+                              _buildLegendDot(const Color(0xFF2563EB), 'Sua Reserva'),
+                              const SizedBox(width: 10),
+                              _buildLegendDot(const Color(0xFFDC2626), 'Ocupada'),
+                              const SizedBox(width: 10),
+                              _buildLegendDot(const Color(0xFFD97706), 'Colega Depto'),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   );
                 },
@@ -957,22 +984,27 @@ class _MapaScreenState extends State<MapaScreen> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+          Flexible(
+            child: Text(
+              '$label: ',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+            ),
           ),
           Text(
             '$value',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
           ),
         ],
       ),

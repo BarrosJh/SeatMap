@@ -200,6 +200,169 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
+  void _mostrarSeletorEscritorioModal(BuildContext context) {
+    final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
+    final escAtual = seatProvider.selectedEscritorio?.nome.toLowerCase() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.apartment_rounded, color: Color(0xFF2563EB), size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'Selecione o Escritório',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Escolha a unidade para visualizar a planta e reservar:',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+                _buildEscritorioOptionCard(
+                  context: ctx,
+                  nome: 'Berrini',
+                  cidade: 'São Paulo - SP',
+                  totalMesas: '102 Assentos',
+                  isSelected: escAtual.contains('berrini'),
+                  icon: Icons.domain_rounded,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _selecionarEscritorio('Berrini');
+                  },
+                ),
+                const SizedBox(height: 10),
+                _buildEscritorioOptionCard(
+                  context: ctx,
+                  nome: 'Barueri',
+                  cidade: 'Barueri - Alphaville',
+                  totalMesas: '66 Assentos',
+                  isSelected: escAtual.contains('barueri'),
+                  icon: Icons.apartment_rounded,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _selecionarEscritorio('Barueri');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEscritorioOptionCard({
+    required BuildContext context,
+    required String nome,
+    required String cidade,
+    required String totalMesas,
+    required bool isSelected,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+            width: isSelected ? 2.0 : 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: isSelected ? Colors.white : const Color(0xFF475569), size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Escritório $nome',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? const Color(0xFF1E3A8A) : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2563EB),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'ATIVO',
+                            style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$cidade • $totalMesas',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// AppBar Otimizada para Mobile
   PreferredSizeWidget _buildMobileAppBar(
     BuildContext context,
@@ -207,9 +370,10 @@ class _MainNavigationState extends State<MainNavigation> {
     int activeIndex,
     SeatMapProvider seatProvider,
   ) {
+    final isMapa = activeIndex == 1;
     String title = 'SeatMap';
-    if (activeIndex == 1) {
-      final esc = seatProvider.selectedEscritorio?.nome ?? 'Mapa';
+    if (isMapa) {
+      final esc = seatProvider.selectedEscritorio?.nome ?? 'Berrini';
       title = 'Mapa ($esc)';
     } else if (activeIndex == 2) {
       title = 'Check-in QR';
@@ -219,36 +383,51 @@ class _MainNavigationState extends State<MainNavigation> {
       title = 'Painel RH';
     }
 
+    final titleContent = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2563EB),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.domain_rounded, color: Colors.white, size: 16),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (isMapa) ...[
+          const SizedBox(width: 4),
+          const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF93C5FD), size: 18),
+        ],
+      ],
+    );
+
     return AppBar(
       backgroundColor: const Color(0xFF0F172A),
       elevation: 0,
       automaticallyImplyLeading: false,
       iconTheme: const IconThemeData(color: Colors.white),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2563EB),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Icon(Icons.domain_rounded, color: Colors.white, size: 16),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
+      title: isMapa
+          ? InkWell(
+              onTap: () => _mostrarSeletorEscritorioModal(context),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: titleContent,
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+            )
+          : titleContent,
       actions: [
         if (user != null)
           Padding(
@@ -315,7 +494,12 @@ class _MainNavigationState extends State<MainNavigation> {
         ),
         child: NavigationBar(
           selectedIndex: activeIndex,
-          onDestinationSelected: (index) => _onTabSelected(index, isAdmin),
+          onDestinationSelected: (index) {
+            _onTabSelected(index, isAdmin);
+            if (index == 1) {
+              _mostrarSeletorEscritorioModal(context);
+            }
+          },
           destinations: [
             const NavigationDestination(
               icon: Icon(Icons.dashboard_outlined),
