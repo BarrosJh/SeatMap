@@ -75,6 +75,9 @@ export class ReservaController {
       }
     }
 
+    // Obter limite semanal de reservas antes de abrir transação
+    const limiteAtivas = await ConfigService.getNumber('LIMITE_SEMANAL_RESERVAS', 2);
+
     const client = await pool.connect();
 
     try {
@@ -131,8 +134,6 @@ export class ReservaController {
 
       // 4. Validar limite de cotas de reservas ativas se não for troca no mesmo dia
       if (!isTroca) {
-        const limiteAtivas = await ConfigService.getNumber('LIMITE_SEMANAL_RESERVAS', 2);
-
         const contagemAtivasRes = await client.query(`
           SELECT COUNT(*) AS total
           FROM reservas
