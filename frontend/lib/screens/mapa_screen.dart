@@ -558,20 +558,20 @@ class _MapaScreenState extends State<MapaScreen> {
                       final canGoForward = isRh ? true : (_weekOffset < (isNextOpen ? 1 : 0));
 
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: isCompact ? MainAxisAlignment.spaceBetween : MainAxisSize.min as dynamic,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                              icon: const Icon(Icons.chevron_left_rounded, size: 22),
                               tooltip: canGoBack ? 'Semana Anterior' : null,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                               color: canGoBack ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
                               onPressed: (canGoBack && auth.token != null) ? () => _changeWeek(-1, auth.token!) : null,
                             ),
@@ -588,7 +588,7 @@ class _MapaScreenState extends State<MapaScreen> {
                                     Text(
                                       _getWeekLabel(),
                                       style: const TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                         color: Color(0xFF1E293B),
                                       ),
@@ -597,20 +597,25 @@ class _MapaScreenState extends State<MapaScreen> {
                                 ),
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                              tooltip: canGoForward ? 'Próxima Semana' : null,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                              color: canGoForward ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
-                              onPressed: (canGoForward && auth.token != null) ? () => _changeWeek(1, auth.token!) : null,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.calendar_month_outlined, size: 15, color: Color(0xFF64748B)),
-                              tooltip: 'Escolher Data no Calendário',
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                              onPressed: auth.token != null ? () => _pickCustomDate(context, auth.token!) : null,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                                  tooltip: canGoForward ? 'Próxima Semana' : null,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                  color: canGoForward ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
+                                  onPressed: (canGoForward && auth.token != null) ? () => _changeWeek(1, auth.token!) : null,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.calendar_month_outlined, size: 16, color: Color(0xFF64748B)),
+                                  tooltip: 'Escolher Data no Calendário',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                  onPressed: auth.token != null ? () => _pickCustomDate(context, auth.token!) : null,
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -739,19 +744,19 @@ class _MapaScreenState extends State<MapaScreen> {
                   return Column(
                     children: [
                       if (isCompact) ...[
-                        // Mobile / Compact Layout
+                        // Mobile / Compact Layout: Linha 1 = Seletor de Semana Full Width
+                        SizedBox(
+                          width: double.infinity,
+                          child: weekSelectorWidget,
+                        ),
+                        const SizedBox(height: 8),
+                        // Linha 2 = Dias Úteis + Alternador Planta/Lista
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Flexible(child: weekSelectorWidget),
+                            Expanded(child: dayTabsWidget),
                             const SizedBox(width: 6),
                             viewToggleWidget,
                           ],
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: dayTabsWidget,
                         ),
                       ] else ...[
                         // Desktop / Wide Layout

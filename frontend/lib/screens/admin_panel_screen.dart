@@ -1071,13 +1071,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                             const SizedBox(height: 12),
                             dropDepto,
                             const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(child: dropPerfil),
-                                const SizedBox(width: 10),
-                                Expanded(child: dropStatus),
-                              ],
-                            ),
+                            dropPerfil,
+                            const SizedBox(height: 10),
+                            dropStatus,
                           ],
                         );
                       }
@@ -1264,12 +1260,21 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     );
   }
 
+  String _formatarData(String isoDate) {
+    try {
+      final parsed = DateTime.parse(isoDate);
+      return DateFormat('dd/MM/yyyy').format(parsed);
+    } catch (_) {
+      return isoDate;
+    }
+  }
+
   // ==========================================
   // TAB 2: IMPORTAÇÃO EM LOTE
   // ==========================================
   Widget _buildTabImportacaoLote() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1000),
@@ -1280,81 +1285,114 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                 elevation: 1,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Importação em Lote de Colaboradores',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Cole os dados de colaboradores em formato CSV (delimitado por ponto e vírgula ou vírgula). O sistema criará automaticamente departamentos que não existirem e gerará as credenciais de acesso.',
-                        style: TextStyle(fontSize: 13, color: Colors.black87),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                  padding: const EdgeInsets.all(16),
+                  child: LayoutBuilder(
+                    builder: (context, boxConstraints) {
+                      final isMobile = boxConstraints.maxWidth < 650;
+
+                      final inputSenha = TextField(
+                        controller: _loteDefaultSenhaController,
+                        decoration: const InputDecoration(
+                          labelText: 'Senha Padrão Inicial (se não informada)',
+                          border: OutlineInputBorder(),
+                          isDense: true,
                         ),
-                        child: const Text(
-                          'Formato esperado das colunas:\nNome;Email;Matricula;Departamento;Perfil;Senha (opcional)',
-                          style: TextStyle(fontFamily: 'monospace', fontSize: 12),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
+                      );
+
+                      final btnExemplo = OutlinedButton.icon(
+                        icon: const Icon(Icons.description_outlined),
+                        label: const Text('Carregar Exemplo'),
+                        onPressed: _carregarExemploCsv,
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _loteDefaultSenhaController,
-                              decoration: const InputDecoration(
-                                labelText: 'Senha Padrão Inicial (se não informada na linha)',
-                                border: OutlineInputBorder(),
-                                isDense: true,
+                          const Text(
+                            'Importação em Lote de Colaboradores',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Cole os dados de colaboradores em formato CSV (delimitado por ponto e vírgula ou vírgula). O sistema criará automaticamente departamentos que não existirem e gerará as credenciais de acesso.',
+                            style: TextStyle(fontSize: 13, color: Colors.black87),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                            ),
+                            child: const Text(
+                              'Formato esperado das colunas:\nNome;Email;Matricula;Departamento;Perfil;Senha (opcional)',
+                              style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          if (isMobile) ...[
+                            inputSenha,
+                            const SizedBox(height: 10),
+                            SizedBox(width: double.infinity, child: btnExemplo),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(child: inputSenha),
+                                const SizedBox(width: 12),
+                                btnExemplo,
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _loteTextController,
+                            maxLines: 8,
+                            onChanged: (_) => _processarPreviaLote(),
+                            decoration: const InputDecoration(
+                              hintText: 'Cole aqui os registros CSV...',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          if (isMobile) ...[
+                            Text('Linhas identificadas: ${_lotePreview.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0F172A),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                ),
+                                icon: const Icon(Icons.cloud_upload_outlined),
+                                label: Text('Importar ${_lotePreview.length} Usuários'),
+                                onPressed: _lotePreview.isEmpty ? null : _executarImportacaoLote,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.description_outlined),
-                            label: const Text('Carregar Exemplo'),
-                            onPressed: _carregarExemploCsv,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _loteTextController,
-                        maxLines: 8,
-                        onChanged: (_) => _processarPreviaLote(),
-                        decoration: const InputDecoration(
-                          hintText: 'Cole aqui os registros CSV...',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Linhas identificadas: ${_lotePreview.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F172A),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ] else ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Linhas identificadas: ${_lotePreview.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0F172A),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                  ),
+                                  icon: const Icon(Icons.cloud_upload_outlined),
+                                  label: Text('Importar ${_lotePreview.length} Usuários'),
+                                  onPressed: _lotePreview.isEmpty ? null : _executarImportacaoLote,
+                                ),
+                              ],
                             ),
-                            icon: const Icon(Icons.cloud_upload_outlined),
-                            label: Text('Importar ${_lotePreview.length} Usuários'),
-                            onPressed: _lotePreview.isEmpty ? null : _executarImportacaoLote,
-                          ),
+                          ],
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -1443,7 +1481,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                   padding: const EdgeInsets.all(14),
                   child: LayoutBuilder(
                     builder: (context, filterConstraints) {
-                      final isMobileFilter = filterConstraints.maxWidth < 700;
+                      final isMobileFilter = filterConstraints.maxWidth < 650;
 
                       final searchField = TextField(
                         controller: _searchReservaController,
@@ -1546,21 +1584,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                               ],
                             ),
                             const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(child: btnDataInicio),
-                                const SizedBox(width: 8),
-                                Expanded(child: btnDataFim),
-                              ],
-                            ),
+                            btnDataInicio,
                             const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(child: dropEscritorio),
-                                const SizedBox(width: 8),
-                                Expanded(child: dropStatus),
-                              ],
-                            ),
+                            btnDataFim,
+                            const SizedBox(height: 10),
+                            dropEscritorio,
+                            const SizedBox(height: 10),
+                            dropStatus,
                           ],
                         );
                       }
@@ -1687,7 +1717,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
-                                'Data: ${r.dataReserva} | Local: ${r.escritorioNome} - ${r.baiaNome}\nMatrícula: ${r.matricula} | Depto: ${r.departamentoNome ?? "Geral"}',
+                                'Data: ${_formatarData(r.dataReserva)} | Local: ${r.escritorioNome} - ${r.baiaNome}\nMatrícula: ${r.matricula} | Depto: ${r.departamentoNome ?? "Geral"}',
                                 style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                               ),
                             ),
@@ -1714,15 +1744,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   // ==========================================
   Widget _buildTabDepartamentos() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 10,
                 children: [
                   Text('Departamentos Corporativos (${_departamentos.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ElevatedButton.icon(
@@ -1771,7 +1804,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   // ==========================================
   Widget _buildTabPoliticas() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
@@ -1782,115 +1815,133 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                 elevation: 1,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Parâmetros Globais de Reserva',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _limiteSemanalController,
-                        keyboardType: TextInputType.number,
+                  padding: const EdgeInsets.all(16),
+                  child: LayoutBuilder(
+                    builder: (context, polConstraints) {
+                      final isMobile = polConstraints.maxWidth < 600;
+
+                      final inputHorarioGestao = TextFormField(
+                        controller: _horarioGestaoController,
                         decoration: const InputDecoration(
-                          labelText: 'Limite de Reservas Semanais por Usuário',
+                          labelText: 'Abertura Gestão (Horário)',
                           border: OutlineInputBorder(),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
+                      );
+
+                      final dropDiaGestao = DropdownButtonFormField<String>(
+                        initialValue: _diaGestao,
+                        decoration: const InputDecoration(
+                          labelText: 'Dia da Semana (Gestão)',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: '1', child: Text('Segunda-feira')),
+                          DropdownMenuItem(value: '4', child: Text('Quinta-feira')),
+                          DropdownMenuItem(value: '5', child: Text('Sexta-feira')),
+                        ],
+                        onChanged: (v) => setState(() => _diaGestao = v ?? '5'),
+                      );
+
+                      final inputHorarioColab = TextFormField(
+                        controller: _horarioColabController,
+                        decoration: const InputDecoration(
+                          labelText: 'Abertura Geral (Horário)',
+                          border: OutlineInputBorder(),
+                        ),
+                      );
+
+                      final dropDiaColab = DropdownButtonFormField<String>(
+                        initialValue: _diaColab,
+                        decoration: const InputDecoration(
+                          labelText: 'Dia da Semana (Colaborador)',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: '1', child: Text('Segunda-feira')),
+                          DropdownMenuItem(value: '4', child: Text('Quinta-feira')),
+                          DropdownMenuItem(value: '5', child: Text('Sexta-feira')),
+                        ],
+                        onChanged: (v) => setState(() => _diaColab = v ?? '5'),
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _horarioGestaoController,
-                              decoration: const InputDecoration(
-                                labelText: 'Abertura Gestão (Horário)',
-                                border: OutlineInputBorder(),
-                              ),
+                          const Text(
+                            'Parâmetros Globais de Reserva',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _limiteSemanalController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Limite de Reservas Semanais por Usuário',
+                              border: OutlineInputBorder(),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                    initialValue: _diaGestao,
-                              decoration: const InputDecoration(
-                                labelText: 'Dia da Semana (Gestão)',
-                                border: OutlineInputBorder(),
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: '1', child: Text('Segunda-feira')),
-                                DropdownMenuItem(value: '4', child: Text('Quinta-feira')),
-                                DropdownMenuItem(value: '5', child: Text('Sexta-feira')),
+                          const SizedBox(height: 16),
+                          if (isMobile) ...[
+                            inputHorarioGestao,
+                            const SizedBox(height: 12),
+                            dropDiaGestao,
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(child: inputHorarioGestao),
+                                const SizedBox(width: 12),
+                                Expanded(child: dropDiaGestao),
                               ],
-                              onChanged: (v) => setState(() => _diaGestao = v ?? '5'),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          if (isMobile) ...[
+                            inputHorarioColab,
+                            const SizedBox(height: 12),
+                            dropDiaColab,
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(child: inputHorarioColab),
+                                const SizedBox(width: 12),
+                                Expanded(child: dropDiaColab),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _horarioCheckinController,
+                            decoration: const InputDecoration(
+                              labelText: 'Horário Limite de Check-in Diário (No-Show Cutoff)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0F172A),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              ),
+                              icon: const Icon(Icons.save),
+                              label: const Text('Salvar Parâmetros'),
+                              onPressed: _salvarParametros,
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _horarioColabController,
-                              decoration: const InputDecoration(
-                                labelText: 'Abertura Geral (Horário)',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                    initialValue: _diaColab,
-                              decoration: const InputDecoration(
-                                labelText: 'Dia da Semana (Colaborador)',
-                                border: OutlineInputBorder(),
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: '1', child: Text('Segunda-feira')),
-                                DropdownMenuItem(value: '4', child: Text('Quinta-feira')),
-                                DropdownMenuItem(value: '5', child: Text('Sexta-feira')),
-                              ],
-                              onChanged: (v) => setState(() => _diaColab = v ?? '5'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _horarioCheckinController,
-                        decoration: const InputDecoration(
-                          labelText: 'Horário Limite de Check-in Diário (No-Show Cutoff)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0F172A),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          ),
-                          icon: const Icon(Icons.save),
-                          label: const Text('Salvar Parâmetros'),
-                          onPressed: _salvarParametros,
-                        ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1918,51 +1969,65 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Exportação de Relatórios de Ocupação',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
+                  padding: const EdgeInsets.all(16),
+                  child: LayoutBuilder(
+                    builder: (context, relConstraints) {
+                      final isMobile = relConstraints.maxWidth < 550;
+
+                      final btnDataRelatorio = OutlinedButton.icon(
+                        icon: const Icon(Icons.date_range),
+                        label: Text('Data: ${DateFormat("dd/MM/yyyy").format(_dataRelatorio)}'),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _dataRelatorio,
+                            firstDate: DateTime(2025),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) setState(() => _dataRelatorio = picked);
+                        },
+                      );
+
+                      final btnExportar = ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        icon: const Icon(Icons.download),
+                        label: const Text('Exportar CSV de Ocupação'),
+                        onPressed: _exportarCsv,
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.date_range),
-                              label: Text('Data: ${DateFormat("dd/MM/yyyy").format(_dataRelatorio)}'),
-                              onPressed: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _dataRelatorio,
-                                  firstDate: DateTime(2025),
-                                  lastDate: DateTime(2030),
-                                );
-                                if (picked != null) setState(() => _dataRelatorio = picked);
-                              },
-                            ),
+                          const Text(
+                            'Exportação de Relatórios de Ocupação',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade700,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          const SizedBox(height: 12),
+                          if (isMobile) ...[
+                            SizedBox(width: double.infinity, child: btnDataRelatorio),
+                            const SizedBox(height: 10),
+                            SizedBox(width: double.infinity, child: btnExportar),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(child: btnDataRelatorio),
+                                const SizedBox(width: 12),
+                                btnExportar,
+                              ],
                             ),
-                            icon: const Icon(Icons.file_download),
-                            label: const Text('Exportar CSV'),
-                            onPressed: _exportarCsv,
-                          ),
+                          ],
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),

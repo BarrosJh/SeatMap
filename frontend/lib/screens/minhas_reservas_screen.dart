@@ -390,49 +390,57 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                dataExtenso,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: tagBgColor,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: tagBorderColor),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (isHoje) ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF2563EB),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                    ],
                     Text(
-                      tagRelativa,
-                      style: TextStyle(
-                        fontSize: 11,
+                      dataExtenso,
+                      style: const TextStyle(
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: tagTextColor,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: tagBgColor,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: tagBorderColor),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isHoje) ...[
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF2563EB),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            tagRelativa,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: tagTextColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -441,10 +449,10 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                 ),
                 child: Text(
                   totalNoDia == 1
-                      ? '1 reserva'
+                      ? '1 assento'
                       : totalAtivasNoDia > 0
-                          ? '$totalNoDia reservas ($totalAtivasNoDia ativa)'
-                          : '$totalNoDia reservas',
+                          ? '$totalNoDia assentos ($totalAtivasNoDia ativo)'
+                          : '$totalNoDia assentos',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -628,188 +636,200 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
             const SizedBox(height: 12),
 
             // Linha Inferior: Voucher Code + Checkin Info + Ações
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                // Chip do Código de Comprovante (Clicável)
-                if (r.codigoComprovante != null && r.codigoComprovante!.isNotEmpty)
-                  InkWell(
-                    onTap: () {
-                      final auth = Provider.of<AuthProvider>(context, listen: false);
-                      final tipo = r.checkinRealizado
-                          ? TipoComprovante.checkin
-                          : (r.isCancelada
-                              ? TipoComprovante.cancelamento
-                              : TipoComprovante.visualizacao);
-                      ComprovanteDialog.show(
-                        context,
-                        tipo: tipo,
-                        comprovante: r.codigoComprovante!,
-                        dataReserva: r.dataReserva,
-                        escritorioNome: r.escritorioNome,
-                        escritorioCidade: r.escritorioCidade,
-                        cadeiraIdentificador: r.cadeiraIdentificador,
-                        baiaNome: r.baiaNome,
-                        usuarioNome: auth.user?.nome,
-                        usuarioMatricula: auth.user?.matricula,
-                        dataHoraAcao: r.checkinEm != null
-                            ? DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.tryParse(r.checkinEm!)?.toLocal() ?? DateTime.now())
-                            : null,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    // Chip do Código de Comprovante (Clicável)
+                    if (r.codigoComprovante != null && r.codigoComprovante!.isNotEmpty)
+                      InkWell(
+                        onTap: () {
+                          final auth = Provider.of<AuthProvider>(context, listen: false);
+                          final tipo = r.checkinRealizado
+                              ? TipoComprovante.checkin
+                              : (r.isCancelada
+                                  ? TipoComprovante.cancelamento
+                                  : TipoComprovante.visualizacao);
+                          ComprovanteDialog.show(
+                            context,
+                            tipo: tipo,
+                            comprovante: r.codigoComprovante!,
+                            dataReserva: r.dataReserva,
+                            escritorioNome: r.escritorioNome,
+                            escritorioCidade: r.escritorioCidade,
+                            cadeiraIdentificador: r.cadeiraIdentificador,
+                            baiaNome: r.baiaNome,
+                            usuarioNome: auth.user?.nome,
+                            usuarioMatricula: auth.user?.matricula,
+                            dataHoraAcao: r.checkinEm != null
+                                ? DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.tryParse(r.checkinEm!)?.toLocal() ?? DateTime.now())
+                                : null,
+                          );
+                        },
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.confirmation_number_outlined, size: 12, color: Color(0xFF475569)),
-                          const SizedBox(width: 5),
-                          Text(
-                            r.codigoComprovante!,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                            ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
                           ),
-                          const SizedBox(width: 5),
-                          const Icon(Icons.open_in_new_rounded, size: 11, color: Color(0xFF94A3B8)),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // Informação de Presença Confirmada
-                if (r.checkinRealizado) ...[
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFBBF7D0)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.verified_rounded, size: 12, color: Color(0xFF16A34A)),
-                        const SizedBox(width: 4),
-                        Text(
-                          horaCheckin != null ? 'Presença às $horaCheckin' : 'Presença Confirmada',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF15803D),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.confirmation_number_outlined, size: 12, color: Color(0xFF475569)),
+                              const SizedBox(width: 5),
+                              Text(
+                                r.codigoComprovante!,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              const Icon(Icons.open_in_new_rounded, size: 11, color: Color(0xFF94A3B8)),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
 
-                const Spacer(),
+                    // Informação de Presença Confirmada
+                    if (r.checkinRealizado)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified_rounded, size: 12, color: Color(0xFF16A34A)),
+                            const SizedBox(width: 4),
+                            Text(
+                              horaCheckin != null ? 'Presença às $horaCheckin' : 'Presença Confirmada',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF15803D),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
 
                 // Botões de Ação Contextual
-                if (r.isAtiva) ...[
-                  if (r.isHoje && !r.checkinRealizado) ...[
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 14),
-                      label: const Text('Fazer Check-in', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      onPressed: () async {
-                        if (token != null) {
-                          final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
-                          final auth = Provider.of<AuthProvider>(context, listen: false);
-                          final ok = await seatProvider.confirmarPresencaHoje(token);
-                          if (context.mounted) {
-                            if (ok) {
-                              ComprovanteDialog.show(
-                                context,
-                                tipo: TipoComprovante.checkin,
-                                comprovante: r.codigoComprovante ?? 'RES-CHECKIN',
-                                dataReserva: r.dataReserva,
-                                escritorioNome: r.escritorioNome,
-                                escritorioCidade: r.escritorioCidade,
-                                cadeiraIdentificador: r.cadeiraIdentificador,
-                                baiaNome: r.baiaNome,
-                                usuarioNome: auth.user?.nome,
-                                usuarioMatricula: auth.user?.matricula,
-                                dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(seatProvider.errorMessage ?? 'Falha ao confirmar presença.'),
-                                  backgroundColor: const Color(0xFFDC2626),
-                                ),
-                              );
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (r.isAtiva) ...[
+                      if (r.isHoje && !r.checkinRealizado)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A34A),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 14),
+                          label: const Text('Fazer Check-in', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            if (token != null) {
+                              final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
+                              final auth = Provider.of<AuthProvider>(context, listen: false);
+                              final ok = await seatProvider.confirmarPresencaHoje(token);
+                              if (context.mounted) {
+                                if (ok) {
+                                  ComprovanteDialog.show(
+                                    context,
+                                    tipo: TipoComprovante.checkin,
+                                    comprovante: r.codigoComprovante ?? 'RES-CHECKIN',
+                                    dataReserva: r.dataReserva,
+                                    escritorioNome: r.escritorioNome,
+                                    escritorioCidade: r.escritorioCidade,
+                                    cadeiraIdentificador: r.cadeiraIdentificador,
+                                    baiaNome: r.baiaNome,
+                                    usuarioNome: auth.user?.nome,
+                                    usuarioMatricula: auth.user?.matricula,
+                                    dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(seatProvider.errorMessage ?? 'Falha ao confirmar presença.'),
+                                      backgroundColor: const Color(0xFFDC2626),
+                                    ),
+                                  );
+                                }
+                              }
                             }
+                          },
+                        ),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          side: const BorderSide(color: Color(0xFFFCA5A5)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.cancel_outlined, size: 14),
+                        label: const Text('Cancelar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          if (token != null) {
+                            _showCancelDialog(r, token);
                           }
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 8),
+                        },
+                      ),
+                    ] else ...[
+                      // Para reservas canceladas ou concluídas: botão de abrir voucher
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF2563EB),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        ),
+                        icon: const Icon(Icons.receipt_long_rounded, size: 14),
+                        label: const Text('Ver Detalhes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          final auth = Provider.of<AuthProvider>(context, listen: false);
+                          final tipo = r.checkinRealizado
+                              ? TipoComprovante.checkin
+                              : (r.isCancelada
+                                  ? TipoComprovante.cancelamento
+                                  : TipoComprovante.visualizacao);
+                          ComprovanteDialog.show(
+                            context,
+                            tipo: tipo,
+                            comprovante: r.codigoComprovante ?? 'RES-CONFIRMADO',
+                            dataReserva: r.dataReserva,
+                            escritorioNome: r.escritorioNome,
+                            escritorioCidade: r.escritorioCidade,
+                            cadeiraIdentificador: r.cadeiraIdentificador,
+                            baiaNome: r.baiaNome,
+                            usuarioNome: auth.user?.nome,
+                            usuarioMatricula: auth.user?.matricula,
+                            dataHoraAcao: r.checkinEm != null
+                                ? DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.tryParse(r.checkinEm!)?.toLocal() ?? DateTime.now())
+                                : null,
+                          );
+                        },
+                      ),
+                    ],
                   ],
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFDC2626),
-                      side: const BorderSide(color: Color(0xFFFCA5A5)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    icon: const Icon(Icons.cancel_outlined, size: 14),
-                    label: const Text('Cancelar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    onPressed: () {
-                      if (token != null) {
-                        _showCancelDialog(r, token);
-                      }
-                    },
-                  ),
-                ] else ...[
-                  // Para reservas canceladas ou concluídas: botão de abrir voucher
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF2563EB),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    ),
-                    icon: const Icon(Icons.receipt_long_rounded, size: 14),
-                    label: const Text('Ver Detalhes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    onPressed: () {
-                      final auth = Provider.of<AuthProvider>(context, listen: false);
-                      final tipo = r.checkinRealizado
-                          ? TipoComprovante.checkin
-                          : (r.isCancelada
-                              ? TipoComprovante.cancelamento
-                              : TipoComprovante.visualizacao);
-                      ComprovanteDialog.show(
-                        context,
-                        tipo: tipo,
-                        comprovante: r.codigoComprovante ?? 'RES-CONFIRMADO',
-                        dataReserva: r.dataReserva,
-                        escritorioNome: r.escritorioNome,
-                        escritorioCidade: r.escritorioCidade,
-                        cadeiraIdentificador: r.cadeiraIdentificador,
-                        baiaNome: r.baiaNome,
-                        usuarioNome: auth.user?.nome,
-                        usuarioMatricula: auth.user?.matricula,
-                        dataHoraAcao: r.checkinEm != null
-                            ? DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.tryParse(r.checkinEm!)?.toLocal() ?? DateTime.now())
-                            : null,
-                      );
-                    },
-                  ),
-                ],
+                ),
               ],
             ),
           ],
