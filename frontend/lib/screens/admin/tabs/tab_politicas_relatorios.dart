@@ -6,12 +6,22 @@ class TabPoliticasRelatorios extends StatelessWidget {
   final TextEditingController limiteSemanalController;
   final TextEditingController horarioGestaoController;
   final TextEditingController horarioColabController;
+  final TextEditingController horarioInicioCheckinController;
   final TextEditingController horarioCheckinController;
+  final TextEditingController avisoGlobalController;
+  final TextEditingController mfaExpiracaoController;
+  final TextEditingController mfaTentativasController;
   final String diaGestao;
   final String diaColab;
+  final bool permitirTroca;
+  final bool bloquearFimDeSemana;
+  final bool checkinAutoGestao;
   final DateTime dataRelatorio;
   final Function(String? value) onDiaGestaoChanged;
   final Function(String? value) onDiaColabChanged;
+  final Function(bool value) onPermitirTrocaChanged;
+  final Function(bool value) onBloquearFimDeSemanaChanged;
+  final Function(bool value) onCheckinAutoGestaoChanged;
   final Function(DateTime date) onDataRelatorioChanged;
   final VoidCallback onSalvarParametros;
   final VoidCallback onExecutarLimpezaNoShow;
@@ -22,17 +32,37 @@ class TabPoliticasRelatorios extends StatelessWidget {
     required this.limiteSemanalController,
     required this.horarioGestaoController,
     required this.horarioColabController,
+    required this.horarioInicioCheckinController,
     required this.horarioCheckinController,
+    required this.avisoGlobalController,
+    required this.mfaExpiracaoController,
+    required this.mfaTentativasController,
     required this.diaGestao,
     required this.diaColab,
+    required this.permitirTroca,
+    required this.bloquearFimDeSemana,
+    required this.checkinAutoGestao,
     required this.dataRelatorio,
     required this.onDiaGestaoChanged,
     required this.onDiaColabChanged,
+    required this.onPermitirTrocaChanged,
+    required this.onBloquearFimDeSemanaChanged,
+    required this.onCheckinAutoGestaoChanged,
     required this.onDataRelatorioChanged,
     required this.onSalvarParametros,
     required this.onExecutarLimpezaNoShow,
     required this.onExportarCsv,
   });
+
+  static const List<DropdownMenuItem<String>> _diasSemanaItems = [
+    DropdownMenuItem(value: '1', child: Text('Segunda-feira')),
+    DropdownMenuItem(value: '2', child: Text('Terça-feira')),
+    DropdownMenuItem(value: '3', child: Text('Quarta-feira')),
+    DropdownMenuItem(value: '4', child: Text('Quinta-feira')),
+    DropdownMenuItem(value: '5', child: Text('Sexta-feira')),
+    DropdownMenuItem(value: '6', child: Text('Sábado')),
+    DropdownMenuItem(value: '7', child: Text('Domingo')),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -40,126 +70,341 @@ class TabPoliticasRelatorios extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(maxWidth: 850),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 1. CARD: REGRAS DE ABERTURA E LIMITES
               Card(
-                elevation: 1,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: LayoutBuilder(
                     builder: (context, polConstraints) {
-                      final isMobile = polConstraints.maxWidth < 600;
+                      final isMobile = polConstraints.maxWidth < 620;
 
                       final inputHorarioGestao = TextFormField(
                         controller: horarioGestaoController,
                         decoration: const InputDecoration(
-                          labelText: 'Abertura Gestão (Horário)',
+                          labelText: 'Horário Abertura (Gestão)',
+                          hintText: '08:00',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.access_time_rounded, size: 20),
                         ),
                       );
 
                       final dropDiaGestao = DropdownButtonFormField<String>(
                         initialValue: diaGestao,
                         decoration: const InputDecoration(
-                          labelText: 'Dia da Semana (Gestão)',
+                          labelText: 'Dia Abertura (Gestão)',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_today_rounded, size: 20),
                         ),
-                        items: const [
-                          DropdownMenuItem(value: '1', child: Text('Segunda-feira')),
-                          DropdownMenuItem(value: '4', child: Text('Quinta-feira')),
-                          DropdownMenuItem(value: '5', child: Text('Sexta-feira')),
-                        ],
+                        items: _diasSemanaItems,
                         onChanged: onDiaGestaoChanged,
                       );
 
                       final inputHorarioColab = TextFormField(
                         controller: horarioColabController,
                         decoration: const InputDecoration(
-                          labelText: 'Abertura Geral (Horário)',
+                          labelText: 'Horário Abertura (Geral)',
+                          hintText: '12:00',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.access_time_rounded, size: 20),
                         ),
                       );
 
                       final dropDiaColab = DropdownButtonFormField<String>(
                         initialValue: diaColab,
                         decoration: const InputDecoration(
-                          labelText: 'Dia da Semana (Colaborador)',
+                          labelText: 'Dia Abertura (Geral)',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_today_rounded, size: 20),
                         ),
-                        items: const [
-                          DropdownMenuItem(value: '1', child: Text('Segunda-feira')),
-                          DropdownMenuItem(value: '4', child: Text('Quinta-feira')),
-                          DropdownMenuItem(value: '5', child: Text('Sexta-feira')),
-                        ],
+                        items: _diasSemanaItems,
                         onChanged: onDiaColabChanged,
                       );
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Parâmetros Globais de Reserva',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          const Row(
+                            children: [
+                              Icon(Icons.schedule_rounded, color: Color(0xFF2563EB), size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Abertura da Próxima Semana & Cotas',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: limiteSemanalController,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
-                              labelText: 'Limite de Reservas Semanais por Usuário',
+                              labelText: 'Limite Máximo de Reservas Semanais por Colaborador',
+                              hintText: '2',
                               border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.event_seat_rounded, size: 20),
                             ),
                           ),
                           const SizedBox(height: 16),
                           if (isMobile) ...[
-                            inputHorarioGestao,
-                            const SizedBox(height: 12),
                             dropDiaGestao,
+                            const SizedBox(height: 12),
+                            inputHorarioGestao,
                           ] else ...[
                             Row(
                               children: [
-                                Expanded(child: inputHorarioGestao),
-                                const SizedBox(width: 12),
                                 Expanded(child: dropDiaGestao),
+                                const SizedBox(width: 12),
+                                Expanded(child: inputHorarioGestao),
                               ],
                             ),
                           ],
                           const SizedBox(height: 16),
                           if (isMobile) ...[
-                            inputHorarioColab,
-                            const SizedBox(height: 12),
                             dropDiaColab,
+                            const SizedBox(height: 12),
+                            inputHorarioColab,
                           ] else ...[
                             Row(
                               children: [
-                                Expanded(child: inputHorarioColab),
-                                const SizedBox(width: 12),
                                 Expanded(child: dropDiaColab),
+                                const SizedBox(width: 12),
+                                Expanded(child: inputHorarioColab),
+                              ],
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 2. CARD: POLÍTICAS DE CHECK-IN E REGRAS OPERACIONAIS
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: LayoutBuilder(
+                    builder: (context, chkConstraints) {
+                      final isMobile = chkConstraints.maxWidth < 620;
+
+                      final inputHorarioInicio = TextFormField(
+                        controller: horarioInicioCheckinController,
+                        decoration: const InputDecoration(
+                          labelText: 'Início do Check-in Diário',
+                          hintText: '06:00',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.login_rounded, size: 20),
+                        ),
+                      );
+
+                      final inputHorarioLimite = TextFormField(
+                        controller: horarioCheckinController,
+                        decoration: const InputDecoration(
+                          labelText: 'Horário Limite / Corte (No-Show)',
+                          hintText: '11:00',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.alarm_off_rounded, size: 20),
+                        ),
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.rule_rounded, color: Color(0xFF2563EB), size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Políticas de Check-in e Regras de Reserva',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (isMobile) ...[
+                            inputHorarioInicio,
+                            const SizedBox(height: 12),
+                            inputHorarioLimite,
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(child: inputHorarioInicio),
+                                const SizedBox(width: 12),
+                                Expanded(child: inputHorarioLimite),
                               ],
                             ),
                           ],
                           const SizedBox(height: 16),
-                          TextFormField(
-                            controller: horarioCheckinController,
-                            decoration: const InputDecoration(
-                              labelText: 'Horário Limite de Check-in Diário (No-Show Cutoff)',
-                              border: OutlineInputBorder(),
-                            ),
+
+                          // Switches de Políticas
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Bloquear Reservas aos Fins de Semana', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            subtitle: const Text('Impede colaboradores de reservarem assentos aos Sábados e Domingos.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            value: bloquearFimDeSemana,
+                            activeThumbColor: const Color(0xFF2563EB),
+                            onChanged: onBloquearFimDeSemanaChanged,
+                          ),
+                          const Divider(height: 1),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Permitir Troca de Assento no Mesmo Dia', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            subtitle: const Text('Permite ao colaborador trocar de mesa atomicamente para uma mesma data já reservada.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            value: permitirTroca,
+                            activeThumbColor: const Color(0xFF2563EB),
+                            onChanged: onPermitirTrocaChanged,
+                          ),
+                          const Divider(height: 1),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Check-in Automático para Gestão', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                            subtitle: const Text('Marca a presença como confirmada automaticamente no momento da reserva para usuários GESTAO.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            value: checkinAutoGestao,
+                            activeThumbColor: const Color(0xFF2563EB),
+                            onChanged: onCheckinAutoGestaoChanged,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 3. CARD: COMUNICAÇÃO & AVISO GLOBAL DO RH
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.campaign_rounded, color: Color(0xFFD97706), size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Aviso Global / Comunicado do RH',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Deixe em branco para ocultar o banner. Quando preenchido, será exibido no topo do app para todos os colaboradores.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: avisoGlobalController,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          hintText: 'Ex: Atenção: Na próxima sexta-feira haverá evento corporativo no escritório Berrini.',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 4. CARD: SEGURANÇA E MFA STEP-UP
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: LayoutBuilder(
+                    builder: (context, secConstraints) {
+                      final isMobile = secConstraints.maxWidth < 620;
+
+                      final inputMfaExp = TextFormField(
+                        controller: mfaExpiracaoController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Expiração MFA (Minutos)',
+                          hintText: '10',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.timer_outlined, size: 20),
+                        ),
+                      );
+
+                      final inputMfaTent = TextFormField(
+                        controller: mfaTentativasController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Máximo de Tentativas MFA',
+                          hintText: '3',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.shield_outlined, size: 20),
+                        ),
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.security_rounded, color: Color(0xFF7C3AED), size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Segurança & Autenticação Step-Up (MFA)',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 16),
+                          if (isMobile) ...[
+                            inputMfaExp,
+                            const SizedBox(height: 12),
+                            inputMfaTent,
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(child: inputMfaExp),
+                                const SizedBox(width: 12),
+                                Expanded(child: inputMfaTent),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 20),
                           Align(
                             alignment: Alignment.centerRight,
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF0F172A),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                              icon: const Icon(Icons.save),
-                              label: const Text('Salvar Parâmetros'),
+                              icon: const Icon(Icons.save_rounded, size: 18),
+                              label: const Text('Salvar Todas as Configurações', style: TextStyle(fontWeight: FontWeight.bold)),
                               onPressed: onSalvarParametros,
                             ),
                           ),
@@ -169,32 +414,45 @@ class TabPoliticasRelatorios extends StatelessWidget {
                   ),
                 ),
               ),
+
               const SizedBox(height: 16),
+
+              // 5. CARD: AÇÕES OPERACIONAIS DE EMERGÊNCIA
               Card(
-                elevation: 1,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Ações Operacionais de Emergência',
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                      const Row(
+                        children: [
+                          Icon(Icons.cleaning_services_rounded, color: Color(0xFFEA580C), size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Ações Operacionais de Emergência',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Dispare manualmente a rotina de liberação de no-show para cancelar reservas sem check-in do dia imediatamente.',
-                        style: TextStyle(fontSize: 13, color: Colors.black87),
+                        'Dispare manualmente a rotina de limpeza de No-Show para cancelar imediatamente reservas sem presença confirmada de hoje.',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange.shade800,
+                          backgroundColor: const Color(0xFFEA580C),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        icon: const Icon(Icons.cleaning_services),
+                        icon: const Icon(Icons.cleaning_services_rounded, size: 18),
                         label: const Text('Executar Limpeza de No-Show Agora'),
                         onPressed: onExecutarLimpezaNoShow,
                       ),
@@ -202,19 +460,29 @@ class TabPoliticasRelatorios extends StatelessWidget {
                   ),
                 ),
               ),
+
               const SizedBox(height: 16),
+
+              // 6. CARD: EXPORTAÇÃO DE RELATÓRIO CSV
               Card(
-                elevation: 1,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: LayoutBuilder(
                     builder: (context, relConstraints) {
                       final isMobile = relConstraints.maxWidth < 550;
 
                       final btnDataRelatorio = OutlinedButton.icon(
-                        icon: const Icon(Icons.date_range),
+                        icon: const Icon(Icons.date_range_rounded),
                         label: Text('Data: ${DateFormat("dd/MM/yyyy").format(dataRelatorio)}'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                         onPressed: () async {
                           final picked = await showDatePicker(
                             context: context,
@@ -230,9 +498,10 @@ class TabPoliticasRelatorios extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppConstants.primaryColor,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        icon: const Icon(Icons.download),
+                        icon: const Icon(Icons.download_rounded, size: 18),
                         label: const Text('Exportar CSV de Ocupação'),
                         onPressed: onExportarCsv,
                       );
@@ -240,11 +509,17 @@ class TabPoliticasRelatorios extends StatelessWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Exportação de Relatórios de Ocupação',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          const Row(
+                            children: [
+                              Icon(Icons.table_chart_rounded, color: Color(0xFF0D9488), size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Exportação de Relatórios de Ocupação',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           if (isMobile) ...[
                             SizedBox(width: double.infinity, child: btnDataRelatorio),
                             const SizedBox(height: 10),

@@ -4,12 +4,12 @@ import jwt from 'jsonwebtoken';
 import { DateTime } from 'luxon';
 import pool from '../config/db';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { ConfigService } from '../services/configService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1d';
 const JWT_ADMIN_SECRET = process.env.JWT_ADMIN_SECRET || 'super_secret_admin_mfa_jwt_key_seatmap_2026';
 const JWT_ADMIN_EXPIRATION = process.env.JWT_ADMIN_EXPIRATION || '2h';
-const MFA_CODE_EXPIRATION_MINUTES = parseInt(process.env.MFA_CODE_EXPIRATION_MINUTES || '5', 10);
 
 export class AuthController {
   public static async login(req: Request, res: Response) {
@@ -40,25 +40,29 @@ export class AuthController {
         return res.status(401).json({ error: 'Credenciais inválidas.' });
       }
 
-      const hasRhAccess = Boolean(user.permissao_rh || user.perfil === 'ADMIN_RH');
-
-      const payload = {
+      const token = jwt.sign({
         userId: user.id,
         nome: user.nome,
         email: user.email,
         matricula: user.matricula,
         perfil: user.perfil,
-        permissaoRh: hasRhAccess,
-        is_admin: hasRhAccess,
+        permissaoRh: user.permissao_rh === true || user.perfil === 'ADMIN_RH',
         departamentoId: user.departamento_id,
         departamentoNome: user.departamento_nome
-      };
-
-      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
+      }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
 
       return res.status(200).json({
         token,
-        user: payload
+        user: {
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+          matricula: user.matricula,
+          perfil: user.perfil,
+          permissaoRh: user.permissao_rh === true || user.perfil === 'ADMIN_RH',
+          departamentoId: user.departamento_id,
+          departamentoNome: user.departamento_nome
+        }
       });
     } catch (error) {
       console.error('[AuthController.login] Erro:', error);
@@ -74,9 +78,10 @@ export class AuthController {
     }
 
     try {
+      const expiraMin = await ConfigService.getNumber('MFA_EXPIRACAO_MINUTOS', 10);
       // Gerar código aleatório de 6 dígitos numéricos
       const codigo = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiraEm = DateTime.now().plus({ minutes: MFA_CODE_EXPIRATION_MINUTES }).toJSDate();
+      const expiraEm = DateTime.now().plus({ minutes: expiraMin }).toJSDate();
 
       await pool.query(`
         INSERT INTO auth_mfa_codes (usuario_id, codigo, expira_em, utilizado)
@@ -87,13 +92,13 @@ export class AuthController {
       console.log('================================================================');
       console.log(`[MFA SIMULATION] E-mail enviado para: ${user.email}`);
       console.log(`[MFA SIMULATION] Código de Verificação: >>> ${codigo} <<<`);
-      console.log(`[MFA SIMULATION] Válido até: ${expiraEm.toISOString()} (${MFA_CODE_EXPIRATION_MINUTES} minutos)`);
+      console.log(`[MFA SIMULATION] Válido até: ${expiraEm.toISOString()} (${expiraMin} minutos)`);
       console.log('================================================================');
 
       return res.status(200).json({
         message: 'Código de autenticação MFA gerado e enviado por e-mail com sucesso.',
         email: user.email,
-        expiraEmMinutos: MFA_CODE_EXPIRATION_MINUTES,
+        expiraEmMinutos: expiraMin,
         codigoSimulado: process.env.NODE_ENV !== 'production' ? codigo : undefined
       });
     } catch (error) {
@@ -116,7 +121,7 @@ export class AuthController {
     }
 
     try {
-      const isMasterCode = codigo.trim() === '123456';
+      const isMasterCode = process.env.NODE_ENV !== 'production' && codigo.trim() === '123456';
 
       let mfaRecord: any = null;
       if (isMasterCode) {

@@ -56,9 +56,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   final _limiteSemanalController = TextEditingController();
   final _horarioGestaoController = TextEditingController();
   final _horarioColabController = TextEditingController();
+  final _horarioInicioCheckinController = TextEditingController();
   final _horarioCheckinController = TextEditingController();
+  final _avisoGlobalController = TextEditingController();
+  final _mfaExpiracaoController = TextEditingController();
+  final _mfaTentativasController = TextEditingController();
   String _diaGestao = '5';
   String _diaColab = '5';
+  bool _permitirTroca = true;
+  bool _bloquearFimDeSemana = true;
+  bool _checkinAutoGestao = true;
   DateTime _dataRelatorio = DateTime.now();
 
   @override
@@ -79,7 +86,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     _limiteSemanalController.dispose();
     _horarioGestaoController.dispose();
     _horarioColabController.dispose();
+    _horarioInicioCheckinController.dispose();
     _horarioCheckinController.dispose();
+    _avisoGlobalController.dispose();
+    _mfaExpiracaoController.dispose();
+    _mfaTentativasController.dispose();
     super.dispose();
   }
 
@@ -174,14 +185,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       final list = res.data as List;
       for (final item in list) {
         final chave = item['chave'];
-        final valor = item['valor'];
+        final valor = item['valor']?.toString() ?? '';
         if (chave == 'LIMITE_SEMANAL_RESERVAS') _limiteSemanalController.text = valor;
         if (chave == 'HORARIO_ABERTURA_GESTAO') _horarioGestaoController.text = valor;
         if (chave == 'HORARIO_ABERTURA_COLABORADOR') _horarioColabController.text = valor;
+        if (chave == 'HORARIO_INICIO_CHECKIN') _horarioInicioCheckinController.text = valor;
         if (chave == 'HORARIO_LIMITE_CHECKIN') _horarioCheckinController.text = valor;
         if (chave == 'DIA_ABERTURA_GESTAO') _diaGestao = valor;
         if (chave == 'DIA_ABERTURA_COLABORADOR') _diaColab = valor;
+        if (chave == 'PERMITIR_TROCA_MESMO_DIA') _permitirTroca = (valor == 'true');
+        if (chave == 'BLOQUEAR_FIM_DE_SEMANA') _bloquearFimDeSemana = (valor == 'true');
+        if (chave == 'CHECKIN_AUTOMATICO_GESTAO') _checkinAutoGestao = (valor == 'true');
+        if (chave == 'AVISO_GLOBAL_SISTEMA') _avisoGlobalController.text = valor;
+        if (chave == 'MFA_EXPIRACAO_MINUTOS') _mfaExpiracaoController.text = valor;
+        if (chave == 'MFA_MAX_TENTATIVAS') _mfaTentativasController.text = valor;
       }
+      setState(() {});
     }
   }
 
@@ -789,7 +808,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       {'chave': 'DIA_ABERTURA_GESTAO', 'valor': _diaGestao},
       {'chave': 'HORARIO_ABERTURA_COLABORADOR', 'valor': _horarioColabController.text.trim()},
       {'chave': 'DIA_ABERTURA_COLABORADOR', 'valor': _diaColab},
+      {'chave': 'HORARIO_INICIO_CHECKIN', 'valor': _horarioInicioCheckinController.text.trim()},
       {'chave': 'HORARIO_LIMITE_CHECKIN', 'valor': _horarioCheckinController.text.trim()},
+      {'chave': 'PERMITIR_TROCA_MESMO_DIA', 'valor': _permitirTroca.toString()},
+      {'chave': 'BLOQUEAR_FIM_DE_SEMANA', 'valor': _bloquearFimDeSemana.toString()},
+      {'chave': 'CHECKIN_AUTOMATICO_GESTAO', 'valor': _checkinAutoGestao.toString()},
+      {'chave': 'AVISO_GLOBAL_SISTEMA', 'valor': _avisoGlobalController.text.trim()},
+      {'chave': 'MFA_EXPIRACAO_MINUTOS', 'valor': _mfaExpiracaoController.text.trim()},
+      {'chave': 'MFA_MAX_TENTATIVAS', 'valor': _mfaTentativasController.text.trim()},
     ];
 
     final res = await _apiService.updateParametros(auth.token!, auth.adminToken!, payload);
@@ -1020,12 +1046,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                   limiteSemanalController: _limiteSemanalController,
                   horarioGestaoController: _horarioGestaoController,
                   horarioColabController: _horarioColabController,
+                  horarioInicioCheckinController: _horarioInicioCheckinController,
                   horarioCheckinController: _horarioCheckinController,
+                  avisoGlobalController: _avisoGlobalController,
+                  mfaExpiracaoController: _mfaExpiracaoController,
+                  mfaTentativasController: _mfaTentativasController,
                   diaGestao: _diaGestao,
                   diaColab: _diaColab,
+                  permitirTroca: _permitirTroca,
+                  bloquearFimDeSemana: _bloquearFimDeSemana,
+                  checkinAutoGestao: _checkinAutoGestao,
                   dataRelatorio: _dataRelatorio,
                   onDiaGestaoChanged: (v) => setState(() => _diaGestao = v ?? '5'),
                   onDiaColabChanged: (v) => setState(() => _diaColab = v ?? '5'),
+                  onPermitirTrocaChanged: (v) => setState(() => _permitirTroca = v),
+                  onBloquearFimDeSemanaChanged: (v) => setState(() => _bloquearFimDeSemana = v),
+                  onCheckinAutoGestaoChanged: (v) => setState(() => _checkinAutoGestao = v),
                   onDataRelatorioChanged: (d) => setState(() => _dataRelatorio = d),
                   onSalvarParametros: _salvarParametros,
                   onExecutarLimpezaNoShow: _executarLimpezaEmergencial,

@@ -58,6 +58,12 @@ export class ReservaController {
       return res.status(400).json({ error: 'Não é permitido realizar reservas para datas passadas.' });
     }
 
+    // Validação de bloqueio de finais de semana (Sábado = 6, Domingo = 7)
+    const bloquearFimDeSemana = (await ConfigService.get('BLOQUEAR_FIM_DE_SEMANA', 'true')) === 'true';
+    if (bloquearFimDeSemana && (dataLuxon.weekday === 6 || dataLuxon.weekday === 7)) {
+      return res.status(400).json({ error: 'Não há expediente aos finais de semana. Selecione um dia útil (Segunda a Sexta).' });
+    }
+
     // Validação do ciclo de abertura (Semana útil vigente vs Próxima semana)
     const diffSemanas = getWorkWeekDiff(dataAlvo, hoje);
 
@@ -132,6 +138,15 @@ export class ReservaController {
         });
       }
 
+      // Se for troca, verificar se a política do RH permite trocas no mesmo dia
+      if (isTroca) {
+        const permitirTroca = (await ConfigService.get('PERMITIR_TROCA_MESMO_DIA', 'true')) === 'true';
+        if (!permitirTroca) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'A troca de assento no mesmo dia está desabilitada pela política de RH.' });
+        }
+      }
+
       // 4. Validar limite de cotas de reservas ativas se não for troca no mesmo dia
       if (!isTroca) {
         const contagemAtivasRes = await client.query(`
@@ -156,10 +171,11 @@ export class ReservaController {
       const rawPayload = `${user.userId}-${cadeiraId}-${dataAlvoIso}-${timestampIso}-${idempotencyKey || ''}`;
       const codigoComprovante = 'RES-' + crypto.createHash('sha256').update(rawPayload).digest('hex').substring(0, 16).toUpperCase();
 
-      // 6. Configurar Check-in Automático para GESTAO
+      // 6. Configurar Check-in Automático para GESTAO conforme parametrização
+      const checkinAutoGestao = (await ConfigService.get('CHECKIN_AUTOMATICO_GESTAO', 'true')) === 'true';
       const isGestao = user.perfil === 'GESTAO';
-      const checkinRealizado = isGestao;
-      const checkinEm = isGestao ? new Date() : null;
+      const checkinRealizado = isGestao && checkinAutoGestao;
+      const checkinEm = checkinRealizado ? new Date() : null;
 
       // 7. Executar inserção ou troca atômica
       let novaReserva: any;
@@ -264,9 +280,16 @@ export class ReservaController {
     }
 
     const agora = DateTime.now().setZone('America/Sao_Paulo');
+    const horarioInicio = await ConfigService.get('HORARIO_INICIO_CHECKIN', '06:00');
     const horarioLimite = await ConfigService.get('HORARIO_LIMITE_CHECKIN', '11:00');
+    const [horaInicioH, horaInicioM] = horarioInicio.split(':').map(Number);
     const [horaLimiteH, horaLimiteM] = horarioLimite.split(':').map(Number);
+    const inicioCheckinHoje = agora.set({ hour: horaInicioH, minute: horaInicioM, second: 0, millisecond: 0 });
     const limiteCheckinHoje = agora.set({ hour: horaLimiteH, minute: horaLimiteM, second: 0, millisecond: 0 });
+
+    if (agora < inicioCheckinHoje) {
+      return res.status(400).json({ error: `O check-in diário só está liberado a partir das ${horarioInicio}.` });
+    }
 
     try {
       const reservaRes = await pool.query(`

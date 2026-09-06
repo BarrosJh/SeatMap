@@ -49,13 +49,63 @@ async function runSeed() {
     `, [defaultPasswordHash, tiId, operacoesId, rhId, juridicoId]);
     console.log(`[Seed] Inseridos ${resUsers.rowCount} usuários de teste.`);
 
-    // 5. Inserir Baia única de agrupador para cada escritório (as baias não têm nome na interface)
-    const resBaiaBarueri = await client.query(`INSERT INTO baias (escritorio_id, nome) VALUES ($1, 'Planta Barueri') RETURNING id;`, [barueriId]);
-    const resBaiaBerrini = await client.query(`INSERT INTO baias (escritorio_id, nome) VALUES ($1, 'Planta Berrini') RETURNING id;`, [berriniId]);
-    const baiaBarueriId = resBaiaBarueri.rows[0].id;
-    const baiaBerriniId = resBaiaBerrini.rows[0].id;
+    // 5. Inserir Bancadas/Baias Reais para Barueri
+    const barueriBenches = [
+      { nome: 'Bancada 01', seatIds: [1, 2, 3, 4] },
+      { nome: 'Bancada 02', seatIds: [5, 6, 7, 8, 9, 10, 11, 12] },
+      { nome: 'Bancada 03', seatIds: [13, 14, 15, 16, 17, 18, 19, 20] },
+      { nome: 'Bancada 04', seatIds: [21, 22, 23, 24, 25, 26] },
+      { nome: 'Bancada 05', seatIds: [27, 28, 29, 30, 31, 32, 33, 34, 35, 36] },
+      { nome: 'Bancada 06', seatIds: [37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50] },
+      { nome: 'Bancada 07', seatIds: [51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66] }
+    ];
 
-    // 6. Cadastrar 66 CADEIRAS DE BARUERI (Coordenadas fiéis à planta de Barueri)
+    const seatToBaiaBarueri: Record<number, number> = {};
+    for (const bench of barueriBenches) {
+      const resBaia = await client.query(
+        'INSERT INTO baias (escritorio_id, nome) VALUES ($1, $2) RETURNING id',
+        [barueriId, bench.nome]
+      );
+      const baiaId = resBaia.rows[0].id;
+      for (const sId of bench.seatIds) {
+        seatToBaiaBarueri[sId] = baiaId;
+      }
+    }
+    console.log(`[Seed] Inseridas ${barueriBenches.length} bancadas reais para Barueri.`);
+
+    // 6. Inserir Bancadas/Baias Reais para Berrini (15 Bancadas)
+    const berriniBenches = [
+      { nome: 'Bancada 01', seatIds: [1, 2, 3, 4, 5, 6, 7, 8] },
+      { nome: 'Bancada 02', seatIds: [9, 10, 11, 12, 13, 14, 15, 16] },
+      { nome: 'Bancada 03', seatIds: [17, 18, 19, 20, 21, 22] },
+      { nome: 'Bancada 04', seatIds: [23, 24, 25, 26, 27, 28] },
+      { nome: 'Bancada 05', seatIds: [29, 30, 31, 32, 33, 34] },
+      { nome: 'Bancada 06', seatIds: [35, 36, 37, 38, 39, 40] },
+      { nome: 'Bancada 07', seatIds: [41, 42, 43, 44, 45, 46] },
+      { nome: 'Bancada 08', seatIds: [47, 48, 49, 50, 51, 52] },
+      { nome: 'Bancada 09', seatIds: [53, 54, 55, 56, 57, 58, 59, 60] },
+      { nome: 'Bancada 10', seatIds: [61, 62, 63, 64, 65, 66, 67, 68] },
+      { nome: 'Bancada 11', seatIds: [69, 70, 71, 72, 73, 74, 75, 76] },
+      { nome: 'Bancada 12', seatIds: [77, 78, 79, 80, 81, 82, 83, 84] },
+      { nome: 'Bancada 13', seatIds: [85, 86, 87, 88, 89, 90] },
+      { nome: 'Bancada 14', seatIds: [91, 92, 93, 94, 95, 96] },
+      { nome: 'Bancada 15', seatIds: [97, 98, 99, 100, 101, 102] }
+    ];
+
+    const seatToBaiaBerrini: Record<number, number> = {};
+    for (const bench of berriniBenches) {
+      const resBaia = await client.query(
+        'INSERT INTO baias (escritorio_id, nome) VALUES ($1, $2) RETURNING id',
+        [berriniId, bench.nome]
+      );
+      const baiaId = resBaia.rows[0].id;
+      for (const sId of bench.seatIds) {
+        seatToBaiaBerrini[sId] = baiaId;
+      }
+    }
+    console.log(`[Seed] Inseridas ${berriniBenches.length} bancadas reais para Berrini.`);
+
+    // 7. Cadastrar 66 CADEIRAS DE BARUERI (Coordenadas fiéis à planta de Barueri)
     const barueriSeats: Array<{ id: number; x: number; y: number }> = [
       { id: 1, x: 118, y: 591 },
       { id: 2, x: 118, y: 548 },
@@ -126,14 +176,15 @@ async function runSeed() {
     ];
 
     for (const seat of barueriSeats) {
+      const bId = seatToBaiaBarueri[seat.id] || Object.values(seatToBaiaBarueri)[0];
       await client.query(`
         INSERT INTO cadeiras (baia_id, identificador, posicao_x, posicao_y, ativa)
         VALUES ($1, $2, $3, $4, true);
-      `, [baiaBarueriId, seat.id.toString(), seat.x, seat.y]);
+      `, [bId, seat.id.toString(), seat.x, seat.y]);
     }
-    console.log(`[Seed] Inseridas 66 cadeiras para Barueri.`);
+    console.log(`[Seed] Inseridas 66 cadeiras para Barueri distribuídas em suas respectivas bancadas.`);
 
-    // 7. Cadastrar 102 CADEIRAS DE BERRINI (Coordenadas fiéis à planta de Berrini)
+    // 8. Cadastrar 102 CADEIRAS DE BERRINI (Coordenadas fiéis à planta de Berrini)
     const berriniSeats: Array<{ id: number; x: number; y: number }> = [
       { id: 1, x: 12, y: 333 },
       { id: 2, x: 55, y: 332 },
@@ -240,22 +291,30 @@ async function runSeed() {
     ];
 
     for (const seat of berriniSeats) {
+      const bId = seatToBaiaBerrini[seat.id] || Object.values(seatToBaiaBerrini)[0];
       await client.query(`
         INSERT INTO cadeiras (baia_id, identificador, posicao_x, posicao_y, ativa)
         VALUES ($1, $2, $3, $4, true);
-      `, [baiaBerriniId, seat.id.toString(), seat.x, seat.y]);
+      `, [bId, seat.id.toString(), seat.x, seat.y]);
     }
-    console.log(`[Seed] Inseridas 102 cadeiras para Berrini com numeração 1 a 102.`);
+    console.log(`[Seed] Inseridas 102 cadeiras para Berrini distribuídas em suas 15 bancadas reais.`);
 
     // 8. Inserir Parâmetros padrão do Sistema
     await client.query(`
       INSERT INTO configuracoes_sistema (chave, valor, descricao) VALUES
       ('LIMITE_SEMANAL_RESERVAS', '2', 'Quantidade máxima de reservas permitidas por semana para cada colaborador'),
       ('HORARIO_ABERTURA_GESTAO', '08:00', 'Horário de liberação da agenda da próxima semana para perfil GESTAO'),
-      ('DIA_ABERTURA_GESTAO', '5', 'Dia da semana para abertura GESTAO (1=Segunda, 5=Sexta)'),
+      ('DIA_ABERTURA_GESTAO', '5', 'Dia da semana para abertura GESTAO (1=Segunda a 7=Domingo)'),
       ('HORARIO_ABERTURA_COLABORADOR', '12:00', 'Horário de liberação da agenda da próxima semana para perfil COLABORADOR'),
-      ('DIA_ABERTURA_COLABORADOR', '5', 'Dia da semana para abertura COLABORADOR (1=Segunda, 5=Sexta)'),
+      ('DIA_ABERTURA_COLABORADOR', '5', 'Dia da semana para abertura COLABORADOR (1=Segunda a 7=Domingo)'),
+      ('HORARIO_INICIO_CHECKIN', '06:00', 'Horário a partir do qual a confirmação diária de presença é liberada'),
       ('HORARIO_LIMITE_CHECKIN', '11:00', 'Horário de corte para confirmação diária de presença no app'),
+      ('PERMITIR_TROCA_MESMO_DIA', 'true', 'Permite que o colaborador troque de assento para a mesma data já reservada'),
+      ('BLOQUEAR_FIM_DE_SEMANA', 'true', 'Bloqueia a criação de reservas para Sábados e Domingos'),
+      ('CHECKIN_AUTOMATICO_GESTAO', 'true', 'Realiza o check-in automático ao reservar para usuários com perfil GESTAO'),
+      ('AVISO_GLOBAL_SISTEMA', '', 'Mensagem institucional de aviso em tempo real exibida no topo do app'),
+      ('MFA_EXPIRACAO_MINUTOS', '10', 'Tempo de validade do código MFA enviado por e-mail (em minutos)'),
+      ('MFA_MAX_TENTATIVAS', '3', 'Quantidade máxima de tentativas inválidas de MFA antes de bloquear o código'),
       ('TIMEZONE', 'America/Sao_Paulo', 'Fuso horário oficial do sistema')
       ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, descricao = EXCLUDED.descricao;
     `);
