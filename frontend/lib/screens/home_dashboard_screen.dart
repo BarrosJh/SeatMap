@@ -471,8 +471,13 @@ class HomeDashboardScreen extends StatelessWidget {
           else
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              child: Column(
-                children: dias.map((dia) => _buildVerticalDayRow(dia, escritorio)).toList(),
+              child: Builder(
+                builder: (context) {
+                  final hojeStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+                  return Column(
+                    children: dias.map((dia) => _buildVerticalDayRow(dia, escritorio, hojeStr)).toList(),
+                  );
+                },
               ),
             ),
         ],
@@ -481,7 +486,7 @@ class HomeDashboardScreen extends StatelessWidget {
   }
 
   /// Linha de um dia útil
-  Widget _buildVerticalDayRow(OcupacaoDiaModel dia, OcupacaoEscritorioModel escritorio) {
+  Widget _buildVerticalDayRow(OcupacaoDiaModel dia, OcupacaoEscritorioModel escritorio, String hojeStr) {
     final perc = dia.percentual;
 
     Color barColor;
@@ -497,7 +502,6 @@ class HomeDashboardScreen extends StatelessWidget {
       textColor = const Color(0xFFB91C1C);
     }
 
-    final hojeStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final isHoje = dia.data == hojeStr;
 
     return Padding(
@@ -507,12 +511,12 @@ class HomeDashboardScreen extends StatelessWidget {
           final dataParsed = DateTime.tryParse(dia.data);
           onNavegarParaMapa(escritorio.nome, dataParsed);
         },
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: const BorderRadius.all(Radius.circular(6)),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           decoration: BoxDecoration(
             color: isHoje ? const Color(0xFFECFDF5) : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: const BorderRadius.all(Radius.circular(6)),
             border: isHoje ? Border.all(color: const Color(0xFF6EE7B7), width: 1.0) : null,
           ),
           child: Row(
@@ -548,9 +552,9 @@ class HomeDashboardScreen extends StatelessWidget {
               Expanded(
                 child: Container(
                   height: 6,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(3),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.all(Radius.circular(3)),
                   ),
                   child: Align(
                     alignment: Alignment.centerLeft,
@@ -559,7 +563,7 @@ class HomeDashboardScreen extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           color: barColor,
-                          borderRadius: BorderRadius.circular(3),
+                          borderRadius: const BorderRadius.all(Radius.circular(3)),
                         ),
                       ),
                     ),

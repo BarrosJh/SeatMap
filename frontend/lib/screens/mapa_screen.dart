@@ -374,61 +374,98 @@ class _MapaScreenState extends State<MapaScreen> {
     );
   }
 
+  // Cache de Memoização de Alta Performance para evitar alocações de 102 desks por frame
+  MapaDataModel? _cachedMapaDataRef;
+  String? _cachedDateIso;
+  String? _cachedOfficeName;
+  UserModel? _cachedUserRef;
+  List<DeskModel> _cachedDesks = const [];
+  Map<String, CadeiraModel> _cachedChairMap = const {};
+
   Widget _buildInteractiveFloorPlanView(
     SeatMapProvider seatProvider,
     UserModel currentUser,
     String token,
   ) {
-    // Mapa auxiliar identificador -> CadeiraModel para sincronização em tempo real
-    final Map<String, CadeiraModel> cadeiraPorNumero = {};
-    if (seatProvider.mapaData != null) {
-      for (final baia in seatProvider.mapaData!.baias) {
-        for (final cad in baia.cadeiras) {
-          cadeiraPorNumero[cad.identificador] = cad;
-          final numClean = cad.identificador.replaceAll(RegExp(r'[^0-9]'), '');
-          if (numClean.isNotEmpty) {
-            cadeiraPorNumero[numClean] = cad;
-            cadeiraPorNumero[numClean.padLeft(2, '0')] = cad;
+    final officeName = seatProvider.selectedEscritorio?.nome ?? 'Berrini';
+    final dateIso = seatProvider.selectedDateIso;
+    final currentMapaData = seatProvider.mapaData;
+
+    // Se os dados não mudaram, reutiliza o mapa de cadeiras e a lista de desks em memória
+    if (_cachedMapaDataRef != currentMapaData ||
+        _cachedDateIso != dateIso ||
+        _cachedOfficeName != officeName ||
+        _cachedUserRef != currentUser) {
+      
+      final Map<String, CadeiraModel> cadeiraPorNumero = {};
+      if (currentMapaData != null) {
+        for (final baia in currentMapaData.baias) {
+          for (final cad in baia.cadeiras) {
+            final idStr = cad.identificador;
+            cadeiraPorNumero[idStr] = cad;
+
+            // Extração rápida de dígitos sem compilar RegExp por item
+            final sb = StringBuffer();
+            for (int i = 0; i < idStr.length; i++) {
+              final code = idStr.codeUnitAt(i);
+              if (code >= 48 && code <= 57) sb.writeCharCode(code);
+            }
+            final numClean = sb.toString();
+            if (numClean.isNotEmpty) {
+              cadeiraPorNumero[numClean] = cad;
+              if (numClean.length == 1) {
+                cadeiraPorNumero['0$numClean'] = cad;
+              }
+            }
           }
         }
       }
+
+      final canonicalDesks = getDesksForOffice(officeName);
+
+      // Sincroniza as mesas do escritório selecionado estritamente com os dados reais do banco de dados
+      final desks = canonicalDesks.map((d) {
+        final cad = cadeiraPorNumero[d.number];
+        DeskStatus status = DeskStatus.available;
+        String? occupantName;
+        String? occupantDept;
+
+        if (cad != null) {
+          if (cad.isMinhaReserva) {
+            status = DeskStatus.selected;
+            occupantName = '${currentUser.nome} (Você)';
+            occupantDept = currentUser.departamentoNome ?? 'Geral';
+          } else if (cad.isOcupada) {
+            final isSameDept = cad.ocupante != null &&
+                cad.ocupante!.departamentoId != null &&
+                cad.ocupante!.departamentoId == currentUser.departamentoId;
+            status = isSameDept ? DeskStatus.reserved : DeskStatus.occupied;
+            occupantName = cad.ocupante?.nome ?? 'Colega';
+            occupantDept = cad.ocupante?.departamento ?? 'Geral';
+          } else {
+            status = DeskStatus.available;
+            occupantName = null;
+            occupantDept = null;
+          }
+        }
+
+        return d.copyWith(
+          status: status,
+          occupantName: occupantName,
+          occupantDepartment: occupantDept,
+        );
+      }).toList(growable: false);
+
+      _cachedMapaDataRef = currentMapaData;
+      _cachedDateIso = dateIso;
+      _cachedOfficeName = officeName;
+      _cachedUserRef = currentUser;
+      _cachedDesks = List.unmodifiable(desks);
+      _cachedChairMap = Map.unmodifiable(cadeiraPorNumero);
     }
 
-    final officeName = seatProvider.selectedEscritorio?.nome ?? 'Berrini';
-    final canonicalDesks = getDesksForOffice(officeName);
-
-    // Sincroniza as mesas do escritório selecionado estritamente com os dados reais do banco de dados
-    final desks = canonicalDesks.map((d) {
-      final cad = cadeiraPorNumero[d.number];
-      DeskStatus status = DeskStatus.available;
-      String? occupantName;
-      String? occupantDept;
-
-      if (cad != null) {
-        if (cad.isMinhaReserva) {
-          status = DeskStatus.selected;
-          occupantName = '${currentUser.nome} (Você)';
-          occupantDept = currentUser.departamentoNome ?? 'Geral';
-        } else if (cad.isOcupada) {
-          final isSameDept = cad.ocupante != null &&
-              cad.ocupante!.departamentoId != null &&
-              cad.ocupante!.departamentoId == currentUser.departamentoId;
-          status = isSameDept ? DeskStatus.reserved : DeskStatus.occupied;
-          occupantName = cad.ocupante?.nome ?? 'Colega';
-          occupantDept = cad.ocupante?.departamento ?? 'Geral';
-        } else {
-          status = DeskStatus.available;
-          occupantName = null;
-          occupantDept = null;
-        }
-      }
-
-      return d.copyWith(
-        status: status,
-        occupantName: occupantName,
-        occupantDepartment: occupantDept,
-      );
-    }).toList();
+    final cadeiraPorNumero = _cachedChairMap;
+    final desks = _cachedDesks;
 
     return InteractiveFloorPlan(
       key: ValueKey(officeName),

@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 /// Static background painter for Berrini office floor plan (1184 x 516 px):
@@ -5,18 +6,27 @@ import 'package:flutter/material.dart';
 class BerriniFloorPlanBackgroundPainter extends CustomPainter {
   const BerriniFloorPlanBackgroundPainter();
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 1. Subtle floor architectural grid / dot pattern
-    final dotPaint = Paint()
-      ..color = const Color(0xFFE2E8F0)
-      ..strokeWidth = 1.0;
+  static final List<Offset> _dotPoints = _buildDotPoints(1184.0, 516.0);
 
-    for (double x = 20; x < size.width; x += 30) {
-      for (double y = 20; y < size.height; y += 30) {
-        canvas.drawCircle(Offset(x, y), 0.8, dotPaint);
+  static List<Offset> _buildDotPoints(double width, double height) {
+    final points = <Offset>[];
+    for (double x = 20; x < width; x += 30) {
+      for (double y = 20; y < height; y += 30) {
+        points.add(Offset(x, y));
       }
     }
+    return List.unmodifiable(points);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Subtle floor architectural grid / dot pattern (Batch optimized)
+    final dotPaint = Paint()
+      ..color = const Color(0xFFE2E8F0)
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPoints(ui.PointMode.points, _dotPoints, dotPaint);
 
     // 2. Structural Meeting Rooms & Technical Areas
     final roomFillPaint = Paint()

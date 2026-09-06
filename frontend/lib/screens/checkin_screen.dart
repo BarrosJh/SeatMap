@@ -36,11 +36,15 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
     _scanLineAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
+    );
+    if (widget.isActive) {
+      _scanLineAnim.repeat(reverse: true);
+    }
   }
 
   void _initScanner() {
     _scannerController = MobileScannerController(
+      autoStart: widget.isActive,
       detectionSpeed: DetectionSpeed.normal,
       facing: CameraFacing.back,
       torchEnabled: false,
@@ -53,18 +57,22 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
       _scannerController.start();
+      _scanLineAnim.repeat(reverse: true);
     } else if (!widget.isActive && oldWidget.isActive) {
       _scannerController.stop();
+      _scanLineAnim.stop();
+      _scanLineAnim.reset();
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_scannerController.value.isInitialized) return;
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       _scannerController.stop();
+      _scanLineAnim.stop();
     } else if (state == AppLifecycleState.resumed && widget.isActive) {
       _scannerController.start();
+      _scanLineAnim.repeat(reverse: true);
     }
   }
 
@@ -801,32 +809,33 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
                     border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.8), width: 2.5),
                   ),
                 ),
-                // Linha de Varredura Animada
-                AnimatedBuilder(
-                  animation: _scanLineAnim,
-                  builder: (context, child) {
-                    return Positioned(
-                      top: _scanLineAnim.value * (clampedBoxSize - 20),
-                      left: 10,
-                      right: 10,
-                      child: Container(
-                        height: 3,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Colors.transparent, Color(0xFF38BDF8), Colors.transparent],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF38BDF8).withValues(alpha: 0.8),
-                              blurRadius: 8,
-                              spreadRadius: 2,
+                // Linha de Varredura Animada (apenas quando a aba está ativa)
+                if (widget.isActive)
+                  AnimatedBuilder(
+                    animation: _scanLineAnim,
+                    builder: (context, child) {
+                      return Positioned(
+                        top: _scanLineAnim.value * (clampedBoxSize - 20),
+                        left: 10,
+                        right: 10,
+                        child: Container(
+                          height: 3,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Colors.transparent, Color(0xFF38BDF8), Colors.transparent],
                             ),
-                          ],
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF38BDF8).withValues(alpha: 0.8),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
               ],
             ),
           ),

@@ -105,8 +105,8 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
       ..setEntry(1, 3, dy)
       ..setEntry(3, 3, 1.0);
 
-    _minScale = fitScale; // Limita o zoom out para nunca encolher além do enquadramento ideal
-    _maxScale = math.max(3.5, fitScale * 3.5);
+    _minScale = math.max(0.1, fitScale * 0.5); // Permite zoom out flexível
+    _maxScale = math.max(4.0, fitScale * 4.0);
   }
 
   void _animateToMatrix(Matrix4 targetMatrix) {
@@ -134,7 +134,8 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
   void _zoomOut() {
     final currentMatrix = _transformationController.value;
     final currentScale = currentMatrix.getMaxScaleOnAxis();
-    if (currentScale <= _minScale + 0.05) {
+    final fitScale = _defaultMatrix.getMaxScaleOnAxis();
+    if (currentScale <= fitScale * 1.05) {
       _resetZoom();
       return;
     }
@@ -146,7 +147,14 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
     final currentScale = currentMatrix.getMaxScaleOnAxis();
     if (currentScale <= 0) return;
 
+    final fitScale = _defaultMatrix.getMaxScaleOnAxis();
     final targetScale = (currentScale * factor).clamp(_minScale, _maxScale);
+
+    if (factor < 1.0 && targetScale <= fitScale * 1.05) {
+      _resetZoom();
+      return;
+    }
+
     if ((targetScale - currentScale).abs() < 0.001) {
       if (factor < 1.0) {
         _resetZoom();
@@ -242,13 +250,8 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -256,7 +259,7 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
                       borderRadius: BorderRadius.circular(12),
                       child: Stack(
                         children: [
-                          // 1. Static Structural Background Layer
+                          // 1. Static Structural Background Layer (Paint Isolated)
                           RepaintBoundary(
                             child: CustomPaint(
                               size: Size(_effectiveFloorWidth, _effectiveFloorHeight),
@@ -266,22 +269,27 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
                             ),
                           ),
 
-                          // 2. Interactive Desks Layer
-                          ...widget.desks.map((desk) {
-                            return Positioned(
-                              left: desk.dx,
-                              top: desk.dy,
-                              width: desk.width,
-                              height: desk.height,
-                              child: Transform.rotate(
-                                angle: desk.rotationDegrees * math.pi / 180.0,
-                                child: _DeskItemWidget(
-                                  desk: desk,
-                                  onTap: () => _handleDeskTap(desk),
-                                ),
-                              ),
-                            );
-                          }),
+                          // 2. Interactive Desks Layer (Paint Isolated)
+                          RepaintBoundary(
+                            child: Stack(
+                              children: widget.desks.map((desk) {
+                                return Positioned(
+                                  left: desk.dx,
+                                  top: desk.dy,
+                                  width: desk.width,
+                                  height: desk.height,
+                                  child: Transform.rotate(
+                                    angle: desk.rotationDegrees * math.pi / 180.0,
+                                    child: _DeskItemWidget(
+                                      key: ValueKey(desk.id),
+                                      desk: desk,
+                                      onTap: () => _handleDeskTap(desk),
+                                    ),
+                                  ),
+                                );
+                              }).toList(growable: false),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -339,12 +347,13 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
   }
 }
 
-/// Single interactive desk item rendered with Material 3 styling
+/// Single interactive desk item rendered with optimized high-FPS styling
 class _DeskItemWidget extends StatelessWidget {
   final DeskModel desk;
   final VoidCallback onTap;
 
   const _DeskItemWidget({
+    super.key,
     required this.desk,
     required this.onTap,
   });
@@ -366,35 +375,44 @@ class _DeskItemWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = desk.status;
 
+    Color borderColor;
+    Color textColor;
+    switch (status) {
+      case DeskStatus.available:
+        borderColor = const Color(0xFF388E3C);
+        textColor = const Color(0xFF1B5E20);
+        break;
+      case DeskStatus.occupied:
+        borderColor = const Color(0xFFC62828);
+        textColor = Colors.white;
+        break;
+      case DeskStatus.reserved:
+        borderColor = const Color(0xFFD97706);
+        textColor = const Color(0xFF78350F);
+        break;
+      case DeskStatus.selected:
+        borderColor = const Color(0xFF1565C0);
+        textColor = Colors.white;
+        break;
+    }
+
     return Tooltip(
       message: _getTooltipText(),
-      waitDuration: const Duration(milliseconds: 50),
-      showDuration: const Duration(seconds: 3),
+      waitDuration: const Duration(milliseconds: 350),
+      showDuration: const Duration(seconds: 2),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
           onTap: onTap,
-          child: Container(
+          behavior: HitTestBehavior.opaque,
+          child: DecoratedBox(
             decoration: BoxDecoration(
               color: status.color,
-              borderRadius: BorderRadius.circular(4.0),
+              borderRadius: const BorderRadius.all(Radius.circular(3.5)),
               border: Border.all(
-                color: status == DeskStatus.available
-                    ? const Color(0xFF388E3C)
-                    : (status == DeskStatus.occupied
-                        ? const Color(0xFFC62828)
-                        : (status == DeskStatus.reserved
-                            ? const Color(0xFFD97706)
-                            : const Color(0xFF1565C0))),
+                color: borderColor,
                 width: 1.0,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 2.0,
-                  offset: const Offset(0, 1),
-                ),
-              ],
             ),
             child: Center(
               child: Transform.rotate(
@@ -406,11 +424,7 @@ class _DeskItemWidget extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10.0,
                       fontWeight: FontWeight.bold,
-                      color: status == DeskStatus.available
-                          ? const Color(0xFF1B5E20)
-                          : (status == DeskStatus.reserved
-                              ? const Color(0xFF78350F)
-                              : Colors.white),
+                      color: textColor,
                     ),
                   ),
                 ),

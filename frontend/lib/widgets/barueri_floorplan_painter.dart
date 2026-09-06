@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 /// Static background painter for Barueri office floor plan (820 x 637 px):
@@ -5,18 +6,27 @@ import 'package:flutter/material.dart';
 class BarueriFloorPlanBackgroundPainter extends CustomPainter {
   const BarueriFloorPlanBackgroundPainter();
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    // 1. Floor grid dot pattern
-    final dotPaint = Paint()
-      ..color = const Color(0xFFE2E8F0)
-      ..strokeWidth = 1.0;
+  static final List<Offset> _dotPoints = _buildDotPoints(820.0, 637.0);
 
-    for (double x = 20; x < size.width; x += 30) {
-      for (double y = 20; y < size.height; y += 30) {
-        canvas.drawCircle(Offset(x, y), 0.8, dotPaint);
+  static List<Offset> _buildDotPoints(double width, double height) {
+    final points = <Offset>[];
+    for (double x = 20; x < width; x += 30) {
+      for (double y = 20; y < height; y += 30) {
+        points.add(Offset(x, y));
       }
     }
+    return List.unmodifiable(points);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Floor grid dot pattern (Batch optimized)
+    final dotPaint = Paint()
+      ..color = const Color(0xFFE2E8F0)
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPoints(ui.PointMode.points, _dotPoints, dotPaint);
 
     // 2. Structural Meeting Room / Service Block (#D9D9D9 in SVG)
     final roomFillPaint = Paint()
