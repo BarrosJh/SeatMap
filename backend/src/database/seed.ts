@@ -310,7 +310,6 @@ async function runSeed() {
       ('HORARIO_INICIO_CHECKIN', '06:00', 'Horário a partir do qual a confirmação diária de presença é liberada'),
       ('HORARIO_LIMITE_CHECKIN', '11:00', 'Horário de corte para confirmação diária de presença no app'),
       ('PERMITIR_TROCA_MESMO_DIA', 'true', 'Permite que o colaborador troque de assento para a mesma data já reservada'),
-      ('BLOQUEAR_FIM_DE_SEMANA', 'true', 'Bloqueia a criação de reservas para Sábados e Domingos'),
       ('CHECKIN_AUTOMATICO_GESTAO', 'true', 'Realiza o check-in automático ao reservar para usuários com perfil GESTAO'),
       ('AVISO_GLOBAL_SISTEMA', '', 'Mensagem institucional de aviso em tempo real exibida no topo do app'),
       ('MFA_EXPIRACAO_MINUTOS', '10', 'Tempo de validade do código MFA enviado por e-mail (em minutos)'),

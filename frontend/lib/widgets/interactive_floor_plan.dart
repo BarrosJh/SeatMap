@@ -382,8 +382,10 @@ class _DeskItemWidget extends StatelessWidget {
                 color: status == DeskStatus.available
                     ? const Color(0xFF388E3C)
                     : (status == DeskStatus.occupied
-                        ? const Color(0xFF757575)
-                        : const Color(0xFF1565C0)),
+                        ? const Color(0xFFC62828)
+                        : (status == DeskStatus.reserved
+                            ? const Color(0xFFD97706)
+                            : const Color(0xFF1565C0))),
                 width: 1.0,
               ),
               boxShadow: [
@@ -404,10 +406,10 @@ class _DeskItemWidget extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10.0,
                       fontWeight: FontWeight.bold,
-                      color: status == DeskStatus.occupied
-                          ? const Color(0xFF424242)
-                          : (status == DeskStatus.available
-                              ? const Color(0xFF1B5E20)
+                      color: status == DeskStatus.available
+                          ? const Color(0xFF1B5E20)
+                          : (status == DeskStatus.reserved
+                              ? const Color(0xFF78350F)
                               : Colors.white),
                     ),
                   ),

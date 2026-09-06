@@ -14,13 +14,11 @@ class TabPoliticasRelatorios extends StatelessWidget {
   final String diaGestao;
   final String diaColab;
   final bool permitirTroca;
-  final bool bloquearFimDeSemana;
   final bool checkinAutoGestao;
   final DateTime dataRelatorio;
   final Function(String? value) onDiaGestaoChanged;
   final Function(String? value) onDiaColabChanged;
   final Function(bool value) onPermitirTrocaChanged;
-  final Function(bool value) onBloquearFimDeSemanaChanged;
   final Function(bool value) onCheckinAutoGestaoChanged;
   final Function(DateTime date) onDataRelatorioChanged;
   final VoidCallback onSalvarParametros;
@@ -40,13 +38,11 @@ class TabPoliticasRelatorios extends StatelessWidget {
     required this.diaGestao,
     required this.diaColab,
     required this.permitirTroca,
-    required this.bloquearFimDeSemana,
     required this.checkinAutoGestao,
     required this.dataRelatorio,
     required this.onDiaGestaoChanged,
     required this.onDiaColabChanged,
     required this.onPermitirTrocaChanged,
-    required this.onBloquearFimDeSemanaChanged,
     required this.onCheckinAutoGestaoChanged,
     required this.onDataRelatorioChanged,
     required this.onSalvarParametros,
@@ -253,15 +249,6 @@ class TabPoliticasRelatorios extends StatelessWidget {
                           const SizedBox(height: 16),
 
                           // Switches de Políticas
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Bloquear Reservas aos Fins de Semana', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                            subtitle: const Text('Impede colaboradores de reservarem assentos aos Sábados e Domingos.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                            value: bloquearFimDeSemana,
-                            activeThumbColor: const Color(0xFF2563EB),
-                            onChanged: onBloquearFimDeSemanaChanged,
-                          ),
-                          const Divider(height: 1),
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
                             title: const Text('Permitir Troca de Assento no Mesmo Dia', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),

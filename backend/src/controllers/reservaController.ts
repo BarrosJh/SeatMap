@@ -58,9 +58,8 @@ export class ReservaController {
       return res.status(400).json({ error: 'Não é permitido realizar reservas para datas passadas.' });
     }
 
-    // Validação de bloqueio de finais de semana (Sábado = 6, Domingo = 7)
-    const bloquearFimDeSemana = (await ConfigService.get('BLOQUEAR_FIM_DE_SEMANA', 'true')) === 'true';
-    if (bloquearFimDeSemana && (dataLuxon.weekday === 6 || dataLuxon.weekday === 7)) {
+    // Bloqueio definitivo de finais de semana (Sábado = 6, Domingo = 7 - sem expediente)
+    if (dataLuxon.weekday === 6 || dataLuxon.weekday === 7) {
       return res.status(400).json({ error: 'Não há expediente aos finais de semana. Selecione um dia útil (Segunda a Sexta).' });
     }
 

@@ -13,9 +13,9 @@ enum DeskStatus {
       case DeskStatus.available:
         return const Color(0xFF81C784); // Soft Green
       case DeskStatus.occupied:
-        return const Color(0xFFBDBDBD); // Neutral Gray
+        return const Color(0xFFE53935); // Red (Ocupada)
       case DeskStatus.reserved:
-        return const Color(0xFFFFB74D); // Amber / Warning
+        return const Color(0xFFFFB74D); // Amber / Colega Depto
       case DeskStatus.selected:
         return const Color(0xFF1E88E5); // Vibrant Blue
     }
@@ -27,9 +27,9 @@ enum DeskStatus {
       case DeskStatus.available:
         return const Color(0xFFE8F5E9);
       case DeskStatus.occupied:
-        return const Color(0xFFEEEEEE);
+        return const Color(0xFFFEF2F2);
       case DeskStatus.reserved:
-        return const Color(0xFFFFF3E0);
+        return const Color(0xFFFFFBEB);
       case DeskStatus.selected:
         return const Color(0xFFE3F2FD);
     }
@@ -41,9 +41,9 @@ enum DeskStatus {
       case DeskStatus.available:
         return const Color(0xFF2E7D32);
       case DeskStatus.occupied:
-        return const Color(0xFF616161);
+        return const Color(0xFFB91C1C);
       case DeskStatus.reserved:
-        return const Color(0xFFE65100);
+        return const Color(0xFFB45309);
       case DeskStatus.selected:
         return const Color(0xFF1565C0);
     }
@@ -57,9 +57,9 @@ enum DeskStatus {
       case DeskStatus.occupied:
         return 'Ocupada';
       case DeskStatus.reserved:
-        return 'Reservada';
+        return 'Colega Depto';
       case DeskStatus.selected:
-        return 'Selecionada';
+        return 'Sua Reserva';
     }
   }
 

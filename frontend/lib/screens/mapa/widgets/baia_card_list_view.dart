@@ -62,7 +62,7 @@ class BaiaCardListView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bancada ${index + 1}',
+                        baia.nome.isNotEmpty ? baia.nome : 'Bancada ${index + 1}',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
                       ),
                       Text(
