@@ -110,6 +110,66 @@ class ApiService {
     }
   }
 
+  Future<ApiResponse<Map<String, dynamic>>> solicitarRecuperacaoSenha(String login) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/esqueci-senha'),
+        headers: _headers(null),
+        body: jsonEncode({'login': login}),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: body,
+          message: body['message'],
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Erro ao solicitar recuperação de senha.',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<String>> redefinirSenha(String login, String codigo, String novaSenha) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/redefinir-senha'),
+        headers: _headers(null),
+        body: jsonEncode({
+          'login': login,
+          'codigo': codigo,
+          'novaSenha': novaSenha,
+        }),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: body['message'] ?? 'Senha redefinida com sucesso.',
+          message: body['message'],
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Erro ao redefinir senha.',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
   // ==========================================
   // ESCRITÓRIOS & ASSENTOS
   // ==========================================
@@ -251,6 +311,33 @@ class ApiService {
         );
       } else {
         return ApiResponse(success: false, error: body['error'] ?? 'Erro ao cancelar reserva.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<String>> enviarComprovanteEmail(String token, int reservaId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/reservas/$reservaId/enviar-comprovante-email'),
+        headers: _headers(token),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: body['email']?.toString() ?? '',
+          message: body['message'] ?? 'Comprovante enviado por e-mail com sucesso.',
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Erro ao enviar comprovante por e-mail.',
+          statusCode: response.statusCode,
+        );
       }
     } catch (e) {
       return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);

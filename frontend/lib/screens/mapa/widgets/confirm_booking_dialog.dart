@@ -72,8 +72,10 @@ class ConfirmBookingDialog {
                   if (res.success && res.data != null) {
                     final comprovante = res.data!['comprovante'] as String? ?? 'RES-CONFIRMADO';
                     final troca = res.data!['trocaRealizada'] == true;
+                    final reservaId = res.data!['reservaId'] as int? ?? res.data!['id'] as int?;
                     ComprovanteDialog.show(
                       context,
+                      reservaId: reservaId,
                       tipo: troca ? TipoComprovante.troca : TipoComprovante.reserva,
                       comprovante: comprovante,
                       dataReserva: seatProvider.selectedDateIso,
@@ -144,6 +146,7 @@ class ConfirmBookingDialog {
                   final comprovante = res.data?['codigoComprovante'] as String? ?? reserva.codigoComprovante ?? 'RES-CANCELADO';
                   ComprovanteDialog.show(
                     context,
+                    reservaId: reserva.id,
                     tipo: TipoComprovante.cancelamento,
                     comprovante: comprovante,
                     dataReserva: reserva.dataReserva,

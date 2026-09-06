@@ -65,6 +65,7 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                     final comprovante = res.data?['codigoComprovante'] as String? ?? reserva.codigoComprovante ?? 'RES-CANCELADO';
                     ComprovanteDialog.show(
                       context,
+                      reservaId: reserva.id,
                       tipo: TipoComprovante.cancelamento,
                       comprovante: comprovante,
                       dataReserva: reserva.dataReserva,
@@ -659,6 +660,7 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                                   : TipoComprovante.visualizacao);
                           ComprovanteDialog.show(
                             context,
+                            reservaId: r.id,
                             tipo: tipo,
                             comprovante: r.codigoComprovante!,
                             dataReserva: r.dataReserva,
@@ -756,6 +758,7 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                                 if (ok) {
                                   ComprovanteDialog.show(
                                     context,
+                                    reservaId: r.id,
                                     tipo: TipoComprovante.checkin,
                                     comprovante: r.codigoComprovante ?? 'RES-CHECKIN',
                                     dataReserva: r.dataReserva,
@@ -812,6 +815,7 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                                   : TipoComprovante.visualizacao);
                           ComprovanteDialog.show(
                             context,
+                            reservaId: r.id,
                             tipo: tipo,
                             comprovante: r.codigoComprovante ?? 'RES-CONFIRMADO',
                             dataReserva: r.dataReserva,

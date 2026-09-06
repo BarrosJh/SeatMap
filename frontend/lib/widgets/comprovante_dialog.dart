@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 
 enum TipoComprovante {
   reserva,
@@ -10,7 +13,8 @@ enum TipoComprovante {
   visualizacao,
 }
 
-class ComprovanteDialog extends StatelessWidget {
+class ComprovanteDialog extends StatefulWidget {
+  final int? reservaId;
   final TipoComprovante tipo;
   final String comprovante;
   final String dataReserva;
@@ -25,6 +29,7 @@ class ComprovanteDialog extends StatelessWidget {
 
   const ComprovanteDialog({
     super.key,
+    this.reservaId,
     required this.tipo,
     required this.comprovante,
     required this.dataReserva,
@@ -40,6 +45,7 @@ class ComprovanteDialog extends StatelessWidget {
 
   static Future<void> show(
     BuildContext context, {
+    int? reservaId,
     required TipoComprovante tipo,
     required String comprovante,
     required String dataReserva,
@@ -55,6 +61,7 @@ class ComprovanteDialog extends StatelessWidget {
     return showDialog(
       context: context,
       builder: (ctx) => ComprovanteDialog(
+        reservaId: reservaId,
         tipo: tipo,
         comprovante: comprovante,
         dataReserva: dataReserva,
@@ -71,10 +78,41 @@ class ComprovanteDialog extends StatelessWidget {
   }
 
   @override
+  State<ComprovanteDialog> createState() => _ComprovanteDialogState();
+}
+
+class _ComprovanteDialogState extends State<ComprovanteDialog> {
+  final ApiService _apiService = ApiService();
+  bool _enviandoEmail = false;
+
+  Future<void> _enviarEmail(BuildContext context) async {
+    if (widget.reservaId == null) return;
+
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (auth.token == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _enviandoEmail = true);
+
+    final res = await _apiService.enviarComprovanteEmail(auth.token!, widget.reservaId!);
+
+    if (mounted) {
+      setState(() => _enviandoEmail = false);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(res.message ?? (res.success ? 'Comprovante enviado por e-mail!' : 'Erro ao enviar e-mail.')),
+          backgroundColor: res.success ? const Color(0xFF16A34A) : Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    String dataFormatada = dataReserva;
+    String dataFormatada = widget.dataReserva;
     try {
-      final dt = DateTime.parse(dataReserva);
+      final dt = DateTime.parse(widget.dataReserva);
       dataFormatada = DateFormat("dd/MM/yyyy (EEEE)", 'pt_BR').format(dt);
     } catch (_) {}
 
@@ -87,7 +125,7 @@ class ComprovanteDialog extends StatelessWidget {
     String statusLabel;
     Color statusColor;
 
-    switch (tipo) {
+    switch (widget.tipo) {
       case TipoComprovante.reserva:
         headerIconColor = const Color(0xFF16A34A);
         headerBgColor = const Color(0xFFDCFCE7);
@@ -140,7 +178,7 @@ class ComprovanteDialog extends StatelessWidget {
         break;
     }
 
-    final titulo = tituloCustomizado ?? tituloDefault;
+    final titulo = widget.tituloCustomizado ?? tituloDefault;
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -150,30 +188,23 @@ class ComprovanteDialog extends StatelessWidget {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Ícone e Título
-              Center(
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: headerBgColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: headerBorderColor, width: 2),
-                  ),
-                  child: Icon(headerIcon, color: headerIconColor, size: 36),
+              // Header com Ícone e Título
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: headerBgColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: headerBorderColor, width: 2),
                 ),
+                child: Icon(headerIcon, color: headerIconColor, size: 32),
               ),
               const SizedBox(height: 14),
               Text(
                 titulo,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                ),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
               ),
               const SizedBox(height: 4),
               Text(
@@ -181,160 +212,168 @@ class ComprovanteDialog extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
-              const SizedBox(height: 12),
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      color: statusColor,
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 18),
 
-              // CARD ESTILIZADO DO COMPROVANTE (VOUCHER)
+              // Card do Código do Comprovante
               Container(
-                padding: const EdgeInsets.all(16),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Column(
                   children: [
-                    // Linha do Hash / Voucher com Botão de Copiar
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'CÓDIGO DE AUTENTICIDADE',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.6,
-                                    color: Color(0xFF64748B),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                SelectableText(
-                                  comprovante,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontFamily: 'monospace',
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF2563EB)),
-                            tooltip: 'Copiar Comprovante',
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: comprovante));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Código copiado com sucesso!'),
-                                  duration: Duration(seconds: 2),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SelectableText(
+                      widget.comprovante,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: 'monospace',
+                        color: Color(0xFF0F172A),
+                        letterSpacing: 2,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Código Único de Integridade & Auditoria',
+                      style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
 
-                    // Detalhes da Reserva
-                    if (usuarioNome != null) ...[
-                      _buildLinha(
-                        'Colaborador',
-                        '${usuarioNome!} ${usuarioMatricula != null ? "($usuarioMatricula)" : ""}',
-                      ),
+              // Detalhes da Reserva em Tabela Elegante
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    if (widget.usuarioNome != null) ...[
+                      _buildLinha('Colaborador', widget.usuarioNome!),
+                      if (widget.usuarioMatricula != null) ...[
+                        const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                        _buildLinha('Matrícula', widget.usuarioMatricula!),
+                      ],
                       const Divider(height: 14, color: Color(0xFFE2E8F0)),
                     ],
-                    _buildLinha('Data da Reserva', dataFormatada),
+                    _buildLinha('Data do Assento', dataFormatada),
                     const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                    _buildLinha('Escritório', '$escritorioNome ($escritorioCidade)'),
-                    if (baiaNome != null) ...[
+                    _buildLinha('Escritório', '${widget.escritorioNome} (${widget.escritorioCidade})'),
+                    if (widget.baiaNome != null) ...[
                       const Divider(height: 14, color: Color(0xFFE2E8F0)),
-                      _buildLinha('Baia / Setor', baiaNome!),
+                      _buildLinha('Baia / Setor', widget.baiaNome!),
                     ],
                     const Divider(height: 14, color: Color(0xFFE2E8F0)),
                     _buildLinha(
-                      tipo == TipoComprovante.cancelamento ? 'Estação Liberada' : 'Estação / Mesa',
-                      'Mesa $cadeiraIdentificador',
+                      widget.tipo == TipoComprovante.cancelamento ? 'Estação Liberada' : 'Estação / Mesa',
+                      'Mesa ${widget.cadeiraIdentificador}',
                       isDestacado: true,
                     ),
-                    if (dataHoraAcao != null) ...[
+                    if (widget.dataHoraAcao != null) ...[
                       const Divider(height: 14, color: Color(0xFFE2E8F0)),
                       _buildLinha(
-                        tipo == TipoComprovante.checkin
+                        widget.tipo == TipoComprovante.checkin
                             ? 'Horário do Check-in'
-                            : tipo == TipoComprovante.cancelamento
+                            : widget.tipo == TipoComprovante.cancelamento
                                 ? 'Cancelado em'
                                 : 'Registrado em',
-                        dataHoraAcao!,
+                        widget.dataHoraAcao!,
                       ),
                     ],
                   ],
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 20),
 
               // Botões de Ação
-              Row(
+              Column(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.copy_rounded, size: 16),
-                      label: const Text('Copiar Código'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: comprovante));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Código copiado para a área de transferência!'),
-                            duration: Duration(seconds: 2),
-                            behavior: SnackBarBehavior.floating,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.copy_rounded, size: 16),
+                          label: const Text('Copiar Código'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                        );
-                      },
-                    ),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: widget.comprovante));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Código copiado para a área de transferência!'),
+                                duration: Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      if (widget.reservaId != null) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: _enviandoEmail
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.email_outlined, size: 16, color: Color(0xFF2563EB)),
+                            label: Text(
+                              _enviandoEmail ? 'Enviando...' : 'Por E-mail',
+                              style: const TextStyle(color: Color(0xFF2563EB)),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF93C5FD)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: _enviandoEmail ? null : () => _enviarEmail(context),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: headerIconColor,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: () => Navigator.pop(context),

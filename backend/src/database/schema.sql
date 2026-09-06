@@ -84,3 +84,15 @@ CREATE TABLE IF NOT EXISTS auth_mfa_codes (
     criado_em TIMESTAMP DEFAULT NOW()
 );
 
+-- Tabela: auth_password_resets
+CREATE TABLE IF NOT EXISTS auth_password_resets (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    codigo VARCHAR(6) NOT NULL,
+    expira_em TIMESTAMP NOT NULL,
+    utilizado BOOLEAN DEFAULT false,
+    tentativas INT DEFAULT 0,
+    criado_em TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_password_resets_usuario ON auth_password_resets(usuario_id, utilizado);
+

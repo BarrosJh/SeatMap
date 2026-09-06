@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import pool from '../config/db';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ConfigService } from '../services/configService';
+import { EmailService } from '../services/emailService';
 import { wsManager } from '../websocket/wsServer';
 import { getWorkWeekDiff, isProximaSemanaLiberada } from '../utils/workWeekUtils';
 
@@ -523,6 +524,71 @@ export class ReservaController {
     } catch (error) {
       console.error('[ReservaController.minhasReservas] Erro:', error);
       return res.status(500).json({ error: 'Erro ao listar reservas do usuário.' });
+    }
+  }
+
+  public static async enviarComprovanteEmail(req: AuthenticatedRequest, res: Response) {
+    const user = req.user!;
+    const reservaId = parseInt(req.params.id, 10);
+
+    if (isNaN(reservaId)) {
+      return res.status(400).json({ error: 'ID de reserva inválido.' });
+    }
+
+    try {
+      const result = await pool.query(`
+        SELECT 
+          r.id,
+          to_char(r.data_reserva, 'YYYY-MM-DD') AS data_reserva,
+          r.codigo_comprovante,
+          r.status,
+          to_char(r.criado_em, 'DD/MM/YYYY HH24:MI') AS criado_em_formatado,
+          c.identificador AS cadeira_identificador,
+          b.nome AS baia_nome,
+          e.nome AS escritorio_nome,
+          e.cidade AS escritorio_cidade,
+          u.nome AS usuario_nome,
+          u.email AS usuario_email
+        FROM reservas r
+        JOIN cadeiras c ON r.cadeira_id = c.id
+        JOIN baias b ON c.baia_id = b.id
+        JOIN escritorios e ON b.escritorio_id = e.id
+        JOIN usuarios u ON r.usuario_id = u.id
+        WHERE r.id = $1
+      `, [reservaId]);
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'Reserva não encontrada.' });
+      }
+
+      const reserva = result.rows[0];
+
+      // Verificar autorização (o próprio usuário ou perfil RH/ADMIN)
+      const hasPermission = reserva.usuario_email === user.email || user.perfil === 'ADMIN_RH' || user.permissaoRh === true;
+      if (!hasPermission) {
+        return res.status(403).json({ error: 'Você não tem permissão para acessar o comprovante desta reserva.' });
+      }
+
+      // Disparar envio de e-mail assíncrono
+      EmailService.enviarComprovanteReserva(reserva.usuario_email, reserva.usuario_nome, {
+        escritorioNome: reserva.escritorio_nome,
+        escritorioCidade: reserva.escritorio_cidade,
+        baiaNome: reserva.baia_nome,
+        cadeiraIdentificador: reserva.cadeira_identificador,
+        dataReserva: reserva.data_reserva,
+        codigoComprovante: reserva.codigo_comprovante,
+        emitidoEm: reserva.criado_em_formatado
+      }).catch(err => {
+        console.error('[ReservaController.enviarComprovanteEmail] Erro ao despachar e-mail:', err);
+      });
+
+      return res.status(200).json({
+        message: `Comprovante enviado com sucesso para ${reserva.usuario_email}`,
+        email: reserva.usuario_email
+      });
+    } catch (error) {
+      console.error('[ReservaController.enviarComprovanteEmail] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao enviar comprovante por e-mail.' });
     }
   }
 }

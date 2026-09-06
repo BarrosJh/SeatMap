@@ -5,6 +5,7 @@ import { DateTime } from 'luxon';
 import pool from '../config/db';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ConfigService } from '../services/configService';
+import { EmailService } from '../services/emailService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1d';
@@ -88,12 +89,10 @@ export class AuthController {
         VALUES ($1, $2, $3, false)
       `, [user.userId, codigo, expiraEm]);
 
-      // Simulação do disparo do e-mail com destaque visual no console
-      console.log('================================================================');
-      console.log(`[MFA SIMULATION] E-mail enviado para: ${user.email}`);
-      console.log(`[MFA SIMULATION] Código de Verificação: >>> ${codigo} <<<`);
-      console.log(`[MFA SIMULATION] Válido até: ${expiraEm.toISOString()} (${expiraMin} minutos)`);
-      console.log('================================================================');
+      // Disparo do e-mail com template HTML corporativo via EmailService
+      EmailService.enviarCodigoMfa(user.email, user.nome, codigo, expiraMin).catch(err => {
+        console.error('[AuthController.solicitarMfa] Erro ao enviar e-mail:', err);
+      });
 
       return res.status(200).json({
         message: 'Código de autenticação MFA gerado e enviado por e-mail com sucesso.',
@@ -146,7 +145,9 @@ export class AuthController {
       }
 
       // Marcar código como utilizado
-      await pool.query('UPDATE auth_mfa_codes SET utilizado = true WHERE id = $1', [mfaRecord.id]);
+      if (mfaRecord.id > 0) {
+        await pool.query('UPDATE auth_mfa_codes SET utilizado = true WHERE id = $1', [mfaRecord.id]);
+      }
 
       // Emitir token administrativo com assinatura e escopo específico
       const adminToken = jwt.sign({
@@ -164,6 +165,154 @@ export class AuthController {
     } catch (error) {
       console.error('[AuthController.validarMfa] Erro:', error);
       return res.status(500).json({ error: 'Erro interno ao validar MFA.' });
+    }
+  }
+
+  // ==========================================
+  // ESQUECI MINHA SENHA & REDEFINIÇÃO
+  // ==========================================
+
+  public static async solicitarRecuperacaoSenha(req: Request, res: Response) {
+    const { login } = req.body;
+
+    if (!login || typeof login !== 'string' || login.trim().length === 0) {
+      return res.status(400).json({ error: 'Informe a matrícula ou e-mail cadastrado.' });
+    }
+
+    try {
+      const userRes = await pool.query(`
+        SELECT id, nome, email, matricula, ativo
+        FROM usuarios
+        WHERE (email = $1 OR matricula = $1) AND ativo = true
+      `, [login.trim()]);
+
+      if (userRes.rowCount === 0) {
+        // Resposta genérica segura para não expor enumeração de usuários
+        return res.status(200).json({
+          message: 'Se a matrícula ou e-mail estiver cadastrado, um código de redefinição será enviado.'
+        });
+      }
+
+      const user = userRes.rows[0];
+      const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiraMin = 15;
+      const expiraEm = DateTime.now().plus({ minutes: expiraMin }).toJSDate();
+
+      // Invalidar códigos pendentes anteriores do usuário
+      await pool.query(`
+        UPDATE auth_password_resets
+        SET utilizado = true
+        WHERE usuario_id = $1 AND utilizado = false
+      `, [user.id]);
+
+      // Inserir novo código
+      await pool.query(`
+        INSERT INTO auth_password_resets (usuario_id, codigo, expira_em, utilizado, tentativas)
+        VALUES ($1, $2, $3, false, 0)
+      `, [user.id, codigo, expiraEm]);
+
+      // Envio assíncrono do e-mail
+      EmailService.enviarCodigoRecuperacaoSenha(user.email, user.nome, codigo, expiraMin).catch(err => {
+        console.error('[AuthController.solicitarRecuperacaoSenha] Erro ao enviar e-mail:', err);
+      });
+
+      // Mascarar e-mail para exibição segura (ex: j***@dominio.com)
+      const partesEmail = user.email.split('@');
+      const nomeEmail = partesEmail[0];
+      const dominioEmail = partesEmail[1] || '';
+      const emailMascarado = (nomeEmail.length > 2)
+        ? `${nomeEmail[0]}***${nomeEmail[nomeEmail.length - 1]}@${dominioEmail}`
+        : `${nomeEmail[0]}***@${dominioEmail}`;
+
+      return res.status(200).json({
+        message: 'Código de recuperação enviado com sucesso para o seu e-mail cadastrado.',
+        emailMascarado,
+        expiraEmMinutos: expiraMin,
+        codigoSimulado: process.env.NODE_ENV !== 'production' ? codigo : undefined
+      });
+    } catch (error) {
+      console.error('[AuthController.solicitarRecuperacaoSenha] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao solicitar recuperação de senha.' });
+    }
+  }
+
+  public static async redefinirSenha(req: Request, res: Response) {
+    const { login, codigo, novaSenha } = req.body;
+
+    if (!login || !codigo || !novaSenha) {
+      return res.status(400).json({ error: 'Login, código de verificação e nova senha são obrigatórios.' });
+    }
+
+    if (String(codigo).trim().length !== 6) {
+      return res.status(400).json({ error: 'O código de verificação deve ter 6 dígitos numéricos.' });
+    }
+
+    if (String(novaSenha).length < 6) {
+      return res.status(400).json({ error: 'A nova senha deve possuir no mínimo 6 caracteres.' });
+    }
+
+    try {
+      const userRes = await pool.query(`
+        SELECT id, nome, email
+        FROM usuarios
+        WHERE (email = $1 OR matricula = $1) AND ativo = true
+      `, [String(login).trim()]);
+
+      if (userRes.rowCount === 0) {
+        return res.status(404).json({ error: 'Usuário não encontrado ou inativo.' });
+      }
+
+      const user = userRes.rows[0];
+
+      // Buscar código ativo
+      const resetRes = await pool.query(`
+        SELECT id, codigo, expira_em, tentativas, utilizado
+        FROM auth_password_resets
+        WHERE usuario_id = $1 AND utilizado = false
+        ORDER BY id DESC
+        LIMIT 1
+      `, [user.id]);
+
+      if (resetRes.rowCount === 0) {
+        return res.status(400).json({ error: 'Nenhum código de recuperação ativo. Solicite um novo código.' });
+      }
+
+      const resetRecord = resetRes.rows[0];
+
+      // Validar tentativas
+      if (resetRecord.tentativas >= 5) {
+        await pool.query('UPDATE auth_password_resets SET utilizado = true WHERE id = $1', [resetRecord.id]);
+        return res.status(400).json({ error: 'Limite de tentativas excedido. Solicite um novo código de recuperação.' });
+      }
+
+      // Validar expiração
+      if (new Date(resetRecord.expira_em) < new Date()) {
+        await pool.query('UPDATE auth_password_resets SET utilizado = true WHERE id = $1', [resetRecord.id]);
+        return res.status(400).json({ error: 'O código de verificação expirou. Solicite um novo código.' });
+      }
+
+      // Validar correspondência do código
+      if (resetRecord.codigo !== String(codigo).trim()) {
+        await pool.query('UPDATE auth_password_resets SET tentativas = tentativas + 1 WHERE id = $1', [resetRecord.id]);
+        const restantes = 5 - (resetRecord.tentativas + 1);
+        return res.status(400).json({
+          error: `Código incorreto. Você ainda tem ${restantes} tentativa(s).`
+        });
+      }
+
+      // Atualizar a senha do usuário
+      const saltRounds = 10;
+      const novaSenhaHash = await bcrypt.hash(String(novaSenha), saltRounds);
+
+      await pool.query('UPDATE usuarios SET senha_hash = $1 WHERE id = $2', [novaSenhaHash, user.id]);
+      await pool.query('UPDATE auth_password_resets SET utilizado = true WHERE id = $1', [resetRecord.id]);
+
+      return res.status(200).json({
+        message: 'Senha alterada com sucesso! Você já pode realizar login com sua nova senha.'
+      });
+    } catch (error) {
+      console.error('[AuthController.redefinirSenha] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao redefinir senha do usuário.' });
     }
   }
 }
