@@ -1,10 +1,10 @@
-import cron from 'node-cron';
+import cron, { ScheduledTask } from 'node-cron';
 import { DateTime } from 'luxon';
 import pool from '../config/db';
 import { wsManager } from '../websocket/wsServer';
 
 export class CronService {
-  private static task: cron.ScheduledTask | null = null;
+  private static task: ScheduledTask | null = null;
 
   public static init(): void {
     // Agendador executado diariamente às 11:00:00 no fuso de São Paulo
