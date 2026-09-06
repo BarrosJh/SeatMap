@@ -539,7 +539,10 @@ class _MapaScreenState extends State<MapaScreen> {
           children: [
             // BARRA DE CONTROLE CORPORATIVA UNIFICADA
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.of(context).size.width < 500 ? 10 : 20,
+                vertical: 10,
+              ),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 border: Border(
@@ -558,7 +561,7 @@ class _MapaScreenState extends State<MapaScreen> {
                       final canGoForward = isRh ? true : (_weekOffset < (isNextOpen ? 1 : 0));
 
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
@@ -568,32 +571,39 @@ class _MapaScreenState extends State<MapaScreen> {
                           mainAxisAlignment: isCompact ? MainAxisAlignment.spaceBetween : MainAxisSize.min as dynamic,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.chevron_left_rounded, size: 22),
+                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
                               tooltip: canGoBack ? 'Semana Anterior' : null,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                               color: canGoBack ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
                               onPressed: (canGoBack && auth.token != null) ? () => _changeWeek(-1, auth.token!) : null,
                             ),
-                            InkWell(
-                              onTap: auth.token != null ? () => _resetToCurrentWeek(auth.token!) : null,
-                              borderRadius: BorderRadius.circular(6),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.date_range_rounded, size: 14, color: Color(0xFF2563EB)),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      _getWeekLabel(),
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF1E293B),
+                            Flexible(
+                              child: InkWell(
+                                onTap: auth.token != null ? () => _resetToCurrentWeek(auth.token!) : null,
+                                borderRadius: BorderRadius.circular(6),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.date_range_rounded, size: 13, color: Color(0xFF2563EB)),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          _getWeekLabel(),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1E293B),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -601,18 +611,18 @@ class _MapaScreenState extends State<MapaScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                                  icon: const Icon(Icons.chevron_right_rounded, size: 20),
                                   tooltip: canGoForward ? 'Próxima Semana' : null,
                                   padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                                   color: canGoForward ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
                                   onPressed: (canGoForward && auth.token != null) ? () => _changeWeek(1, auth.token!) : null,
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.calendar_month_outlined, size: 16, color: Color(0xFF64748B)),
+                                  icon: const Icon(Icons.calendar_month_outlined, size: 15, color: Color(0xFF64748B)),
                                   tooltip: 'Escolher Data no Calendário',
                                   padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                                   onPressed: auth.token != null ? () => _pickCustomDate(context, auth.token!) : null,
                                 ),
                               ],
@@ -729,12 +739,14 @@ class _MapaScreenState extends State<MapaScreen> {
                           icon: Icons.map_rounded,
                           label: 'Planta',
                           isSelected: _isFloorPlanView,
+                          iconOnly: isCompact,
                           onTap: () => setState(() => _isFloorPlanView = true),
                         ),
                         _buildViewToggleButton(
                           icon: Icons.view_agenda_rounded,
                           label: 'Lista',
                           isSelected: !_isFloorPlanView,
+                          iconOnly: isCompact,
                           onTap: () => setState(() => _isFloorPlanView = false),
                         ),
                       ],
@@ -891,43 +903,49 @@ class _MapaScreenState extends State<MapaScreen> {
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
+    bool iconOnly = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: iconOnly ? 8 : 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
               ),
-            ),
-          ],
+              if (!iconOnly) ...[
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
