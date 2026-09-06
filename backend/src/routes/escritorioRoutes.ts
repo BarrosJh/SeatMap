@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { EscritorioController } from '../controllers/escritorioController';
 import { authenticateToken } from '../middleware/auth';
+import { globalLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+
+router.use(globalLimiter);
 
 // GET /api/escritorios
 router.get('/', authenticateToken, EscritorioController.listar);

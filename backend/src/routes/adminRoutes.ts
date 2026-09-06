@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/adminController';
 import { authenticateToken, requireAdmin, authenticateAdminMfa } from '../middleware/auth';
+import { adminLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
-// Todas as rotas administrativas exigem autenticação do usuário e perfil ADMIN_RH
+// Todas as rotas administrativas exigem autenticação do usuário, rate limit e perfil ADMIN_RH
+router.use(adminLimiter);
 router.use(authenticateToken);
 router.use(requireAdmin);
 

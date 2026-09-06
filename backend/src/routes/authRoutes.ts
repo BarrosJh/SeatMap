@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
+import { authLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+
+// Rate limiting estrito para autenticação e recuperação de senha
+router.use(authLimiter);
 
 // POST /api/auth/login
 router.post('/login', AuthController.login);

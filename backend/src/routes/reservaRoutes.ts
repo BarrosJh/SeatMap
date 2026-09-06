@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { ReservaController } from '../controllers/reservaController';
 import { authenticateToken } from '../middleware/auth';
+import { globalLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+
+router.use(globalLimiter);
 
 // POST /api/reservas (Criação com troca atômica, cota semanal e auto-checkin de gestão)
 router.post('/', authenticateToken, ReservaController.criarReserva);

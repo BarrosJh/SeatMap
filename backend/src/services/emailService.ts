@@ -364,20 +364,20 @@ export class EmailService {
       const info = await transporter.sendMail(mailOptions);
 
       console.log('================================================================');
-      console.log(`[EmailService] E-mail enviado com sucesso!`);
-      console.log(`[EmailService] Tipo: [${opts.tipoLog}] Destinatário: ${opts.to}`);
-      console.log(`[EmailService] Assunto: ${opts.subject}`);
+      console.log('[EmailService] E-mail enviado com sucesso!');
+      console.log('[EmailService] Tipo:', opts.tipoLog, '| Destinatário:', opts.to);
+      console.log('[EmailService] Assunto:', opts.subject);
       if (opts.codigoDebug) {
-        console.log(`[EmailService] Código/Token: >>> ${opts.codigoDebug} <<<`);
+        console.log('[EmailService] Código/Token: >>>', opts.codigoDebug, '<<<');
       }
       if (info.messageId) {
-        console.log(`[EmailService] MessageId: ${info.messageId}`);
+        console.log('[EmailService] MessageId:', info.messageId);
       }
       console.log('================================================================');
 
       return true;
     } catch (error) {
-      console.error(`[EmailService Error] Falha ao despachar e-mail para ${opts.to}:`, error);
+      console.error('[EmailService Error] Falha ao despachar e-mail para:', opts.to, error);
       return false;
     }
   }

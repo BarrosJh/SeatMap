@@ -5,19 +5,35 @@ import cors from 'cors';
 import routes from './routes';
 import { wsManager } from './websocket/wsServer';
 import { CronService } from './services/cronService';
+import { globalLimiter } from './middleware/rateLimiter';
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 
-// Middlewares globais
+// Configuração segura de CORS
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : ['http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:3000', 'http://127.0.0.1:8080'];
+
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    // Permite chamadas sem origin (mobile apps, curl, server-to-server) e origens permitidas
+    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Origem não permitida pela política de CORS'));
+    }
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token']
 }));
 app.use(express.json());
+
+// Rate Limiting Global
+app.use('/api', globalLimiter);
 
 // Rotas da API
 app.use('/api', routes);

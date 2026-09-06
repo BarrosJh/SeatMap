@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { TiController } from '../controllers/tiController';
 import { authMiddleware, requireTi } from '../middleware/auth';
+import { adminLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
-// Todas as rotas de TI exigem autenticação e permissão de TI
+// Todas as rotas de TI exigem rate limit, autenticação e permissão de TI
+router.use(adminLimiter);
 router.use(authMiddleware);
 router.use(requireTi);
 
