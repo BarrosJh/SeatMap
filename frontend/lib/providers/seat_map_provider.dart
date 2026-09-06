@@ -20,6 +20,7 @@ class SeatMapProvider extends ChangeNotifier {
   ReservaFiltro _filtroReservas = ReservaFiltro.ativas;
   DateTime? _filtroData;
   List<OcupacaoEscritorioModel> _ocupacaoSemanal = [];
+  String? _avisoGlobal;
   bool _carregandoOcupacao = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -36,6 +37,7 @@ class SeatMapProvider extends ChangeNotifier {
   DateTime? get filtroData => _filtroData;
   String? get filtroDataIso => _filtroData != null ? DateFormat('yyyy-MM-dd').format(_filtroData!) : null;
   List<OcupacaoEscritorioModel> get ocupacaoSemanal => _ocupacaoSemanal;
+  String? get avisoGlobal => _avisoGlobal;
   bool get carregandoOcupacao => _carregandoOcupacao;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -124,12 +126,24 @@ class SeatMapProvider extends ChangeNotifier {
 
   void initWebSocket(String token) {
     _wsSubscription?.cancel();
-    _wsSubscription = _wsService.seatUpdates.listen((update) {
-      _handleRealtimeSeatUpdate(update);
+    _wsSubscription = _wsService.seatUpdates.listen((msg) {
+      _handleRealtimeMessage(msg);
     });
 
     if (_selectedEscritorio != null) {
       _wsService.connect(token: token, escritorioId: _selectedEscritorio!.id);
+    }
+  }
+
+  void _handleRealtimeMessage(Map<String, dynamic> msg) {
+    if (msg['tipo'] == 'AVISO_GLOBAL_ATUALIZADO' || msg['evento'] == 'aviso_global_atualizado') {
+      _avisoGlobal = msg['aviso']?.toString() ?? '';
+      notifyListeners();
+      return;
+    }
+
+    if (msg['evento'] == 'assento_atualizado') {
+      _handleRealtimeSeatUpdate(msg);
     }
   }
 
@@ -204,6 +218,11 @@ class SeatMapProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    _wsSubscription?.cancel();
+    _wsSubscription = _wsService.seatUpdates.listen((msg) {
+      _handleRealtimeMessage(msg);
+    });
+
     final escRes = await _apiService.getEscritorios(token);
     if (escRes.success && escRes.data != null && escRes.data!.isNotEmpty) {
       _escritorios = escRes.data!;
@@ -213,6 +232,7 @@ class SeatMapProvider extends ChangeNotifier {
         carregarMapa(token),
         carregarMinhasReservas(token),
         carregarOcupacaoSemanal(token),
+        carregarAvisoGlobal(token),
       ]);
     } else {
       _errorMessage = escRes.error ?? 'Falha ao carregar lista de escritórios.';
@@ -220,6 +240,14 @@ class SeatMapProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  Future<void> carregarAvisoGlobal(String token) async {
+    final res = await _apiService.getAvisoGlobal(token);
+    if (res.success && res.data != null) {
+      _avisoGlobal = res.data;
+      notifyListeners();
+    }
   }
 
   Future<void> carregarOcupacaoSemanal(String token) async {

@@ -11,6 +11,9 @@ router.get('/', authenticateToken, EscritorioController.listar);
 router.get('/ocupacao-semanal', authenticateToken, EscritorioController.getOcupacaoSemanal);
 router.get('/ocupacao/semanal', authenticateToken, EscritorioController.getOcupacaoSemanal);
 
+// GET /api/escritorios/aviso
+router.get('/aviso', authenticateToken, EscritorioController.getAvisoGlobal);
+
 // GET /api/escritorios/:id/mapa?data=YYYY-MM-DD
 router.get('/:id/mapa', authenticateToken, EscritorioController.getMapa);
 

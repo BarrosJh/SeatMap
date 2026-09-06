@@ -42,6 +42,12 @@ export class AdminController {
       }
 
       const atualizadas = await ConfigService.getAll();
+      const avisoAtualizado = await ConfigService.get('AVISO_GLOBAL_SISTEMA', '');
+      wsManager.broadcastToAll({
+        tipo: 'AVISO_GLOBAL_ATUALIZADO',
+        aviso: avisoAtualizado
+      });
+
       return res.status(200).json({
         message: 'Configurações atualizadas com sucesso.',
         parametros: atualizadas

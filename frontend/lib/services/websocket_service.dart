@@ -38,9 +38,7 @@ class WebSocketService {
         (data) {
           try {
             final json = jsonDecode(data.toString());
-            if (json['evento'] == 'assento_atualizado') {
-              _seatUpdateController.add(json);
-            }
+            _seatUpdateController.add(json);
           } catch (e) {
             print('[WS Client] Erro ao decodificar mensagem: $e');
           }

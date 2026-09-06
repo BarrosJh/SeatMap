@@ -37,6 +37,7 @@ class HomeDashboardScreen extends StatelessWidget {
             await Future.wait([
               seatProvider.carregarOcupacaoSemanal(token),
               seatProvider.carregarMinhasReservas(token),
+              seatProvider.carregarAvisoGlobal(token),
             ]);
           }
         },
@@ -46,6 +47,12 @@ class HomeDashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 0. Banner de Comunicado do RH (Tempo Real)
+              if (seatProvider.avisoGlobal != null && seatProvider.avisoGlobal!.trim().isNotEmpty) ...[
+                _buildAvisoRhBanner(context, seatProvider.avisoGlobal!.trim()),
+                const SizedBox(height: 18),
+              ],
+
               // 1. Banner Corporativo Superior Estruturado
               _buildCorporateBanner(context, primeiroNome, hojeCapitalizado, seatProvider),
 
@@ -620,6 +627,89 @@ class HomeDashboardScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 0. Banner de Comunicado do RH em Tempo Real
+  Widget _buildAvisoRhBanner(BuildContext context, String aviso) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7), // Âmbar quente elegante
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD97706).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.campaign_rounded,
+              color: Color(0xFFB45309),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Text(
+                      'COMUNICADO DO RH',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(
+                      Icons.circle,
+                      size: 6,
+                      color: Color(0xFFD97706),
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Aviso Oficial',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  aviso,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF78350F),
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

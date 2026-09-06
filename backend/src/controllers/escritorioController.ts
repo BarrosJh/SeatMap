@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import pool from '../config/db';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { getMondayOfCurrentWorkWeek, isProximaSemanaLiberada } from '../utils/workWeekUtils';
+import { ConfigService } from '../services/configService';
 
 export class EscritorioController {
   public static async listar(req: AuthenticatedRequest, res: Response) {
@@ -276,6 +277,16 @@ export class EscritorioController {
     } catch (error) {
       console.error('[EscritorioController.getOcupacaoSemanal] Erro:', error);
       return res.status(500).json({ error: 'Erro ao calcular ocupação semanal dos escritórios.' });
+    }
+  }
+
+  public static async getAvisoGlobal(req: AuthenticatedRequest, res: Response) {
+    try {
+      const aviso = await ConfigService.get('AVISO_GLOBAL_SISTEMA', '');
+      return res.status(200).json({ aviso });
+    } catch (error) {
+      console.error('[EscritorioController.getAvisoGlobal] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao obter aviso global do sistema.' });
     }
   }
 }

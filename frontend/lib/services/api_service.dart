@@ -153,6 +153,25 @@ class ApiService {
     }
   }
 
+  Future<ApiResponse<String>> getAvisoGlobal(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/escritorios/aviso'),
+        headers: _headers(token),
+      );
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return ApiResponse(success: true, data: body['aviso']?.toString() ?? '', statusCode: response.statusCode);
+      } else {
+        final body = jsonDecode(response.body);
+        return ApiResponse(success: false, error: body['error'] ?? 'Erro ao buscar aviso global.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
   Future<ApiResponse<MapaDataModel>> getMapa(String token, int escritorioId, String dataIso) async {
     try {
       final response = await http.get(
