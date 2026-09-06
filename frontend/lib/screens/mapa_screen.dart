@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../core/constants.dart';
 import '../models/desk_model.dart';
 import '../models/seat_model.dart';
 import '../models/user_model.dart';
@@ -9,6 +8,10 @@ import '../providers/auth_provider.dart';
 import '../providers/seat_map_provider.dart';
 import '../widgets/comprovante_dialog.dart';
 import '../widgets/interactive_floor_plan.dart';
+import 'mapa/widgets/baia_card_list_view.dart';
+import 'mapa/widgets/confirm_booking_dialog.dart';
+import 'mapa/widgets/map_control_header.dart';
+import 'mapa/widgets/occupant_details_modal.dart';
 
 class MapaScreen extends StatefulWidget {
   const MapaScreen({super.key});
@@ -96,7 +99,6 @@ class _MapaScreenState extends State<MapaScreen> {
     final isNextOpen = user != null && _isDateOpenForBooking(_getBaseMonday(1), user);
 
     if (!isRh && delta > 0 && !isNextOpen) {
-      // Bloqueio silencioso sem alertas desnecessários
       return;
     }
 
@@ -216,293 +218,18 @@ class _MapaScreenState extends State<MapaScreen> {
         return;
       }
 
-      _showConfirmacaoReservaDialog(cadeira, token);
+      ConfirmBookingDialog.showBooking(
+        context: context,
+        cadeira: cadeira,
+        token: token,
+      );
     } else if (cadeira.isOcupada || cadeira.isMinhaReserva) {
-      _showDetalhesOcupanteModal(cadeira, currentUser);
+      OccupantDetailsModal.show(
+        context: context,
+        cadeira: cadeira,
+        currentUser: currentUser,
+      );
     }
-  }
-
-  void _showDetalhesOcupanteModal(CadeiraModel cadeira, UserModel currentUser) {
-    final ocupante = cadeira.ocupante;
-    final isMinha = cadeira.isMinhaReserva;
-    final isSameDept = ocupante != null &&
-        ocupante.departamentoId != null &&
-        ocupante.departamentoId == currentUser.departamentoId;
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          backgroundColor: Colors.white,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: isMinha
-                            ? const Color(0xFF2563EB)
-                            : (isSameDept ? Colors.amber.shade700 : const Color(0xFFDC2626)),
-                        radius: 24,
-                        child: Icon(
-                          isMinha ? Icons.person : (isSameDept ? Icons.group : Icons.person_outline),
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isMinha ? '${currentUser.nome} (Você)' : (ocupante?.nome ?? 'Colega'),
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              isMinha
-                                  ? (currentUser.departamentoNome ?? 'Geral')
-                                  : (ocupante?.departamento ?? 'Sem departamento'),
-                              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Chip(
-                        backgroundColor: Colors.grey.shade100,
-                        label: Text(
-                          'Mesa ${cadeira.identificador}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  if (ocupante != null) ...[
-                    if (isSameDept && !isMinha)
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.amber.shade400),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.star, color: Colors.amber, size: 20),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Colega do seu mesmo departamento!',
-                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.check_circle_outline, color: Colors.blueGrey),
-                      title: const Text('Status do Check-in:'),
-                      subtitle: Text(
-                        ocupante.checkinRealizado ? 'Presença Confirmada' : 'Aguardando confirmação diária',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: ocupante.checkinRealizado ? Colors.green : Colors.orange.shade800,
-                        ),
-                      ),
-                    ),
-                    if (ocupante.matricula != null && (currentUser.isAdmin || currentUser.isGestao))
-                      ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.badge_outlined, color: Colors.blueGrey),
-                        title: const Text('Matrícula:'),
-                        subtitle: Text(ocupante.matricula!),
-                      ),
-                  ],
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Fechar'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showConfirmacaoReservaDialog(CadeiraModel cadeira, String token) {
-    final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final dataStr = DateFormat('dd/MM/yyyy (EEEE)', 'pt_BR').format(seatProvider.selectedDate);
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              const Icon(Icons.event_seat, color: AppConstants.primaryColor),
-              const SizedBox(width: 8),
-              Text('Reservar Mesa ${cadeira.identificador}'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Deseja confirmar a reserva para este assento?'),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Data: $dataStr', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text('Escritório: ${seatProvider.selectedEscritorio?.nome ?? ''}'),
-                    Text('Mesa: ${cadeira.identificador}'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Nota: Se você já tiver um assento marcado no mesmo dia, a troca será realizada de forma atômica.',
-                style: TextStyle(fontSize: 12, color: Colors.black54),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final res = await seatProvider.reservarOuTrocar(token, cadeira.id);
-                if (mounted) {
-                  if (res.success && res.data != null) {
-                    final comprovante = res.data!['comprovante'] as String? ?? 'RES-CONFIRMADO';
-                    final troca = res.data!['trocaRealizada'] == true;
-                    ComprovanteDialog.show(
-                      context,
-                      tipo: troca ? TipoComprovante.troca : TipoComprovante.reserva,
-                      comprovante: comprovante,
-                      dataReserva: seatProvider.selectedDateIso,
-                      escritorioNome: seatProvider.selectedEscritorio?.nome ?? 'Escritório',
-                      escritorioCidade: seatProvider.selectedEscritorio?.cidade ?? 'SP',
-                      cadeiraIdentificador: cadeira.identificador,
-                      usuarioNome: auth.user?.nome,
-                      usuarioMatricula: auth.user?.matricula,
-                      dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(res.error ?? 'Falha ao processar reserva.'),
-                        backgroundColor: Colors.red.shade700,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Confirmar Reserva'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showCancelDialog(ReservaModel reserva, String token) {
-    final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626)),
-            SizedBox(width: 8),
-            Text('Cancelar Reserva'),
-          ],
-        ),
-        content: Text(
-          'Deseja realmente cancelar sua reserva para o dia ${reserva.dataReserva} no assento ${reserva.cadeiraIdentificador} (${reserva.escritorioNome})?',
-          style: const TextStyle(fontSize: 14, color: Color(0xFF334155)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Voltar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final res = await seatProvider.cancelarMinhaReserva(token, reserva.id);
-              if (mounted) {
-                if (res.success) {
-                  final comprovante = res.data?['codigoComprovante'] as String? ?? reserva.codigoComprovante ?? 'RES-CANCELADO';
-                  ComprovanteDialog.show(
-                    context,
-                    tipo: TipoComprovante.cancelamento,
-                    comprovante: comprovante,
-                    dataReserva: reserva.dataReserva,
-                    escritorioNome: reserva.escritorioNome,
-                    escritorioCidade: reserva.escritorioCidade,
-                    cadeiraIdentificador: reserva.cadeiraIdentificador,
-                    baiaNome: reserva.baiaNome,
-                    usuarioNome: auth.user?.nome,
-                    usuarioMatricula: auth.user?.matricula,
-                    dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(res.error ?? 'Falha ao cancelar reserva.'),
-                      backgroundColor: const Color(0xFFDC2626),
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Sim, Cancelar'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -532,322 +259,46 @@ class _MapaScreenState extends State<MapaScreen> {
       }
     }
 
+    final isRh = auth.user?.isAdmin == true;
+    final isNextOpen = auth.user != null && _isDateOpenForBooking(_getBaseMonday(1), auth.user!);
+    final canGoBack = isRh ? true : _weekOffset > 0;
+    final canGoForward = isRh ? true : (_weekOffset < (isNextOpen ? 1 : 0));
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: Column(
           children: [
-            // BARRA DE CONTROLE CORPORATIVA UNIFICADA
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: MediaQuery.of(context).size.width < 500 ? 10 : 20,
-                vertical: 10,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
-                ),
-              ),
-              child: LayoutBuilder(
-                builder: (context, headerConstraints) {
-                  final isCompact = headerConstraints.maxWidth < 780;
-
-                  final weekSelectorWidget = Builder(
-                    builder: (ctx) {
-                      final isRh = auth.user?.isAdmin == true;
-                      final isNextOpen = auth.user != null && _isDateOpenForBooking(_getBaseMonday(1), auth.user!);
-                      final canGoBack = isRh ? true : _weekOffset > 0;
-                      final canGoForward = isRh ? true : (_weekOffset < (isNextOpen ? 1 : 0));
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: isCompact ? MainAxisAlignment.spaceBetween : MainAxisSize.min as dynamic,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                              tooltip: canGoBack ? 'Semana Anterior' : null,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                              color: canGoBack ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
-                              onPressed: (canGoBack && auth.token != null) ? () => _changeWeek(-1, auth.token!) : null,
-                            ),
-                            Flexible(
-                              child: InkWell(
-                                onTap: auth.token != null ? () => _resetToCurrentWeek(auth.token!) : null,
-                                borderRadius: BorderRadius.circular(6),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.date_range_rounded, size: 13, color: Color(0xFF2563EB)),
-                                      const SizedBox(width: 4),
-                                      Flexible(
-                                        child: Text(
-                                          _getWeekLabel(),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF1E293B),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                                  tooltip: canGoForward ? 'Próxima Semana' : null,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                                  color: canGoForward ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
-                                  onPressed: (canGoForward && auth.token != null) ? () => _changeWeek(1, auth.token!) : null,
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.calendar_month_outlined, size: 15, color: Color(0xFF64748B)),
-                                  tooltip: 'Escolher Data no Calendário',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                                  onPressed: auth.token != null ? () => _pickCustomDate(context, auth.token!) : null,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-
-                  final dayTabsWidget = SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: diasUteis.map((dia) {
-                        final isSelected = DateFormat('yyyy-MM-dd').format(dia) == seatProvider.selectedDateIso;
-                        final isToday = DateFormat('yyyy-MM-dd').format(dia) == DateFormat('yyyy-MM-dd').format(DateTime.now());
-                        final diaSemanaNome = DateFormat('EEE', 'pt_BR').format(dia).toUpperCase();
-                        final diaNumero = DateFormat('dd/MM').format(dia);
-
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: InkWell(
-                            onTap: () {
-                              if (auth.token != null) {
-                                seatProvider.selecionarData(auth.token!, dia);
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
-                                  width: isSelected ? 1.5 : 1.0,
-                                ),
-                                boxShadow: isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(0xFF2563EB).withValues(alpha: 0.25),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        diaSemanaNome,
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected ? Colors.white70 : const Color(0xFF64748B),
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                      Text(
-                                        diaNumero,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected ? Colors.white : const Color(0xFF1E293B),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (isToday) ...[
-                                    const SizedBox(width: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: isSelected ? Colors.white.withValues(alpha: 0.2) : const Color(0xFFDBEAFE),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        'HOJE',
-                                        style: TextStyle(
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected ? Colors.white : const Color(0xFF1D4ED8),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  );
-
-                  final viewToggleWidget = Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildViewToggleButton(
-                          icon: Icons.map_rounded,
-                          label: 'Planta',
-                          isSelected: _isFloorPlanView,
-                          iconOnly: isCompact,
-                          onTap: () => setState(() => _isFloorPlanView = true),
-                        ),
-                        _buildViewToggleButton(
-                          icon: Icons.view_agenda_rounded,
-                          label: 'Lista',
-                          isSelected: !_isFloorPlanView,
-                          iconOnly: isCompact,
-                          onTap: () => setState(() => _isFloorPlanView = false),
-                        ),
-                      ],
-                    ),
-                  );
-
-                  return Column(
-                    children: [
-                      if (isCompact) ...[
-                        // Mobile / Compact Layout:
-                        // Linha 1 = Seletor de Semana Full Width
-                        SizedBox(
-                          width: double.infinity,
-                          child: weekSelectorWidget,
-                        ),
-                        const SizedBox(height: 8),
-                        // Linha 2 = Dias Úteis + Alternador Planta/Lista
-                        Row(
-                          children: [
-                            Expanded(child: dayTabsWidget),
-                            const SizedBox(width: 6),
-                            viewToggleWidget,
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                        const SizedBox(height: 6),
-                        // Linha 3 = KPIs Executivos (Total, Livres, Ocupadas, Minhas)
-                        Row(
-                          children: [
-                            Expanded(child: _buildModernKpi(label: 'Total', value: totalAssentos, color: const Color(0xFF334155))),
-                            const SizedBox(width: 4),
-                            Expanded(child: _buildModernKpi(label: 'Livres', value: totalLivres, color: const Color(0xFF16A34A))),
-                            const SizedBox(width: 4),
-                            Expanded(child: _buildModernKpi(label: 'Ocupadas', value: totalOcupadas, color: const Color(0xFFDC2626))),
-                            const SizedBox(width: 4),
-                            Expanded(child: _buildModernKpi(label: 'Minhas', value: totalMinhas, color: const Color(0xFF2563EB))),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // Linha 4 = Legenda direta abaixo dos KPIs (Sem necessidade de scroll)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildLegendDot(const Color(0xFF22C55E), 'Livre'),
-                              _buildLegendDot(const Color(0xFF2563EB), 'Sua Reserva'),
-                              _buildLegendDot(const Color(0xFFDC2626), 'Ocupada'),
-                              _buildLegendDot(const Color(0xFFD97706), 'Colega Depto'),
-                            ],
-                          ),
-                        ),
-                      ] else ...[
-                        // Desktop / Wide Layout
-                        Row(
-                          children: [
-                            weekSelectorWidget,
-                            const SizedBox(width: 12),
-                            Expanded(child: dayTabsWidget),
-                            if (seatProvider.isLoading)
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 8),
-                                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                              ),
-                            const SizedBox(width: 8),
-                            viewToggleWidget,
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                        const SizedBox(height: 6),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildModernKpi(label: 'Total', value: totalAssentos, color: const Color(0xFF334155)),
-                              const SizedBox(width: 6),
-                              _buildModernKpi(label: 'Livres', value: totalLivres, color: const Color(0xFF16A34A)),
-                              const SizedBox(width: 6),
-                              _buildModernKpi(label: 'Ocupadas', value: totalOcupadas, color: const Color(0xFFDC2626)),
-                              const SizedBox(width: 6),
-                              _buildModernKpi(label: 'Minhas', value: totalMinhas, color: const Color(0xFF2563EB)),
-                              const SizedBox(width: 14),
-                              Container(width: 1, height: 16, color: const Color(0xFFE2E8F0)),
-                              const SizedBox(width: 14),
-                              _buildLegendDot(const Color(0xFF22C55E), 'Livre'),
-                              const SizedBox(width: 10),
-                              _buildLegendDot(const Color(0xFF2563EB), 'Sua Reserva'),
-                              const SizedBox(width: 10),
-                              _buildLegendDot(const Color(0xFFDC2626), 'Ocupada'),
-                              const SizedBox(width: 10),
-                              _buildLegendDot(const Color(0xFFD97706), 'Colega Depto'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                },
-              ),
+            // BARRA DE CONTROLE CORPORATIVA UNIFICADA (MODULAR)
+            MapControlHeader(
+              user: auth.user,
+              token: auth.token,
+              seatProvider: seatProvider,
+              weekOffset: _weekOffset,
+              isFloorPlanView: _isFloorPlanView,
+              diasUteis: diasUteis,
+              weekLabel: _getWeekLabel(),
+              totalAssentos: totalAssentos,
+              totalLivres: totalLivres,
+              totalOcupadas: totalOcupadas,
+              totalMinhas: totalMinhas,
+              canGoBack: canGoBack,
+              canGoForward: canGoForward,
+              onChangeWeek: (delta) {
+                if (auth.token != null) _changeWeek(delta, auth.token!);
+              },
+              onResetToCurrentWeek: () {
+                if (auth.token != null) _resetToCurrentWeek(auth.token!);
+              },
+              onPickCustomDate: () {
+                if (auth.token != null) _pickCustomDate(context, auth.token!);
+              },
+              onSelectDate: (dia) {
+                if (auth.token != null) seatProvider.selecionarData(auth.token!, dia);
+              },
+              onToggleView: (isFloorPlan) {
+                setState(() => _isFloorPlanView = isFloorPlan);
+              },
             ),
 
             // CONTEÚDO PRINCIPAL (Planta Baixa Interativa vs Cards de Bancadas)
@@ -856,13 +307,11 @@ class _MapaScreenState extends State<MapaScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : (_isFloorPlanView
                       ? _buildInteractiveFloorPlanView(seatProvider, auth.user!, auth.token!)
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(20),
-                          itemCount: seatProvider.mapaData!.baias.length,
-                          itemBuilder: (context, index) {
-                            final baia = seatProvider.mapaData!.baias[index];
-                            return _buildBaiaCard(baia, index, auth.user!, auth.token!);
-                          },
+                      : BaiaCardListView(
+                          baias: seatProvider.mapaData!.baias,
+                          currentUser: auth.user!,
+                          token: auth.token!,
+                          onCadeiraTapped: (cadeira) => _onCadeiraTapped(cadeira, auth.user!, auth.token!),
                         )),
             ),
 
@@ -905,7 +354,7 @@ class _MapaScreenState extends State<MapaScreen> {
                         if (auth.token != null) {
                           final messenger = ScaffoldMessenger.of(context);
                           final ok = await seatProvider.confirmarPresencaHoje(auth.token!);
-                          if (mounted) {
+                          if (context.mounted) {
                             messenger.showSnackBar(
                               SnackBar(
                                 content: Text(ok ? 'Presença confirmada com sucesso!' : 'Falha ao confirmar presença.'),
@@ -920,306 +369,6 @@ class _MapaScreenState extends State<MapaScreen> {
                 ),
               ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildViewToggleButton({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    bool iconOnly = false,
-  }) {
-    return Tooltip(
-      message: label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: iconOnly ? 8 : 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-              ),
-              if (!iconOnly) ...[
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModernKpi({
-    required String label,
-    required int value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              '$label: ',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, color: Color(0xFF475569), fontWeight: FontWeight.w500),
-            ),
-          ),
-          Text(
-            '$value',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLegendDot(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF475569),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Card de Cada Bancada / Bloco de Mesas
-  Widget _buildBaiaCard(BaiaModel baia, int index, UserModel user, String token) {
-    final rangeInicio = baia.cadeiras.isNotEmpty ? baia.cadeiras.first.identificador : '';
-    final rangeFim = baia.cadeiras.isNotEmpty ? baia.cadeiras.last.identificador : '';
-
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 16),
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Cabeçalho da Bancada
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.table_restaurant_rounded, color: Color(0xFF2563EB), size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Bancada ${index + 1}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
-                      ),
-                      Text(
-                        '${baia.cadeiras.length} assentos (Mesas $rangeInicio a $rangeFim)',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: baia.totalLivres > 0 ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: baia.totalLivres > 0 ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
-                    ),
-                  ),
-                  child: Text(
-                    '${baia.totalLivres} livres',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: baia.totalLivres > 0 ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Grade de Botões de Assentos
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: baia.cadeiras.map((cadeira) {
-                return _buildCleanSeatButton(cadeira, user, token);
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Botão Interativo do Assento (Versão Clean)
-  Widget _buildCleanSeatButton(CadeiraModel cadeira, UserModel currentUser, String token) {
-    Color bgColor = const Color(0xFFF8FAFC);
-    Color borderColor = const Color(0xFFCBD5E1);
-    Color textColor = const Color(0xFF0F172A);
-    Color statusColor = const Color(0xFF16A34A);
-    String statusLabel = 'Livre';
-    IconData statusIcon = Icons.event_seat;
-
-    final isSameDept = cadeira.ocupante != null &&
-        cadeira.ocupante!.departamentoId != null &&
-        cadeira.ocupante!.departamentoId == currentUser.departamentoId;
-
-    if (cadeira.isMinhaReserva) {
-      bgColor = const Color(0xFFEFF6FF);
-      borderColor = const Color(0xFF2563EB);
-      textColor = const Color(0xFF1E3A8A);
-      statusColor = const Color(0xFF2563EB);
-      statusLabel = 'Você';
-      statusIcon = Icons.person;
-    } else if (cadeira.isOcupada) {
-      if (isSameDept) {
-        bgColor = const Color(0xFFFFFBEB);
-        borderColor = const Color(0xFFF59E0B);
-        textColor = const Color(0xFF78350F);
-        statusColor = const Color(0xFFD97706);
-        statusLabel = cadeira.ocupante?.nome.split(' ').first ?? 'Colega';
-        statusIcon = Icons.group;
-      } else {
-        bgColor = const Color(0xFFFEF2F2);
-        borderColor = const Color(0xFFEF4444);
-        textColor = const Color(0xFF991B1B);
-        statusColor = const Color(0xFFDC2626);
-        statusLabel = 'Ocupada';
-        statusIcon = Icons.person_outline;
-      }
-    }
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _onCadeiraTapped(cadeira, currentUser, token),
-        borderRadius: BorderRadius.circular(10),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 82,
-          height: 72,
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: borderColor,
-              width: (cadeira.isMinhaReserva || isSameDept) ? 2.0 : 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 3,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(statusIcon, size: 14, color: statusColor),
-                    const SizedBox(width: 4),
-                    Text(
-                      cadeira.identificador,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: borderColor.withValues(alpha: 0.5)),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
@@ -1327,7 +476,11 @@ class _MapaScreenState extends State<MapaScreen> {
         ).firstOrNull;
 
         if (reserva != null) {
-          _showCancelDialog(reserva, token);
+          ConfirmBookingDialog.showCancel(
+            context: context,
+            reserva: reserva,
+            token: token,
+          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
