@@ -1,0 +1,29 @@
+{
+  "name": "seatmap-internal",
+  "version": "1.0.0",
+  "description": "Sistema interno de marcação de assentos concorrente com suporte ACID e WebSockets em tempo real",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:backend",
+    "dev:backend": "npm --prefix backend run dev",
+    "build": "npm --prefix backend run build",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "db:seed": "npm --prefix backend run db:seed",
+    "docker:up": "docker-compose up -d --build",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "test:concurrency": "k6 run concurrency_test.js"
+  },
+  "keywords": [
+    "seatmap",
+    "desk-booking",
+    "realtime",
+    "websocket",
+    "postgresql",
+    "flutter",
+    "concurrency"
+  ],
+  "author": "SeatMap Team",
+  "license": "ISC"
+}
+
