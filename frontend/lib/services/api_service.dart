@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../core/constants.dart';
 import '../models/user_model.dart';
@@ -41,7 +42,7 @@ class ApiService {
   }
 
   // ==========================================
-  // AUTH
+  // AUTH (ENTERPRISE)
   // ==========================================
   Future<ApiResponse<Map<String, dynamic>>> login(String login, String senha) async {
     try {
@@ -53,6 +54,19 @@ class ApiService {
 
       final body = jsonDecode(response.body);
       if (response.statusCode == 200) {
+        if (body['requiresMfa'] == true) {
+          return ApiResponse(
+            success: true,
+            data: {
+              'requiresMfa': true,
+              'mfaType': body['mfaType'] ?? 'TOTP',
+              'tempToken': body['tempToken'],
+              'message': body['message'] ?? 'Insira o código do autenticador.',
+            },
+            statusCode: response.statusCode,
+          );
+        }
+
         return ApiResponse(
           success: true,
           data: {
@@ -70,6 +84,54 @@ class ApiService {
       }
     } catch (e) {
       return ApiResponse(success: false, error: 'Erro de conexão com o servidor: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> validarLoginTotp(String tempToken, String codigo) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/totp/validar-login'),
+        headers: _headers(null),
+        body: jsonEncode({'tempToken': tempToken, 'codigo': codigo}),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: {
+            'token': body['token'],
+            'user': UserModel.fromJson(body['user']),
+          },
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Código de autenticação inválido.',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão com o servidor: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getSsoConfig() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/auth/sso/config'),
+        headers: _headers(null),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: body, statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: body['error'] ?? 'Erro ao carregar SSO.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
     }
   }
 
@@ -835,6 +897,187 @@ class ApiService {
       }
     } catch (e) {
       return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getAuditoriaAcessos(
+    String token, {
+    int pagina = 1,
+    int limite = 25,
+    String? tipoEvento,
+    String? termo,
+    bool? sucesso,
+  }) async {
+    try {
+      final queryParams = {
+        'pagina': pagina.toString(),
+        'limite': limite.toString(),
+        if (tipoEvento != null && tipoEvento.isNotEmpty) 'tipoEvento': tipoEvento,
+        if (termo != null && termo.isNotEmpty) 'termo': termo,
+        if (sucesso != null) 'sucesso': sucesso.toString(),
+      };
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/admin/ti/auditoria-acessos').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: _headers(token));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: body, statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: body['error'] ?? 'Erro ao buscar trilha de auditoria de acessos.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  // ==========================================
+  // RELATÓRIOS E BI DO RH
+  // ==========================================
+
+  Future<ApiResponse<Map<String, dynamic>>> getRelatoriosAnalytics(
+    String token,
+    String adminToken, {
+    required String dataInicio,
+    required String dataFim,
+    String? escritorioId,
+    String? departamentoId,
+    String? status,
+    String? checkinStatus,
+    String? busca,
+  }) async {
+    try {
+      final queryParams = {
+        'dataInicio': dataInicio,
+        'dataFim': dataFim,
+        if (escritorioId != null && escritorioId != 'todos') 'escritorioId': escritorioId,
+        if (departamentoId != null && departamentoId != 'todos') 'departamentoId': departamentoId,
+        if (status != null && status != 'todos') 'status': status,
+        if (checkinStatus != null && checkinStatus != 'todos') 'checkinStatus': checkinStatus,
+        if (busca != null && busca.trim().isNotEmpty) 'busca': busca.trim(),
+      };
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/admin/relatorios/analytics').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: _headers(token, adminToken: adminToken));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: Map<String, dynamic>.from(body), statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: body['error'] ?? 'Erro ao carregar analytics.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getRelatoriosDados(
+    String token,
+    String adminToken, {
+    required String dataInicio,
+    required String dataFim,
+    String? escritorioId,
+    String? departamentoId,
+    String? status,
+    String? checkinStatus,
+    String? busca,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      final queryParams = {
+        'dataInicio': dataInicio,
+        'dataFim': dataFim,
+        if (escritorioId != null && escritorioId != 'todos') 'escritorioId': escritorioId,
+        if (departamentoId != null && departamentoId != 'todos') 'departamentoId': departamentoId,
+        if (status != null && status != 'todos') 'status': status,
+        if (checkinStatus != null && checkinStatus != 'todos') 'checkinStatus': checkinStatus,
+        if (busca != null && busca.trim().isNotEmpty) 'busca': busca.trim(),
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/admin/relatorios/dados').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: _headers(token, adminToken: adminToken));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: Map<String, dynamic>.from(body), statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: body['error'] ?? 'Erro ao carregar dados do relatório.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Uint8List>> downloadRelatorioXlsx(
+    String token,
+    String adminToken, {
+    required String dataInicio,
+    required String dataFim,
+    String? escritorioId,
+    String? departamentoId,
+    String? status,
+    String? checkinStatus,
+    String? busca,
+  }) async {
+    try {
+      final queryParams = {
+        'dataInicio': dataInicio,
+        'dataFim': dataFim,
+        if (escritorioId != null && escritorioId != 'todos') 'escritorioId': escritorioId,
+        if (departamentoId != null && departamentoId != 'todos') 'departamentoId': departamentoId,
+        if (status != null && status != 'todos') 'status': status,
+        if (checkinStatus != null && checkinStatus != 'todos') 'checkinStatus': checkinStatus,
+        if (busca != null && busca.trim().isNotEmpty) 'busca': busca.trim(),
+      };
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/admin/relatorios/exportar/xlsx').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: _headers(token, adminToken: adminToken));
+
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: response.bodyBytes, statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: 'Falha ao baixar planilha Excel (Código ${response.statusCode}).', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro ao exportar Excel: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Uint8List>> downloadRelatorioPdf(
+    String token,
+    String adminToken, {
+    required String dataInicio,
+    required String dataFim,
+    String? escritorioId,
+    String? departamentoId,
+    String? status,
+    String? checkinStatus,
+    String? busca,
+  }) async {
+    try {
+      final queryParams = {
+        'dataInicio': dataInicio,
+        'dataFim': dataFim,
+        if (escritorioId != null && escritorioId != 'todos') 'escritorioId': escritorioId,
+        if (departamentoId != null && departamentoId != 'todos') 'departamentoId': departamentoId,
+        if (status != null && status != 'todos') 'status': status,
+        if (checkinStatus != null && checkinStatus != 'todos') 'checkinStatus': checkinStatus,
+        if (busca != null && busca.trim().isNotEmpty) 'busca': busca.trim(),
+      };
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/admin/relatorios/exportar/pdf').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: _headers(token, adminToken: adminToken));
+
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: response.bodyBytes, statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: 'Falha ao baixar PDF (Código ${response.statusCode}).', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro ao exportar PDF: $e', statusCode: 0);
     }
   }
 }

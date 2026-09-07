@@ -44,6 +44,8 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainNavigation()),
       );
+    } else if (authProvider.requiresMfaStep && mounted) {
+      _abrirModalTotpMfa(authProvider);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -52,6 +54,150 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     }
+  }
+
+  void _abrirModalTotpMfa(AuthProvider authProvider) {
+    final codigoCtrl = TextEditingController();
+    bool loading = false;
+    String? erroMsg;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Autenticação em 2 Etapas',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Digite o código de 6 dígitos gerado no seu aplicativo autenticador (Google ou Microsoft Authenticator) ou um código de backup.',
+                      style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    if (erroMsg != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade900.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade700, width: 1),
+                        ),
+                        child: Text(
+                          erroMsg!,
+                          style: TextStyle(color: Colors.red.shade200, fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    TextField(
+                      controller: codigoCtrl,
+                      autofocus: true,
+                      textAlign: TextAlign.center,
+                      maxLength: 9,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        letterSpacing: 4,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '000000',
+                        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), letterSpacing: 4),
+                        counterText: '',
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xFF38BDF8), width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: loading
+                      ? null
+                      : () {
+                          authProvider.cancelarMfaStep();
+                          Navigator.pop(ctx);
+                        },
+                  child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: loading
+                      ? null
+                      : () async {
+                          final code = codigoCtrl.text.trim();
+                          if (code.isEmpty) {
+                            setModalState(() => erroMsg = 'Informe o código de autenticação.');
+                            return;
+                          }
+                          setModalState(() {
+                            loading = true;
+                            erroMsg = null;
+                          });
+
+                          final navigator = Navigator.of(context);
+                          final dialogNav = Navigator.of(ctx);
+
+                          final ok = await authProvider.validarLoginTotp(code);
+                          if (ok && mounted) {
+                            dialogNav.pop();
+                            navigator.pushReplacement(
+                              MaterialPageRoute(builder: (_) => const MainNavigation()),
+                            );
+                          } else if (mounted) {
+                            setModalState(() {
+                              loading = false;
+                              erroMsg = authProvider.errorMessage ?? 'Código inválido.';
+                            });
+                          }
+                        },
+                  child: loading
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Confirmar e Entrar', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _abrirModalRecuperacaoSenha() {

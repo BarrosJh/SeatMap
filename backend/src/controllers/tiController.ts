@@ -2,12 +2,13 @@ import { Request, Response } from 'express';
 import pool from '../config/db';
 import { ConfigService } from '../services/configService';
 import { EmailService } from '../services/emailService';
+import { AuditService } from '../services/auditService';
 import { wsManager } from '../websocket/wsServer';
 import { performance } from 'perf_hooks';
 
 export class TiController {
   /**
-   * Obtém as configurações de TI (SMTP e MFA)
+   * Obtém as configurações de TI (SMTP, MFA e SSO Corporativo)
    */
   public static async getConfiguracoesTi(req: Request, res: Response): Promise<void> {
     try {
@@ -18,8 +19,30 @@ export class TiController {
       const rawPass = await ConfigService.get('SMTP_PASS', process.env.SMTP_PASS || '');
       const emailFrom = await ConfigService.get('EMAIL_FROM', process.env.EMAIL_FROM || '"SeatMap Corporativo" <nao-responda@seatmap.local>');
 
+      // Configurações de MFA
       const mfaExpiracao = await ConfigService.getNumber('MFA_EXPIRACAO_MINUTOS', 10);
       const mfaMaxTentativas = await ConfigService.getNumber('MFA_MAX_TENTATIVAS', 3);
+      const mfaPolicy = await ConfigService.get('MFA_POLICY', 'OPCIONAL'); // DESATIVADO, OPCIONAL, OBRIGATORIO_RH, OBRIGATORIO_TODOS
+      const mfaEmailEnabled = (await ConfigService.get('MFA_EMAIL_ENABLED', 'true')) === 'true';
+      const mfaTotpEnabled = (await ConfigService.get('MFA_TOTP_ENABLED', 'true')) === 'true';
+
+      // Configurações de SSO Corporativo
+      const ssoEnabled = (await ConfigService.get('SSO_ENABLED', 'false')) === 'true';
+      const ssoAllowedDomains = await ConfigService.get('SSO_ALLOWED_DOMAINS', '');
+      const ssoAutoProvision = (await ConfigService.get('SSO_AUTO_PROVISION', 'true')) === 'true';
+
+      const ssoGoogleEnabled = (await ConfigService.get('SSO_GOOGLE_ENABLED', 'false')) === 'true';
+      const ssoGoogleClientId = await ConfigService.get('SSO_GOOGLE_CLIENT_ID', '');
+      const googleSecretRaw = await ConfigService.get('SSO_GOOGLE_CLIENT_SECRET', '');
+
+      const ssoAzureEnabled = (await ConfigService.get('SSO_AZURE_ENABLED', 'false')) === 'true';
+      const ssoAzureTenantId = await ConfigService.get('SSO_AZURE_TENANT_ID', '');
+      const ssoAzureClientId = await ConfigService.get('SSO_AZURE_CLIENT_ID', '');
+      const azureSecretRaw = await ConfigService.get('SSO_AZURE_CLIENT_SECRET', '');
+
+      const ssoOktaEnabled = (await ConfigService.get('SSO_OKTA_ENABLED', 'false')) === 'true';
+      const ssoOktaClientId = await ConfigService.get('SSO_OKTA_CLIENT_ID', '');
+      const oktaSecretRaw = await ConfigService.get('SSO_OKTA_CLIENT_SECRET', '');
 
       res.status(200).json({
         smtp: {
@@ -32,8 +55,32 @@ export class TiController {
           from: emailFrom
         },
         mfa: {
+          policy: mfaPolicy,
+          emailEnabled: mfaEmailEnabled,
+          totpEnabled: mfaTotpEnabled,
           expiracaoMinutos: mfaExpiracao,
           maxTentativas: mfaMaxTentativas
+        },
+        sso: {
+          enabled: ssoEnabled,
+          allowedDomains: ssoAllowedDomains,
+          autoProvision: ssoAutoProvision,
+          google: {
+            enabled: ssoGoogleEnabled,
+            clientId: ssoGoogleClientId,
+            secretConfigured: googleSecretRaw.length > 0
+          },
+          azure: {
+            enabled: ssoAzureEnabled,
+            tenantId: ssoAzureTenantId,
+            clientId: ssoAzureClientId,
+            secretConfigured: azureSecretRaw.length > 0
+          },
+          okta: {
+            enabled: ssoOktaEnabled,
+            clientId: ssoOktaClientId,
+            secretConfigured: oktaSecretRaw.length > 0
+          }
         }
       });
     } catch (error) {
@@ -43,7 +90,7 @@ export class TiController {
   }
 
   /**
-   * Atualiza as configurações de TI (SMTP e MFA) com hot-reload imediato
+   * Atualiza as configurações de TI (SMTP, MFA e SSO)
    */
   public static async updateConfiguracoesTi(req: Request, res: Response): Promise<void> {
     try {
@@ -54,53 +101,73 @@ export class TiController {
         smtpUser,
         smtpPass,
         emailFrom,
+        mfaPolicy,
+        mfaEmailEnabled,
+        mfaTotpEnabled,
         mfaExpiracaoMinutos,
-        mfaMaxTentativas
+        mfaMaxTentativas,
+        ssoEnabled,
+        ssoAllowedDomains,
+        ssoAutoProvision,
+        ssoGoogleEnabled,
+        ssoGoogleClientId,
+        ssoGoogleClientSecret,
+        ssoAzureEnabled,
+        ssoAzureTenantId,
+        ssoAzureClientId,
+        ssoAzureClientSecret,
+        ssoOktaEnabled,
+        ssoOktaClientId,
+        ssoOktaClientSecret
       } = req.body;
 
-      if (smtpHost !== undefined) {
-        await ConfigService.set('SMTP_HOST', String(smtpHost).trim(), 'Servidor SMTP para envio de e-mails');
-      }
-
-      if (smtpPort !== undefined) {
-        await ConfigService.set('SMTP_PORT', String(smtpPort).trim(), 'Porta do servidor SMTP (587 TLS, 465 SSL)');
-      }
-
-      if (smtpSecure !== undefined) {
-        await ConfigService.set('SMTP_SECURE', String(smtpSecure), 'Uso de conexão segura SSL/TLS direta');
-      }
-
-      if (smtpUser !== undefined) {
-        await ConfigService.set('SMTP_USER', String(smtpUser).trim(), 'Usuário/Conta de autenticação SMTP');
-      }
-
+      if (smtpHost !== undefined) await ConfigService.set('SMTP_HOST', String(smtpHost).trim(), 'Servidor SMTP');
+      if (smtpPort !== undefined) await ConfigService.set('SMTP_PORT', String(smtpPort).trim(), 'Porta SMTP');
+      if (smtpSecure !== undefined) await ConfigService.set('SMTP_SECURE', String(smtpSecure), 'Conexão segura SSL/TLS');
+      if (smtpUser !== undefined) await ConfigService.set('SMTP_USER', String(smtpUser).trim(), 'Usuário SMTP');
       if (smtpPass !== undefined && smtpPass !== '••••••••••••' && smtpPass.trim() !== '') {
-        await ConfigService.set('SMTP_PASS', String(smtpPass).trim(), 'Senha ou App Password do servidor SMTP');
+        await ConfigService.set('SMTP_PASS', String(smtpPass).trim(), 'Senha SMTP Criptografada AES-256');
+      }
+      if (emailFrom !== undefined) await ConfigService.set('EMAIL_FROM', String(emailFrom).trim(), 'Remetente padrão');
+
+      // MFA
+      if (mfaPolicy !== undefined) await ConfigService.set('MFA_POLICY', String(mfaPolicy), 'Política de MFA');
+      if (mfaEmailEnabled !== undefined) await ConfigService.set('MFA_EMAIL_ENABLED', String(mfaEmailEnabled), 'MFA por E-mail');
+      if (mfaTotpEnabled !== undefined) await ConfigService.set('MFA_TOTP_ENABLED', String(mfaTotpEnabled), 'MFA por TOTP App');
+      if (mfaExpiracaoMinutos !== undefined) await ConfigService.set('MFA_EXPIRACAO_MINUTOS', String(mfaExpiracaoMinutos), 'Expiração MFA');
+      if (mfaMaxTentativas !== undefined) await ConfigService.set('MFA_MAX_TENTATIVAS', String(mfaMaxTentativas), 'Tentativas MFA');
+
+      // SSO
+      if (ssoEnabled !== undefined) await ConfigService.set('SSO_ENABLED', String(ssoEnabled), 'SSO Ativo');
+      if (ssoAllowedDomains !== undefined) await ConfigService.set('SSO_ALLOWED_DOMAINS', String(ssoAllowedDomains).trim(), 'Domínios SSO');
+      if (ssoAutoProvision !== undefined) await ConfigService.set('SSO_AUTO_PROVISION', String(ssoAutoProvision), 'Auto Provisionamento SSO');
+
+      // Google SSO
+      if (ssoGoogleEnabled !== undefined) await ConfigService.set('SSO_GOOGLE_ENABLED', String(ssoGoogleEnabled), 'Google SSO');
+      if (ssoGoogleClientId !== undefined) await ConfigService.set('SSO_GOOGLE_CLIENT_ID', String(ssoGoogleClientId).trim(), 'Google Client ID');
+      if (ssoGoogleClientSecret !== undefined && ssoGoogleClientSecret !== '••••••••••••' && ssoGoogleClientSecret.trim() !== '') {
+        await ConfigService.set('SSO_GOOGLE_CLIENT_SECRET', String(ssoGoogleClientSecret).trim(), 'Google Client Secret AES-256');
       }
 
-      if (emailFrom !== undefined) {
-        await ConfigService.set('EMAIL_FROM', String(emailFrom).trim(), 'Remetente padrão dos e-mails institucionais');
+      // Azure SSO
+      if (ssoAzureEnabled !== undefined) await ConfigService.set('SSO_AZURE_ENABLED', String(ssoAzureEnabled), 'Azure SSO');
+      if (ssoAzureTenantId !== undefined) await ConfigService.set('SSO_AZURE_TENANT_ID', String(ssoAzureTenantId).trim(), 'Azure Tenant ID');
+      if (ssoAzureClientId !== undefined) await ConfigService.set('SSO_AZURE_CLIENT_ID', String(ssoAzureClientId).trim(), 'Azure Client ID');
+      if (ssoAzureClientSecret !== undefined && ssoAzureClientSecret !== '••••••••••••' && ssoAzureClientSecret.trim() !== '') {
+        await ConfigService.set('SSO_AZURE_CLIENT_SECRET', String(ssoAzureClientSecret).trim(), 'Azure Client Secret AES-256');
       }
 
-      if (mfaExpiracaoMinutos !== undefined) {
-        const exp = parseInt(String(mfaExpiracaoMinutos), 10);
-        if (!isNaN(exp) && exp > 0) {
-          await ConfigService.set('MFA_EXPIRACAO_MINUTOS', String(exp), 'Tempo de expiração do código MFA em minutos');
-        }
+      // Okta SSO
+      if (ssoOktaEnabled !== undefined) await ConfigService.set('SSO_OKTA_ENABLED', String(ssoOktaEnabled), 'Okta SSO');
+      if (ssoOktaClientId !== undefined) await ConfigService.set('SSO_OKTA_CLIENT_ID', String(ssoOktaClientId).trim(), 'Okta Client ID');
+      if (ssoOktaClientSecret !== undefined && ssoOktaClientSecret !== '••••••••••••' && ssoOktaClientSecret.trim() !== '') {
+        await ConfigService.set('SSO_OKTA_CLIENT_SECRET', String(ssoOktaClientSecret).trim(), 'Okta Client Secret AES-256');
       }
 
-      if (mfaMaxTentativas !== undefined) {
-        const tentativas = parseInt(String(mfaMaxTentativas), 10);
-        if (!isNaN(tentativas) && tentativas > 0) {
-          await ConfigService.set('MFA_MAX_TENTATIVAS', String(tentativas), 'Número máximo de tentativas incorretas de MFA');
-        }
-      }
-
-      // Hot-reload do transportador de e-mail
       EmailService.resetTransporter();
 
       res.status(200).json({
-        message: 'Configurações de infraestrutura e segurança atualizadas com sucesso!',
+        message: 'Configurações de infraestrutura, segurança e SSO atualizadas com sucesso!',
         timestamp: new Date().toISOString()
       });
     } catch (error) {
@@ -110,86 +177,93 @@ export class TiController {
   }
 
   /**
-   * Dispara um teste real de e-mail para o operador de TI conectado
+   * Envia e-mail de teste de conectividade
    */
   public static async testarConexaoEmail(req: Request, res: Response): Promise<void> {
     try {
-      const user = (req as any).user;
-      const targetEmail = req.body.emailDestino || user.email;
-      const targetNome = req.body.nomeDestino || user.nome;
-
-      if (!targetEmail) {
-        res.status(400).json({ error: 'E-mail de destino não fornecido.' });
+      const { emailDestino } = req.body;
+      if (!emailDestino || !emailDestino.includes('@')) {
+        res.status(400).json({ error: 'E-mail de destino válido é obrigatório para o teste.' });
         return;
       }
 
-      const resultado = await EmailService.enviarEmailTeste(targetEmail, targetNome);
+      const inicio = performance.now();
+      const enviado = await EmailService.enviarEmailGenerico(
+        emailDestino,
+        '🧪 Teste de Conectividade SMTP — SeatMap Enterprise',
+        `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px;">
+          <h2 style="color: #0f172a; margin-top: 0;">Conectividade SMTP Validada!</h2>
+          <p style="color: #334155; font-size: 14px;">Este e-mail confirma que as credenciais do servidor SMTP foram validadas com sucesso pelo módulo de infraestrutura do <strong>SeatMap Enterprise</strong>.</p>
+          <div style="background: #f8fafc; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 13px; color: #166534;">
+            ✓ Criptografia AES-256-GCM ativa at-rest<br/>
+            ✓ Conexão autenticada e entregue em tempo real
+          </div>
+          <p style="color: #94a3b8; font-size: 12px; margin-bottom: 0;">Disparado em: ${new Date().toLocaleString('pt-BR')}</p>
+        </div>
+        `
+      );
+      const latenciaMs = Math.round(performance.now() - inicio);
 
-      if (resultado.success) {
+      if (enviado) {
         res.status(200).json({
           success: true,
-          message: resultado.message,
-          destinatario: targetEmail,
-          detalhes: resultado.detalhes
+          message: `E-mail de teste disparado com sucesso para ${emailDestino}.`,
+          latenciaMs
         });
       } else {
-        res.status(400).json({
+        res.status(502).json({
           success: false,
-          error: resultado.message,
-          detalhes: resultado.detalhes
+          error: 'Falha ao autenticar ou enviar através do servidor SMTP configurado.'
         });
       }
     } catch (error: any) {
       console.error('[TiController.testarConexaoEmail Error]:', error);
-      res.status(500).json({ error: error.message || 'Erro ao executar teste de envio SMTP.' });
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Erro inesperado ao testar conexão SMTP.'
+      });
     }
   }
 
   /**
-   * Obtém métricas reais de saúde, diagnóstico, latência e conectividade
+   * Obtém métricas e telemetria de saúde do sistema
    */
   public static async getStatusSistema(req: Request, res: Response): Promise<void> {
     try {
-      // 1. Latência do PostgreSQL
-      const startPg = performance.now();
+      const inicioDb = performance.now();
       await pool.query('SELECT 1');
-      const pgLatencyMs = Math.round((performance.now() - startPg) * 10) / 10;
+      const latenciaDbMs = Math.round(performance.now() - inicioDb);
 
-      // 2. Pool de Conexões do PostgreSQL
-      const poolInfo = {
-        totalConnections: (pool as any).totalCount || 0,
-        idleConnections: (pool as any).idleCount || 0,
-        waitingRequests: (pool as any).waitingCount || 0
-      };
+      const memUsage = process.memoryUsage();
+      const totalRamMb = Math.round(memUsage.rss / 1024 / 1024);
+      const heapUsedMb = Math.round(memUsage.heapUsed / 1024 / 1024);
+      const heapTotalMb = Math.round(memUsage.heapTotal / 1024 / 1024);
 
-      // 3. WebSockets ativos
-      const wsInfo = wsManager.getRoomsInfo();
+      const poolTotal = pool.totalCount;
+      const poolIdle = pool.idleCount;
+      const poolWaiting = pool.waitingCount;
 
-      // 4. Memória do Processo Node.js
-      const memory = process.memoryUsage();
-      const memoryFormatted = {
-        rssMb: Math.round((memory.rss / (1024 * 1024)) * 10) / 10,
-        heapTotalMb: Math.round((memory.heapTotal / (1024 * 1024)) * 10) / 10,
-        heapUsedMb: Math.round((memory.heapUsed / (1024 * 1024)) * 10) / 10,
-        externalMb: Math.round((memory.external / (1024 * 1024)) * 10) / 10
-      };
-
-      // 5. Uptime
-      const uptimeSeconds = Math.floor(process.uptime());
+      const wsClients = wsManager.getClientCount();
 
       res.status(200).json({
-        status: 'OPERATIONAL',
+        status: 'ONLINE',
+        timestamp: new Date().toISOString(),
+        uptimeSegundos: Math.round(process.uptime()),
         database: {
-          status: 'CONNECTED',
-          latencyMs: pgLatencyMs,
-          pool: poolInfo
+          status: 'HEALTHY',
+          latenciaMs: latenciaDbMs,
+          pool: { total: poolTotal, idle: poolIdle, waiting: poolWaiting }
         },
-        websockets: {
-          activeClients: wsInfo.totalClients,
-          activeRooms: wsInfo.activeRooms
+        memory: {
+          rssMb: totalRamMb,
+          heapUsedMb,
+          heapTotalMb
         },
-        memory: memoryFormatted,
-        uptimeSeconds,
+        websocket: {
+          conexoesAtivas: wsClients,
+          status: 'CONNECTED'
+        },
         server: {
           nodeVersion: process.version,
           platform: process.platform,
@@ -206,7 +280,33 @@ export class TiController {
   }
 
   /**
-   * Obtém histórico de auditoria de códigos MFA
+   * Obtém a trilha de auditoria completa de acessos e segurança
+   */
+  public static async getAuditoriaAcessos(req: Request, res: Response): Promise<void> {
+    try {
+      const pagina = parseInt(String(req.query.pagina || '1'), 10);
+      const limite = parseInt(String(req.query.limite || '25'), 10);
+      const tipoEvento = req.query.tipoEvento ? String(req.query.tipoEvento) : undefined;
+      const termo = req.query.termo ? String(req.query.termo) : undefined;
+      const sucesso = req.query.sucesso !== undefined ? req.query.sucesso === 'true' : undefined;
+
+      const resultado = await AuditService.getLogs({
+        pagina,
+        limite,
+        tipoEvento,
+        termo,
+        sucesso
+      });
+
+      res.status(200).json(resultado);
+    } catch (error) {
+      console.error('[TiController.getAuditoriaAcessos Error]:', error);
+      res.status(500).json({ error: 'Erro ao buscar trilha de auditoria de acessos.' });
+    }
+  }
+
+  /**
+   * Obtém histórico de auditoria de códigos MFA legado
    */
   public static async getAuditoriaMfa(req: Request, res: Response): Promise<void> {
     try {
@@ -217,7 +317,7 @@ export class TiController {
           u.nome as usuario_nome,
           u.email as usuario_email,
           u.perfil as usuario_perfil,
-          'MFA_RH' as tipo,
+          'MFA_EMAIL' as tipo,
           m.criado_em,
           m.expira_em,
           CASE WHEN m.utilizado = true THEN m.expira_em ELSE NULL END as utilizado_em,

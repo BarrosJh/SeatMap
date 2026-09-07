@@ -4,6 +4,8 @@ import '../models/desk_model.dart';
 import 'barueri_floorplan_painter.dart';
 import 'berrini_floorplan_painter.dart';
 
+import 'desks_canvas_painter.dart';
+
 /// Interactive Floor Plan Widget with InteractiveViewer, Auto-Centering and Material 3 desks.
 class InteractiveFloorPlan extends StatefulWidget {
   final List<DeskModel> desks;
@@ -42,6 +44,7 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
   double _minScale = 0.3;
   double _maxScale = 3.5;
   bool _hasInitialFit = false;
+  DeskModel? _hoveredDesk;
 
   bool get _isBarueri => widget.officeName?.toLowerCase().contains('barueri') == true;
   double get _effectiveFloorWidth => widget.floorWidth ?? (_isBarueri ? 820.0 : 1184.0);
@@ -69,9 +72,10 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
     if (oldWidget.officeName != widget.officeName ||
         oldWidget.floorWidth != widget.floorWidth ||
         oldWidget.floorHeight != widget.floorHeight) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _resetZoom();
-      });
+      if (_lastViewportSize != null) {
+        _calculateFitMatrix(_lastViewportSize!);
+        _transformationController.value = _defaultMatrix;
+      }
     }
   }
 
@@ -220,11 +224,7 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
 
           if (isFirst) {
             _hasInitialFit = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                _transformationController.value = _defaultMatrix;
-              }
-            });
+            _transformationController.value = _defaultMatrix;
           }
         }
 
@@ -257,40 +257,53 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Stack(
-                        children: [
-                          // 1. Static Structural Background Layer (Paint Isolated)
-                          RepaintBoundary(
-                            child: CustomPaint(
-                              size: Size(_effectiveFloorWidth, _effectiveFloorHeight),
-                              painter: _isBarueri
-                                  ? const BarueriFloorPlanBackgroundPainter()
-                                  : const BerriniFloorPlanBackgroundPainter(),
-                            ),
-                          ),
+                      child: MouseRegion(
+                        cursor: _hoveredDesk != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+                        onHover: (event) {
+                          final hit = DesksCanvasPainter.findDeskAtPoint(widget.desks, event.localPosition);
+                          if (hit != _hoveredDesk) {
+                            setState(() => _hoveredDesk = hit);
+                          }
+                        },
+                        onExit: (_) {
+                          if (_hoveredDesk != null) {
+                            setState(() => _hoveredDesk = null);
+                          }
+                        },
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapUp: (details) {
+                            final hit = DesksCanvasPainter.findDeskAtPoint(widget.desks, details.localPosition);
+                            if (hit != null) {
+                              _handleDeskTap(hit);
+                            }
+                          },
+                          child: Stack(
+                            children: [
+                              // 1. Static Structural Background Layer (Paint Isolated)
+                              RepaintBoundary(
+                                child: CustomPaint(
+                                  size: Size(_effectiveFloorWidth, _effectiveFloorHeight),
+                                  painter: _isBarueri
+                                      ? const BarueriFloorPlanBackgroundPainter()
+                                      : const BerriniFloorPlanBackgroundPainter(),
+                                ),
+                              ),
 
-                          // 2. Interactive Desks Layer (Paint Isolated)
-                          RepaintBoundary(
-                            child: Stack(
-                              children: widget.desks.map((desk) {
-                                return Positioned(
-                                  left: desk.dx,
-                                  top: desk.dy,
-                                  width: desk.width,
-                                  height: desk.height,
-                                  child: Transform.rotate(
-                                    angle: desk.rotationDegrees * math.pi / 180.0,
-                                    child: _DeskItemWidget(
-                                      key: ValueKey(desk.id),
-                                      desk: desk,
-                                      onTap: () => _handleDeskTap(desk),
-                                    ),
+                              // 2. Interactive Desks Layer (Single RenderObject Native GPU Canvas Painter)
+                              RepaintBoundary(
+                                child: CustomPaint(
+                                  size: Size(_effectiveFloorWidth, _effectiveFloorHeight),
+                                  painter: DesksCanvasPainter(
+                                    desks: widget.desks,
+                                    selectedDesk: widget.selectedDesk,
+                                    hoveredDesk: _hoveredDesk,
                                   ),
-                                );
-                              }).toList(growable: false),
-                            ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -343,96 +356,6 @@ class _InteractiveFloorPlanState extends State<InteractiveFloorPlan>
           ),
         );
       },
-    );
-  }
-}
-
-/// Single interactive desk item rendered with optimized high-FPS styling
-class _DeskItemWidget extends StatelessWidget {
-  final DeskModel desk;
-  final VoidCallback onTap;
-
-  const _DeskItemWidget({
-    super.key,
-    required this.desk,
-    required this.onTap,
-  });
-
-  String _getTooltipText() {
-    if (desk.isOccupied) {
-      final name = desk.occupantName?.isNotEmpty == true ? desk.occupantName! : 'Ocupada';
-      final dept = desk.occupantDepartment?.isNotEmpty == true ? ' • ${desk.occupantDepartment}' : '';
-      return 'Mesa ${desk.number} • Reservado por: $name$dept';
-    } else if (desk.status == DeskStatus.selected || desk.isReserved) {
-      final name = desk.occupantName?.isNotEmpty == true ? desk.occupantName! : 'Sua Reserva';
-      return 'Mesa ${desk.number} • $name';
-    } else {
-      return 'Mesa ${desk.number} • Disponível';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final status = desk.status;
-
-    Color borderColor;
-    Color textColor;
-    switch (status) {
-      case DeskStatus.available:
-        borderColor = const Color(0xFF388E3C);
-        textColor = const Color(0xFF1B5E20);
-        break;
-      case DeskStatus.occupied:
-        borderColor = const Color(0xFFC62828);
-        textColor = Colors.white;
-        break;
-      case DeskStatus.reserved:
-        borderColor = const Color(0xFFD97706);
-        textColor = const Color(0xFF78350F);
-        break;
-      case DeskStatus.selected:
-        borderColor = const Color(0xFF1565C0);
-        textColor = Colors.white;
-        break;
-    }
-
-    return Tooltip(
-      message: _getTooltipText(),
-      waitDuration: const Duration(milliseconds: 350),
-      showDuration: const Duration(seconds: 2),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: status.color,
-              borderRadius: const BorderRadius.all(Radius.circular(3.5)),
-              border: Border.all(
-                color: borderColor,
-                width: 1.0,
-              ),
-            ),
-            child: Center(
-              child: Transform.rotate(
-                angle: -desk.rotationDegrees * math.pi / 180.0,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    desk.number,
-                    style: TextStyle(
-                      fontSize: 10.0,
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

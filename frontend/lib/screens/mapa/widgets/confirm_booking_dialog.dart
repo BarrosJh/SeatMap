@@ -52,7 +52,7 @@ class ConfirmBookingDialog {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Nota: Se você já tiver um assento marcado no mesmo dia, a troca será realizada de forma atômica.',
+                'Nota: Se você já tiver um assento marcado no mesmo dia, a troca de assento será realizada automaticamente.',
                 style: TextStyle(fontSize: 12, color: Colors.black54),
               ),
             ],
@@ -72,7 +72,9 @@ class ConfirmBookingDialog {
                   if (res.success && res.data != null) {
                     final comprovante = res.data!['comprovante'] as String? ?? 'RES-CONFIRMADO';
                     final troca = res.data!['trocaRealizada'] == true;
-                    final reservaId = res.data!['reservaId'] as int? ?? res.data!['id'] as int?;
+                    final reservaId = (res.data!['reserva'] is Map ? res.data!['reserva']['id'] as int? : null) ??
+                        res.data!['reservaId'] as int? ??
+                        res.data!['id'] as int?;
                     ComprovanteDialog.show(
                       context,
                       reservaId: reservaId,

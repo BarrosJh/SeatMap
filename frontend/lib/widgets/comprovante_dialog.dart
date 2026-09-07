@@ -143,7 +143,7 @@ class _ComprovanteDialogState extends State<ComprovanteDialog> {
         headerIcon = Icons.swap_horiz_rounded;
         tituloDefault = 'Troca de Mesa Confirmada!';
         subtitulo = 'Comprovante Digital Atualizado';
-        statusLabel = 'TROCA ATÔMICA REALIZADA';
+        statusLabel = 'TROCA REALIZADA';
         statusColor = const Color(0xFF2563EB);
         break;
       case TipoComprovante.checkin:

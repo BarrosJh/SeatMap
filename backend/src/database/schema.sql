@@ -101,3 +101,40 @@ CREATE TABLE IF NOT EXISTS auth_password_resets (
 );
 CREATE INDEX IF NOT EXISTS idx_password_resets_usuario ON auth_password_resets(usuario_id, utilizado);
 
+-- Colunas de Segurança e TOTP na tabela usuarios
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tentativas_login_falhas INT DEFAULT 0;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bloqueado_ate TIMESTAMP;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS totp_secret TEXT;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS totp_ativo BOOLEAN DEFAULT false;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT;
+
+-- Tabela: auditoria_acessos (Trilha de Auditoria Obrigatória)
+CREATE TABLE IF NOT EXISTS auditoria_acessos (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT REFERENCES usuarios(id) ON DELETE SET NULL,
+    login_informado VARCHAR(255),
+    tipo_evento VARCHAR(50) NOT NULL,
+    sucesso BOOLEAN NOT NULL,
+    ip VARCHAR(100),
+    user_agent TEXT,
+    detalhes JSONB,
+    criado_em TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria_acessos(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_auditoria_tipo ON auditoria_acessos(tipo_evento);
+CREATE INDEX IF NOT EXISTS idx_auditoria_criado_em ON auditoria_acessos(criado_em DESC);
+
+-- Tabela: auth_refresh_tokens (Estratégia Opcional de Tokens com Rotação)
+CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,
+    family_id VARCHAR(64) NOT NULL,
+    revogado BOOLEAN DEFAULT false,
+    expira_em TIMESTAMP NOT NULL,
+    ip VARCHAR(100),
+    user_agent TEXT,
+    criado_em TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_family ON auth_refresh_tokens(family_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_usuario ON auth_refresh_tokens(usuario_id, revogado);

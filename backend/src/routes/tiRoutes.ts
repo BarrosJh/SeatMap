@@ -15,6 +15,7 @@ router.put('/configuracoes', TiController.updateConfiguracoesTi);
 router.post('/testar-email', TiController.testarConexaoEmail);
 router.get('/status', TiController.getStatusSistema);
 router.get('/auditoria-mfa', TiController.getAuditoriaMfa);
+router.get('/auditoria-acessos', TiController.getAuditoriaAcessos);
 
 export default router;
 

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../../../core/constants.dart';
 
-class TabPoliticasRelatorios extends StatelessWidget {
+class TabPoliticas extends StatelessWidget {
   final TextEditingController limiteSemanalController;
   final TextEditingController horarioGestaoController;
   final TextEditingController horarioColabController;
@@ -13,17 +11,14 @@ class TabPoliticasRelatorios extends StatelessWidget {
   final String diaColab;
   final bool permitirTroca;
   final bool checkinAutoGestao;
-  final DateTime dataRelatorio;
   final Function(String? value) onDiaGestaoChanged;
   final Function(String? value) onDiaColabChanged;
   final Function(bool value) onPermitirTrocaChanged;
   final Function(bool value) onCheckinAutoGestaoChanged;
-  final Function(DateTime date) onDataRelatorioChanged;
   final VoidCallback onSalvarParametros;
   final VoidCallback onExecutarLimpezaNoShow;
-  final VoidCallback onExportarCsv;
 
-  const TabPoliticasRelatorios({
+  const TabPoliticas({
     super.key,
     required this.limiteSemanalController,
     required this.horarioGestaoController,
@@ -35,15 +30,12 @@ class TabPoliticasRelatorios extends StatelessWidget {
     required this.diaColab,
     required this.permitirTroca,
     required this.checkinAutoGestao,
-    required this.dataRelatorio,
     required this.onDiaGestaoChanged,
     required this.onDiaColabChanged,
     required this.onPermitirTrocaChanged,
     required this.onCheckinAutoGestaoChanged,
-    required this.onDataRelatorioChanged,
     required this.onSalvarParametros,
     required this.onExecutarLimpezaNoShow,
-    required this.onExportarCsv,
   });
 
   static const List<DropdownMenuItem<String>> _diasSemanaItems = [
@@ -248,7 +240,7 @@ class TabPoliticasRelatorios extends StatelessWidget {
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
                             title: const Text('Permitir Troca de Assento no Mesmo Dia', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                            subtitle: const Text('Permite ao colaborador trocar de mesa atomicamente para uma mesma data já reservada.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            subtitle: const Text('Permite ao colaborador trocar de mesa diretamente para uma mesma data já reservada.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                             value: permitirTroca,
                             activeThumbColor: const Color(0xFF2563EB),
                             onChanged: onPermitirTrocaChanged,
@@ -329,7 +321,7 @@ class TabPoliticasRelatorios extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // 5. CARD: AÇÕES OPERACIONAIS DE EMERGÊNCIA
+              // 4. CARD: AÇÕES OPERACIONAIS DE EMERGÊNCIA
               Card(
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -369,85 +361,6 @@ class TabPoliticasRelatorios extends StatelessWidget {
                         onPressed: onExecutarLimpezaNoShow,
                       ),
                     ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // 6. CARD: EXPORTAÇÃO DE RELATÓRIO CSV
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: LayoutBuilder(
-                    builder: (context, relConstraints) {
-                      final isMobile = relConstraints.maxWidth < 550;
-
-                      final btnDataRelatorio = OutlinedButton.icon(
-                        icon: const Icon(Icons.date_range_rounded),
-                        label: Text('Data: ${DateFormat("dd/MM/yyyy").format(dataRelatorio)}'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: dataRelatorio,
-                            firstDate: DateTime(2025),
-                            lastDate: DateTime(2030),
-                          );
-                          if (picked != null) onDataRelatorioChanged(picked);
-                        },
-                      );
-
-                      final btnExportar = ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppConstants.primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        icon: const Icon(Icons.download_rounded, size: 18),
-                        label: const Text('Exportar CSV de Ocupação'),
-                        onPressed: onExportarCsv,
-                      );
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.table_chart_rounded, color: Color(0xFF0D9488), size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Exportação de Relatórios de Ocupação',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          if (isMobile) ...[
-                            SizedBox(width: double.infinity, child: btnDataRelatorio),
-                            const SizedBox(height: 10),
-                            SizedBox(width: double.infinity, child: btnExportar),
-                          ] else ...[
-                            Row(
-                              children: [
-                                Expanded(child: btnDataRelatorio),
-                                const SizedBox(width: 12),
-                                btnExportar,
-                              ],
-                            ),
-                          ],
-                        ],
-                      );
-                    },
                   ),
                 ),
               ),

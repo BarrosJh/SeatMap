@@ -182,9 +182,10 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                               initialDate: seatProvider.filtroData ?? DateTime.now(),
                               firstDate: DateTime(2024),
                               lastDate: DateTime(2030),
-                              helpText: 'SELECIONE A DATA PARA FILTRAR',
-                              cancelText: 'CANCELAR',
-                              confirmText: 'FILTRAR',
+                              locale: const Locale('pt', 'BR'),
+                              helpText: 'Selecione a Data para Filtrar',
+                              cancelText: 'Cancelar',
+                              confirmText: 'Filtrar',
                             );
                             if (selected != null) {
                               seatProvider.setFiltroData(selected);

@@ -94,6 +94,10 @@ class TabReservasGlobal extends StatelessWidget {
                             initialDate: filtroDataInicio,
                             firstDate: DateTime(2025),
                             lastDate: DateTime(2030),
+                            locale: const Locale('pt', 'BR'),
+                            helpText: 'Selecione a Data Inicial',
+                            cancelText: 'Cancelar',
+                            confirmText: 'Selecionar',
                           );
                           if (p != null) {
                             onDataInicioChanged(p);
@@ -110,6 +114,10 @@ class TabReservasGlobal extends StatelessWidget {
                             initialDate: filtroDataFim,
                             firstDate: DateTime(2025),
                             lastDate: DateTime(2030),
+                            locale: const Locale('pt', 'BR'),
+                            helpText: 'Selecione a Data Final',
+                            cancelText: 'Cancelar',
+                            confirmText: 'Selecionar',
                           );
                           if (p != null) {
                             onDataFimChanged(p);

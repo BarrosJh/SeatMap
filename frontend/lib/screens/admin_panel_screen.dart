@@ -3,11 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../models/admin_models.dart';
+import '../models/seat_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'admin/tabs/tab_departamentos.dart';
 import 'admin/tabs/tab_importacao_lote.dart';
-import 'admin/tabs/tab_politicas_relatorios.dart';
+import 'admin/tabs/tab_politicas.dart';
+import 'admin/tabs/tab_relatorios.dart';
 import 'admin/tabs/tab_reservas_global.dart';
 import 'admin/tabs/tab_usuarios.dart';
 
@@ -24,6 +26,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
 
   bool _isLoading = false;
   List<DepartamentoModel> _departamentos = [];
+  List<EscritorioModel> _escritorios = [];
 
   // TAB 1: Usuários
   List<AdminUsuarioModel> _usuarios = [];
@@ -52,7 +55,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   // TAB 4: Departamentos
   final _novoDepController = TextEditingController();
 
-  // TAB 5: Políticas & Relatórios
+  // TAB 5: Políticas de Agendamento
   final _limiteSemanalController = TextEditingController();
   final _horarioGestaoController = TextEditingController();
   final _horarioColabController = TextEditingController();
@@ -63,12 +66,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   String _diaColab = '5';
   bool _permitirTroca = true;
   bool _checkinAutoGestao = true;
-  DateTime _dataRelatorio = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _carregarDadosIniciais();
   }
 
@@ -93,6 +95,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     if (mounted) setState(() => _isLoading = true);
     await Future.wait([
       _carregarDepartamentos(setLoading: false),
+      _carregarEscritorios(setLoading: false),
       _carregarUsuarios(setLoading: false),
       _carregarReservas(setLoading: false),
       _carregarParametros(),
@@ -103,6 +106,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   // ==========================================
   // CARREGAMENTO DE DADOS
   // ==========================================
+  Future<void> _carregarEscritorios({bool setLoading = true}) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (auth.token == null) return;
+
+    if (setLoading && mounted) setState(() => _isLoading = true);
+    final res = await _apiService.getEscritorios(auth.token!);
+    if (mounted) {
+      if (setLoading) _isLoading = false;
+      if (res.success && res.data != null) {
+        setState(() => _escritorios = res.data!);
+      }
+    }
+  }
   Future<void> _carregarDepartamentos({bool setLoading = true}) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (auth.token == null) return;
@@ -857,54 +873,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     await _carregarReservas();
   }
 
-  void _exportarCsv() {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (auth.token == null || auth.adminToken == null) return;
-
-    final dataIso = DateFormat('yyyy-MM-dd').format(_dataRelatorio);
-    final url = '${AppConstants.baseUrl}/admin/relatorio/exportar?data=$dataIso';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Relatório de Ocupação'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Relatório referente a: $dataIso'),
-            const SizedBox(height: 12),
-            const Text(
-              'O relatório em formato CSV contém os registros detalhados de presença, matrículas, horários de check-in e alocações de assentos.',
-              style: TextStyle(fontSize: 13, color: Colors.black87),
-            ),
-            const SizedBox(height: 12),
-            SelectableText(
-              'Endpoint: $url',
-              style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fechar')),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.download),
-            label: const Text('Baixar CSV'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Download do relatório de $dataIso iniciado.'),
-                  backgroundColor: Colors.green.shade700,
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   // ==========================================
   // BUILD PRINCIPAL & TABS
   // ==========================================
@@ -956,7 +924,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
             Tab(icon: Icon(Icons.upload_file_outlined, size: 20), text: 'Importação em Lote'),
             Tab(icon: Icon(Icons.event_seat_outlined, size: 20), text: 'Reservas'),
             Tab(icon: Icon(Icons.domain_outlined, size: 20), text: 'Departamentos'),
-            Tab(icon: Icon(Icons.settings_suggest_outlined, size: 20), text: 'Políticas & Relatórios'),
+            Tab(icon: Icon(Icons.tune_rounded, size: 20), text: 'Políticas de Agendamento'),
+            Tab(icon: Icon(Icons.analytics_rounded, size: 20), text: 'Relatórios & BI'),
           ],
         ),
       ),
@@ -1031,7 +1000,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                   departamentos: _departamentos,
                   onNovoDepartamento: _abrirModalNovoDepartamento,
                 ),
-                TabPoliticasRelatorios(
+                TabPoliticas(
                   limiteSemanalController: _limiteSemanalController,
                   horarioGestaoController: _horarioGestaoController,
                   horarioColabController: _horarioColabController,
@@ -1042,15 +1011,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                   diaColab: _diaColab,
                   permitirTroca: _permitirTroca,
                   checkinAutoGestao: _checkinAutoGestao,
-                  dataRelatorio: _dataRelatorio,
                   onDiaGestaoChanged: (v) => setState(() => _diaGestao = v ?? '5'),
                   onDiaColabChanged: (v) => setState(() => _diaColab = v ?? '5'),
                   onPermitirTrocaChanged: (v) => setState(() => _permitirTroca = v),
                   onCheckinAutoGestaoChanged: (v) => setState(() => _checkinAutoGestao = v),
-                  onDataRelatorioChanged: (d) => setState(() => _dataRelatorio = d),
                   onSalvarParametros: _salvarParametros,
                   onExecutarLimpezaNoShow: _executarLimpezaEmergencial,
-                  onExportarCsv: _exportarCsv,
+                ),
+                TabRelatorios(
+                  departamentos: _departamentos,
+                  escritorios: _escritorios,
                 ),
               ],
             ),

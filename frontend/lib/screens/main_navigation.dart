@@ -52,16 +52,16 @@ class _MainNavigationState extends State<MainNavigation> {
     if (isDrawer && Navigator.canPop(context)) {
       Navigator.pop(context);
     }
-    setState(() => _currentIndex = 1);
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
+    seatProvider.prepararTrocaEscritorioPorNome(nomeEscritorio);
+    setState(() => _currentIndex = 1);
     if (auth.token != null) {
       seatProvider.selecionarEscritorioPorNome(auth.token!, nomeEscritorio);
     }
   }
 
   void _navegarParaMapaComData(String nomeEscritorio, DateTime? data) {
-    setState(() => _currentIndex = 1);
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
     if (auth.token != null) {
@@ -77,6 +77,7 @@ class _MainNavigationState extends State<MainNavigation> {
         seatProvider.selecionarEscritorio(auth.token!, match);
       }
     }
+    setState(() => _currentIndex = 1);
   }
 
   void _selecionarFiltroReservas(ReservaFiltro filtro, {bool isDrawer = false}) {

@@ -110,7 +110,25 @@ class SeatMapProvider extends ChangeNotifier {
         !_reservaHoje!.checkinRealizado;
   }
 
+  void prepararTrocaEscritorioPorNome(String termo) {
+    if (_escritorios.isNotEmpty) {
+      final match = _escritorios.firstWhere(
+        (e) => e.nome.toLowerCase().contains(termo.toLowerCase()) || e.cidade.toLowerCase().contains(termo.toLowerCase()),
+        orElse: () => _escritorios.first,
+      );
+      if (_selectedEscritorio?.id != match.id) {
+        _selectedEscritorio = match;
+        _mapaData = null;
+        notifyListeners();
+      }
+    } else {
+      _mapaData = null;
+      notifyListeners();
+    }
+  }
+
   Future<void> selecionarEscritorioPorNome(String token, String termo) async {
+    prepararTrocaEscritorioPorNome(termo);
     if (_escritorios.isEmpty) {
       final escRes = await _apiService.getEscritorios(token);
       if (escRes.success && escRes.data != null) {
@@ -263,34 +281,52 @@ class SeatMapProvider extends ChangeNotifier {
   }
 
   Future<void> selecionarEscritorio(String token, EscritorioModel escritorio) async {
-    if (_selectedEscritorio?.id == escritorio.id) return;
+    if (_selectedEscritorio?.id == escritorio.id && _mapaData != null) return;
     _selectedEscritorio = escritorio;
+    _mapaData = null; // Zera imediatamente para evitar flash de marcações de outro escritório
+    notifyListeners(); // Invalida visualmente no mesmo frame
     _wsService.switchEscritorio(escritorio.id);
     await carregarMapa(token);
   }
 
   Future<void> selecionarData(String token, DateTime data) async {
+    final novaDataIso = DateFormat('yyyy-MM-dd').format(data);
+    if (selectedDateIso == novaDataIso && _mapaData != null) return;
     _selectedDate = data;
+    _mapaData = null; // Zera imediatamente para evitar flash de reservas de outra data
+    notifyListeners(); // Invalida visualmente no mesmo frame
     await carregarMapa(token);
   }
 
   Future<void> selecionarEscritorioEData(String token, EscritorioModel escritorio, DateTime data) async {
     _selectedEscritorio = escritorio;
     _selectedDate = data;
+    _mapaData = null; // Zera imediatamente
+    notifyListeners(); // Invalida visualmente no mesmo frame
     _wsService.switchEscritorio(escritorio.id);
     await carregarMapa(token);
   }
 
+  int _mapaRequestId = 0;
+
   Future<void> carregarMapa(String token) async {
     if (_selectedEscritorio == null) return;
+    final reqId = ++_mapaRequestId;
     _isLoading = true;
     notifyListeners();
 
     final res = await _apiService.getMapa(token, _selectedEscritorio!.id, selectedDateIso);
+
+    // Se outra requisição foi feita nesse meio tempo, descarta esta resposta antiga
+    if (reqId != _mapaRequestId) return;
+
     _isLoading = false;
 
     if (res.success && res.data != null) {
-      _mapaData = res.data;
+      // Valida se a resposta corresponde estritamente ao escritório e data atualmente selecionados
+      if (res.data!.escritorio.id == _selectedEscritorio!.id && res.data!.data == selectedDateIso) {
+        _mapaData = res.data;
+      }
     } else {
       _errorMessage = res.error ?? 'Erro ao carregar mapa de assentos.';
     }

@@ -145,6 +145,7 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
       final reservaAtualizada = seatProvider.reservaHoje ?? reservaHoje;
       ComprovanteDialog.show(
         context,
+        reservaId: reservaAtualizada.id,
         tipo: TipoComprovante.checkin,
         comprovante: reservaAtualizada.codigoComprovante ?? reservaHoje.codigoComprovante ?? 'RES-CONFIRMADO',
         dataReserva: reservaAtualizada.dataReserva,

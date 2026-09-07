@@ -381,4 +381,18 @@ export class EmailService {
       return false;
     }
   }
+
+  public static async enviarEmailGenerico(
+    para: string,
+    assunto: string,
+    html: string
+  ): Promise<boolean> {
+    return this.despacharEmail({
+      to: para,
+      subject: assunto,
+      html,
+      tipoLog: 'EMAIL_GENERICO_SISTEMA'
+    });
+  }
 }
+

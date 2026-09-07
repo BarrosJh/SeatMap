@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/adminController';
+import { RelatorioController } from '../controllers/relatorioController';
 import { authenticateToken, requireAdmin, authenticateAdminMfa } from '../middleware/auth';
 import { adminLimiter } from '../middleware/rateLimiter';
 
@@ -16,7 +17,13 @@ router.put('/parametros', AdminController.updateParametros);
 router.post('/limpeza-noshow', AdminController.executarLimpezaNoShow);
 router.get('/relatorio/exportar', AdminController.exportarRelatorioCsv);
 
-// 2. Gestão de Usuários
+// 2. Módulo Completo de Relatórios & BI
+router.get('/relatorios/analytics', RelatorioController.getAnalytics);
+router.get('/relatorios/dados', RelatorioController.getDadosRelatorio);
+router.get('/relatorios/exportar/xlsx', RelatorioController.exportarXlsx);
+router.get('/relatorios/exportar/pdf', RelatorioController.exportarPdf);
+
+// 3. Gestão de Usuários
 router.get('/usuarios', AdminController.getUsuarios);
 router.post('/usuarios', AdminController.criarUsuario);
 router.put('/usuarios/:id', AdminController.updateUsuario);
@@ -26,12 +33,13 @@ router.post('/usuarios/:id/status', AdminController.toggleStatusUsuario);
 router.post('/usuarios/:id/reset-senha', AdminController.resetSenhaUsuario);
 router.post('/usuarios/importar-lote', AdminController.importarLoteUsuarios);
 
-// 3. Departamentos
+// 4. Departamentos
 router.get('/departamentos', AdminController.getDepartamentos);
 router.post('/departamentos', AdminController.criarDepartamento);
 
-// 4. Gestão Global de Reservas & Cancelamento RH
+// 5. Gestão Global de Reservas & Cancelamento RH
 router.get('/reservas', AdminController.getReservas);
 router.post('/reservas/:id/cancelar', AdminController.cancelarReservaAdmin);
 
 export default router;
+

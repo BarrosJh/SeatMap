@@ -34,8 +34,9 @@ class _MapaScreenState extends State<MapaScreen> {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
       if (auth.token != null && auth.user != null) {
-        seatProvider.initWebSocket(auth.token!);
-        seatProvider.carregarInicial(auth.token!, auth.user!);
+        if (seatProvider.mapaData == null) {
+          seatProvider.carregarInicial(auth.token!, auth.user!);
+        }
         final now = DateTime.now();
         if (now.weekday >= 6) {
           final dias = _getDiasUteisSemana();
@@ -160,6 +161,10 @@ class _MapaScreenState extends State<MapaScreen> {
       initialDate: initial,
       firstDate: firstDate,
       lastDate: lastDate,
+      locale: const Locale('pt', 'BR'),
+      helpText: 'Selecione a Data de Reserva',
+      cancelText: 'Cancelar',
+      confirmText: 'Selecionar',
       selectableDayPredicate: (d) => d.weekday <= 5,
     );
     if (picked != null) {
@@ -244,7 +249,12 @@ class _MapaScreenState extends State<MapaScreen> {
     int totalOcupadas = 0;
     int totalMinhas = 0;
 
-    if (seatProvider.mapaData != null) {
+    final bool isMapaDataValido = seatProvider.mapaData != null &&
+        seatProvider.selectedEscritorio != null &&
+        seatProvider.mapaData!.escritorio.id == seatProvider.selectedEscritorio!.id &&
+        seatProvider.mapaData!.data == seatProvider.selectedDateIso;
+
+    if (isMapaDataValido) {
       for (final baia in seatProvider.mapaData!.baias) {
         for (final cad in baia.cadeiras) {
           totalAssentos++;
@@ -303,7 +313,7 @@ class _MapaScreenState extends State<MapaScreen> {
 
             // CONTEÚDO PRINCIPAL (Planta Baixa Interativa vs Cards de Bancadas)
             Expanded(
-              child: seatProvider.mapaData == null
+              child: !isMapaDataValido
                   ? const Center(child: CircularProgressIndicator())
                   : (_isFloorPlanView
                       ? _buildInteractiveFloorPlanView(seatProvider, auth.user!, auth.token!)
@@ -391,6 +401,16 @@ class _MapaScreenState extends State<MapaScreen> {
     final dateIso = seatProvider.selectedDateIso;
     final currentMapaData = seatProvider.mapaData;
 
+    // Se o escritório mudou, limpa a seleção de mesa ativa
+    if (_cachedOfficeName != officeName) {
+      _selectedFloorPlanDesk = null;
+    }
+
+    final isMatching = currentMapaData != null &&
+        seatProvider.selectedEscritorio != null &&
+        currentMapaData.escritorio.id == seatProvider.selectedEscritorio!.id &&
+        currentMapaData.data == dateIso;
+
     // Se os dados não mudaram, reutiliza o mapa de cadeiras e a lista de desks em memória
     if (_cachedMapaDataRef != currentMapaData ||
         _cachedDateIso != dateIso ||
@@ -398,7 +418,7 @@ class _MapaScreenState extends State<MapaScreen> {
         _cachedUserRef != currentUser) {
       
       final Map<String, CadeiraModel> cadeiraPorNumero = {};
-      if (currentMapaData != null) {
+      if (isMatching) {
         for (final baia in currentMapaData.baias) {
           for (final cad in baia.cadeiras) {
             final idStr = cad.identificador;
@@ -483,8 +503,12 @@ class _MapaScreenState extends State<MapaScreen> {
             if (res.success && res.data != null) {
               final comprovante = res.data!['comprovante'] as String? ?? 'RES-CONFIRMADO';
               final troca = res.data!['trocaRealizada'] == true;
+              final reservaId = (res.data!['reserva'] is Map ? res.data!['reserva']['id'] as int? : null) ??
+                  res.data!['reservaId'] as int? ??
+                  res.data!['id'] as int?;
               ComprovanteDialog.show(
                 context,
+                reservaId: reservaId,
                 tipo: troca ? TipoComprovante.troca : TipoComprovante.reserva,
                 comprovante: comprovante,
                 dataReserva: seatProvider.selectedDateIso,
