@@ -15,8 +15,9 @@ class AppConstants {
     return 'ws://localhost:3000/ws';
   }
 
-  // Chaves de SharedPreferences
+  // Chaves de SharedPreferences & SecureStorage
   static const String keyToken = 'seatmap_jwt_token';
+  static const String keyRefreshToken = 'seatmap_refresh_token';
   static const String keyAdminToken = 'seatmap_admin_token';
   static const String keyUserData = 'seatmap_user_data';
 

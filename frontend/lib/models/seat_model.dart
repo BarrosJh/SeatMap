@@ -68,7 +68,10 @@ class CadeiraModel {
   final String identificador;
   final int posicaoX;
   final int posicaoY;
-  String status; // 'livre' | 'ocupada' | 'minha_reserva' | 'expirada'
+  String status; // 'livre' | 'ocupada' | 'minha_reserva' | 'expirada' | 'manutencao'
+  final String statusOperacional; // 'DISPONIVEL' | 'EM_MANUTENCAO'
+  final String? motivoManutencao;
+  final String? previsaoRetorno;
   final int? reservaId;
   OcupanteModel? ocupante;
 
@@ -78,14 +81,18 @@ class CadeiraModel {
     required this.posicaoX,
     required this.posicaoY,
     required this.status,
+    this.statusOperacional = 'DISPONIVEL',
+    this.motivoManutencao,
+    this.previsaoRetorno,
     this.reservaId,
     this.ocupante,
   });
 
-  bool get isLivre => status == 'livre';
+  bool get isLivre => status == 'livre' && !isManutencao;
   bool get isMinhaReserva => status == 'minha_reserva';
   bool get isOcupada => status == 'ocupada';
   bool get isExpirada => status == 'expirada';
+  bool get isManutencao => status == 'manutencao' || statusOperacional == 'EM_MANUTENCAO';
 
   factory CadeiraModel.fromJson(Map<String, dynamic> json) {
     return CadeiraModel(
@@ -94,11 +101,80 @@ class CadeiraModel {
       posicaoX: json['posicaoX'] ?? json['posicao_x'] ?? 0,
       posicaoY: json['posicaoY'] ?? json['posicao_y'] ?? 0,
       status: json['status'] ?? 'livre',
+      statusOperacional: json['statusOperacional'] ?? json['status_operacional'] ?? 'DISPONIVEL',
+      motivoManutencao: json['motivoManutencao'] ?? json['motivo_manutencao'],
+      previsaoRetorno: json['previsaoRetorno'] ?? json['previsao_retorno'],
       reservaId: json['reservaId'] ?? json['reserva_id'],
       ocupante: json['ocupante'] != null ? OcupanteModel.fromJson(json['ocupante']) : null,
     );
   }
 }
+
+class HistoricoReservaModel {
+  final int id;
+  final int? reservaId;
+  final int cadeiraId;
+  final int? usuarioId;
+  final String dataReserva;
+  final String tipoEvento;
+  final int? executadoPorUsuarioId;
+  final String? motivo;
+  final Map<String, dynamic>? detalhes;
+  final String criadoEm;
+  final String? usuarioNome;
+  final String? usuarioEmail;
+  final String? usuarioMatricula;
+  final String? departamentoNome;
+  final String? executadoPorNome;
+  final String? cadeiraIdentificador;
+  final String? baiaNome;
+  final String? escritorioNome;
+
+  HistoricoReservaModel({
+    required this.id,
+    this.reservaId,
+    required this.cadeiraId,
+    this.usuarioId,
+    required this.dataReserva,
+    required this.tipoEvento,
+    this.executadoPorUsuarioId,
+    this.motivo,
+    this.detalhes,
+    required this.criadoEm,
+    this.usuarioNome,
+    this.usuarioEmail,
+    this.usuarioMatricula,
+    this.departamentoNome,
+    this.executadoPorNome,
+    this.cadeiraIdentificador,
+    this.baiaNome,
+    this.escritorioNome,
+  });
+
+  factory HistoricoReservaModel.fromJson(Map<String, dynamic> json) {
+    return HistoricoReservaModel(
+      id: json['id'] ?? 0,
+      reservaId: json['reserva_id'] ?? json['reservaId'],
+      cadeiraId: json['cadeira_id'] ?? json['cadeiraId'] ?? 0,
+      usuarioId: json['usuario_id'] ?? json['usuarioId'],
+      dataReserva: json['data_reserva'] ?? json['dataReserva'] ?? '',
+      tipoEvento: json['tipo_evento'] ?? json['tipoEvento'] ?? '',
+      executadoPorUsuarioId: json['executado_por_usuario_id'] ?? json['executadoPorUsuarioId'],
+      motivo: json['motivo'],
+      detalhes: json['detalhes'] is Map<String, dynamic> ? json['detalhes'] : null,
+      criadoEm: json['criado_em'] ?? json['criadoEm'] ?? '',
+      usuarioNome: json['usuario_nome'] ?? json['usuarioNome'],
+      usuarioEmail: json['usuario_email'] ?? json['usuarioEmail'],
+      usuarioMatricula: json['usuario_matricula'] ?? json['usuarioMatricula'],
+      departamentoNome: json['departamento_nome'] ?? json['departamentoNome'],
+      executadoPorNome: json['executado_por_nome'] ?? json['executadoPorNome'],
+      cadeiraIdentificador: json['cadeira_identificador'] ?? json['cadeiraIdentificador'],
+      baiaNome: json['baia_nome'] ?? json['baiaNome'],
+      escritorioNome: json['escritorio_nome'] ?? json['escritorioNome'],
+    );
+  }
+}
+
 
 class BaiaModel {
   final int id;

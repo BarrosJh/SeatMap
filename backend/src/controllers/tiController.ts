@@ -22,7 +22,7 @@ export class TiController {
       // Configurações de MFA
       const mfaExpiracao = await ConfigService.getNumber('MFA_EXPIRACAO_MINUTOS', 10);
       const mfaMaxTentativas = await ConfigService.getNumber('MFA_MAX_TENTATIVAS', 3);
-      const mfaPolicy = await ConfigService.get('MFA_POLICY', 'OPCIONAL'); // DESATIVADO, OPCIONAL, OBRIGATORIO_RH, OBRIGATORIO_TODOS
+      const mfaPolicy = await ConfigService.get('MFA_POLICY', 'DESATIVADO'); // DESATIVADO, OPCIONAL, OBRIGATORIO_RH, OBRIGATORIO_TODOS
       const mfaEmailEnabled = (await ConfigService.get('MFA_EMAIL_ENABLED', 'true')) === 'true';
       const mfaTotpEnabled = (await ConfigService.get('MFA_TOTP_ENABLED', 'true')) === 'true';
 
@@ -30,17 +30,29 @@ export class TiController {
       const ssoEnabled = (await ConfigService.get('SSO_ENABLED', 'false')) === 'true';
       const ssoAllowedDomains = await ConfigService.get('SSO_ALLOWED_DOMAINS', '');
       const ssoAutoProvision = (await ConfigService.get('SSO_AUTO_PROVISION', 'true')) === 'true';
+      const ssoDefaultRole = await ConfigService.get('SSO_DEFAULT_ROLE', 'COLABORADOR');
+      const ssoEnforceForDomains = (await ConfigService.get('SSO_ENFORCE_FOR_DOMAINS', 'false')) === 'true';
 
+      // Google Workspace
       const ssoGoogleEnabled = (await ConfigService.get('SSO_GOOGLE_ENABLED', 'false')) === 'true';
       const ssoGoogleClientId = await ConfigService.get('SSO_GOOGLE_CLIENT_ID', '');
       const googleSecretRaw = await ConfigService.get('SSO_GOOGLE_CLIENT_SECRET', '');
+      const ssoGoogleHd = await ConfigService.get('SSO_GOOGLE_HD', '');
+      const ssoGoogleRedirectUri = await ConfigService.get('SSO_GOOGLE_REDIRECT_URI', '');
 
+      // Microsoft Entra ID / Azure AD
       const ssoAzureEnabled = (await ConfigService.get('SSO_AZURE_ENABLED', 'false')) === 'true';
+      const ssoAzureTenantType = await ConfigService.get('SSO_AZURE_TENANT_TYPE', 'single_tenant');
       const ssoAzureTenantId = await ConfigService.get('SSO_AZURE_TENANT_ID', '');
       const ssoAzureClientId = await ConfigService.get('SSO_AZURE_CLIENT_ID', '');
       const azureSecretRaw = await ConfigService.get('SSO_AZURE_CLIENT_SECRET', '');
+      const ssoAzureScopes = await ConfigService.get('SSO_AZURE_SCOPES', 'openid profile email User.Read');
+      const ssoAzureSecurityGroup = await ConfigService.get('SSO_AZURE_SECURITY_GROUP', '');
+      const ssoAzureRedirectUri = await ConfigService.get('SSO_AZURE_REDIRECT_URI', '');
 
+      // Okta / SAML 2.0
       const ssoOktaEnabled = (await ConfigService.get('SSO_OKTA_ENABLED', 'false')) === 'true';
+      const ssoOktaDomain = await ConfigService.get('SSO_OKTA_DOMAIN', '');
       const ssoOktaClientId = await ConfigService.get('SSO_OKTA_CLIENT_ID', '');
       const oktaSecretRaw = await ConfigService.get('SSO_OKTA_CLIENT_SECRET', '');
 
@@ -65,19 +77,28 @@ export class TiController {
           enabled: ssoEnabled,
           allowedDomains: ssoAllowedDomains,
           autoProvision: ssoAutoProvision,
+          defaultRole: ssoDefaultRole,
+          enforceForDomains: ssoEnforceForDomains,
           google: {
             enabled: ssoGoogleEnabled,
             clientId: ssoGoogleClientId,
-            secretConfigured: googleSecretRaw.length > 0
+            secretConfigured: googleSecretRaw.length > 0,
+            hd: ssoGoogleHd,
+            redirectUri: ssoGoogleRedirectUri
           },
           azure: {
             enabled: ssoAzureEnabled,
+            tenantType: ssoAzureTenantType,
             tenantId: ssoAzureTenantId,
             clientId: ssoAzureClientId,
-            secretConfigured: azureSecretRaw.length > 0
+            secretConfigured: azureSecretRaw.length > 0,
+            scopes: ssoAzureScopes,
+            securityGroup: ssoAzureSecurityGroup,
+            redirectUri: ssoAzureRedirectUri
           },
           okta: {
             enabled: ssoOktaEnabled,
+            domain: ssoOktaDomain,
             clientId: ssoOktaClientId,
             secretConfigured: oktaSecretRaw.length > 0
           }
@@ -109,14 +130,23 @@ export class TiController {
         ssoEnabled,
         ssoAllowedDomains,
         ssoAutoProvision,
+        ssoDefaultRole,
+        ssoEnforceForDomains,
         ssoGoogleEnabled,
         ssoGoogleClientId,
         ssoGoogleClientSecret,
+        ssoGoogleHd,
+        ssoGoogleRedirectUri,
         ssoAzureEnabled,
+        ssoAzureTenantType,
         ssoAzureTenantId,
         ssoAzureClientId,
         ssoAzureClientSecret,
+        ssoAzureScopes,
+        ssoAzureSecurityGroup,
+        ssoAzureRedirectUri,
         ssoOktaEnabled,
+        ssoOktaDomain,
         ssoOktaClientId,
         ssoOktaClientSecret
       } = req.body;
@@ -137,10 +167,12 @@ export class TiController {
       if (mfaExpiracaoMinutos !== undefined) await ConfigService.set('MFA_EXPIRACAO_MINUTOS', String(mfaExpiracaoMinutos), 'Expiração MFA');
       if (mfaMaxTentativas !== undefined) await ConfigService.set('MFA_MAX_TENTATIVAS', String(mfaMaxTentativas), 'Tentativas MFA');
 
-      // SSO
+      // SSO Governance
       if (ssoEnabled !== undefined) await ConfigService.set('SSO_ENABLED', String(ssoEnabled), 'SSO Ativo');
       if (ssoAllowedDomains !== undefined) await ConfigService.set('SSO_ALLOWED_DOMAINS', String(ssoAllowedDomains).trim(), 'Domínios SSO');
       if (ssoAutoProvision !== undefined) await ConfigService.set('SSO_AUTO_PROVISION', String(ssoAutoProvision), 'Auto Provisionamento SSO');
+      if (ssoDefaultRole !== undefined) await ConfigService.set('SSO_DEFAULT_ROLE', String(ssoDefaultRole).trim(), 'Perfil Padrão SSO');
+      if (ssoEnforceForDomains !== undefined) await ConfigService.set('SSO_ENFORCE_FOR_DOMAINS', String(ssoEnforceForDomains), 'Forçar SSO para Domínios');
 
       // Google SSO
       if (ssoGoogleEnabled !== undefined) await ConfigService.set('SSO_GOOGLE_ENABLED', String(ssoGoogleEnabled), 'Google SSO');
@@ -148,17 +180,24 @@ export class TiController {
       if (ssoGoogleClientSecret !== undefined && ssoGoogleClientSecret !== '••••••••••••' && ssoGoogleClientSecret.trim() !== '') {
         await ConfigService.set('SSO_GOOGLE_CLIENT_SECRET', String(ssoGoogleClientSecret).trim(), 'Google Client Secret AES-256');
       }
+      if (ssoGoogleHd !== undefined) await ConfigService.set('SSO_GOOGLE_HD', String(ssoGoogleHd).trim(), 'Google Hosted Domain');
+      if (ssoGoogleRedirectUri !== undefined) await ConfigService.set('SSO_GOOGLE_REDIRECT_URI', String(ssoGoogleRedirectUri).trim(), 'Google Redirect URI');
 
       // Azure SSO
       if (ssoAzureEnabled !== undefined) await ConfigService.set('SSO_AZURE_ENABLED', String(ssoAzureEnabled), 'Azure SSO');
+      if (ssoAzureTenantType !== undefined) await ConfigService.set('SSO_AZURE_TENANT_TYPE', String(ssoAzureTenantType).trim(), 'Azure Tenant Type');
       if (ssoAzureTenantId !== undefined) await ConfigService.set('SSO_AZURE_TENANT_ID', String(ssoAzureTenantId).trim(), 'Azure Tenant ID');
       if (ssoAzureClientId !== undefined) await ConfigService.set('SSO_AZURE_CLIENT_ID', String(ssoAzureClientId).trim(), 'Azure Client ID');
       if (ssoAzureClientSecret !== undefined && ssoAzureClientSecret !== '••••••••••••' && ssoAzureClientSecret.trim() !== '') {
         await ConfigService.set('SSO_AZURE_CLIENT_SECRET', String(ssoAzureClientSecret).trim(), 'Azure Client Secret AES-256');
       }
+      if (ssoAzureScopes !== undefined) await ConfigService.set('SSO_AZURE_SCOPES', String(ssoAzureScopes).trim(), 'Azure Scopes');
+      if (ssoAzureSecurityGroup !== undefined) await ConfigService.set('SSO_AZURE_SECURITY_GROUP', String(ssoAzureSecurityGroup).trim(), 'Azure Security Group');
+      if (ssoAzureRedirectUri !== undefined) await ConfigService.set('SSO_AZURE_REDIRECT_URI', String(ssoAzureRedirectUri).trim(), 'Azure Redirect URI');
 
       // Okta SSO
       if (ssoOktaEnabled !== undefined) await ConfigService.set('SSO_OKTA_ENABLED', String(ssoOktaEnabled), 'Okta SSO');
+      if (ssoOktaDomain !== undefined) await ConfigService.set('SSO_OKTA_DOMAIN', String(ssoOktaDomain).trim(), 'Okta Domain / Issuer');
       if (ssoOktaClientId !== undefined) await ConfigService.set('SSO_OKTA_CLIENT_ID', String(ssoOktaClientId).trim(), 'Okta Client ID');
       if (ssoOktaClientSecret !== undefined && ssoOktaClientSecret !== '••••••••••••' && ssoOktaClientSecret.trim() !== '') {
         await ConfigService.set('SSO_OKTA_CLIENT_SECRET', String(ssoOktaClientSecret).trim(), 'Okta Client Secret AES-256');

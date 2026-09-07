@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import 'admin/tabs/tab_departamentos.dart';
 import 'admin/tabs/tab_importacao_lote.dart';
+import 'admin/tabs/tab_manutencao.dart';
 import 'admin/tabs/tab_politicas.dart';
 import 'admin/tabs/tab_relatorios.dart';
 import 'admin/tabs/tab_reservas_global.dart';
@@ -70,7 +71,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _carregarDadosIniciais();
   }
 
@@ -223,6 +224,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     int? selectedDep = usuario?.departamentoId;
     String selectedPerfil = (usuario?.perfil == 'GESTAO') ? 'GESTAO' : 'COLABORADOR';
     bool permissaoRh = usuario?.permissaoRh ?? (usuario?.perfil == 'ADMIN_RH');
+    bool permissaoTi = usuario?.permissaoTi ?? (usuario?.perfil == 'ADMIN_TI');
+    bool exigirMfa = usuario?.exigirMfa ?? false;
     bool ativo = usuario?.ativo ?? true;
 
     showDialog(
@@ -370,7 +373,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                         ),
                       ),
                       subtitle: const Text(
-                        'Acesso ao painel administrativo e navegação irrestrita no mapa.',
+                        'Acesso ao painel administrativo de gestão de pessoas e reservas.',
                         style: TextStyle(fontSize: 11, color: Colors.black54),
                       ),
                       value: permissaoRh,
@@ -379,7 +382,65 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
+
+                  // Permissão Especial de T.I.
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: permissaoTi ? Colors.cyan.shade50 : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: permissaoTi ? Colors.cyan.shade300 : Colors.grey.shade300),
+                    ),
+                    child: SwitchListTile(
+                      title: Text(
+                        permissaoTi ? 'Permissão de T.I. & Infraestrutura (Ativa)' : 'Permissão de T.I. (Inativa)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: permissaoTi ? Colors.cyan.shade900 : Colors.grey.shade800,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Acesso ao painel de infraestrutura, SMTP, auditoria e gestão de usuários.',
+                        style: TextStyle(fontSize: 11, color: Colors.black54),
+                      ),
+                      value: permissaoTi,
+                      activeThumbColor: Colors.cyan.shade700,
+                      onChanged: (v) => setModalState(() => permissaoTi = v),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Exigir Autenticação em 2 Etapas (MFA)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: exigirMfa ? Colors.amber.shade50 : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: exigirMfa ? Colors.amber.shade400 : Colors.grey.shade300),
+                    ),
+                    child: SwitchListTile(
+                      title: Text(
+                        exigirMfa ? 'Exigir 2FA / MFA no Login (Ativo)' : 'Exigir 2FA / MFA no Login (Opcional)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: exigirMfa ? Colors.amber.shade900 : Colors.grey.shade800,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Obriga o colaborador a validar PIN por E-mail ou TOTP ao autenticar.',
+                        style: TextStyle(fontSize: 11, color: Colors.black54),
+                      ),
+                      value: exigirMfa,
+                      activeThumbColor: Colors.amber.shade800,
+                      onChanged: (v) => setModalState(() => exigirMfa = v),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
                   // Status Ativo / Inativo
                   Container(
@@ -446,6 +507,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                     'departamentoId': selectedDep,
                     'perfil': selectedPerfil,
                     'permissaoRh': permissaoRh,
+                    'permissaoTi': permissaoTi,
+                    'exigirMfa': exigirMfa,
                     'ativo': ativo,
                   });
                   messenger.showSnackBar(
@@ -462,6 +525,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                     'departamentoId': selectedDep,
                     'perfil': selectedPerfil,
                     'permissaoRh': permissaoRh,
+                    'permissaoTi': permissaoTi,
+                    'exigirMfa': exigirMfa,
                     'ativo': ativo,
                   });
                   messenger.showSnackBar(
@@ -878,6 +943,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   // ==========================================
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -923,6 +990,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
             Tab(icon: Icon(Icons.people_alt_outlined, size: 20), text: 'Usuários'),
             Tab(icon: Icon(Icons.upload_file_outlined, size: 20), text: 'Importação em Lote'),
             Tab(icon: Icon(Icons.event_seat_outlined, size: 20), text: 'Reservas'),
+            Tab(icon: Icon(Icons.build_rounded, size: 20), text: 'Manutenção & Facilities'),
             Tab(icon: Icon(Icons.domain_outlined, size: 20), text: 'Departamentos'),
             Tab(icon: Icon(Icons.tune_rounded, size: 20), text: 'Políticas de Agendamento'),
             Tab(icon: Icon(Icons.analytics_rounded, size: 20), text: 'Relatórios & BI'),
@@ -995,6 +1063,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                     _carregarReservas();
                   },
                   onCancelarReserva: (r) => _abrirModalCancelarReserva(r),
+                ),
+                TabManutencao(
+                  token: auth.token ?? '',
+                  adminToken: auth.adminToken,
+                  escritorios: _escritorios,
                 ),
                 TabDepartamentos(
                   departamentos: _departamentos,

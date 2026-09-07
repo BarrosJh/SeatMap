@@ -46,7 +46,7 @@ export class RelatorioController {
       } else if (checkinStatus === 'pendente') {
         conditions.push(`r.checkin_realizado = false AND r.status = 'ATIVA' AND r.data_reserva >= CURRENT_DATE`);
       } else if (checkinStatus === 'noshow') {
-        conditions.push(`(r.status = 'CANCELADA_POR_FALTA' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status != 'CANCELADA'))`);
+        conditions.push(`(r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status != 'CANCELADA'))`);
       }
     }
 
@@ -78,7 +78,7 @@ export class RelatorioController {
           COUNT(r.id)::int AS total_reservas,
           COUNT(CASE WHEN r.checkin_realizado = true THEN 1 END)::int AS total_checkins,
           COUNT(CASE WHEN r.status = 'CANCELADA' THEN 1 END)::int AS total_canceladas,
-          COUNT(CASE WHEN r.status = 'CANCELADA_POR_FALTA' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows,
+          COUNT(CASE WHEN r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows,
           COUNT(CASE WHEN r.status = 'ATIVA' AND r.checkin_realizado = false AND r.data_reserva >= CURRENT_DATE THEN 1 END)::int AS total_pendentes
         FROM reservas r
         JOIN usuarios u ON r.usuario_id = u.id
@@ -109,7 +109,7 @@ export class RelatorioController {
           e.cidade,
           COUNT(r.id)::int AS total_reservas,
           COUNT(CASE WHEN r.checkin_realizado = true THEN 1 END)::int AS total_checkins,
-          COUNT(CASE WHEN r.status = 'CANCELADA_POR_FALTA' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows,
+          COUNT(CASE WHEN r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows,
           COUNT(DISTINCT c.id)::int AS total_mesas_utilizadas
         FROM reservas r
         JOIN usuarios u ON r.usuario_id = u.id
@@ -128,7 +128,7 @@ export class RelatorioController {
           COALESCE(d.nome, 'Sem Departamento') AS departamento,
           COUNT(r.id)::int AS total_reservas,
           COUNT(CASE WHEN r.checkin_realizado = true THEN 1 END)::int AS total_checkins,
-          COUNT(CASE WHEN r.status = 'CANCELADA_POR_FALTA' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows
+          COUNT(CASE WHEN r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows
         FROM reservas r
         JOIN usuarios u ON r.usuario_id = u.id
         LEFT JOIN departamentos d ON u.departamento_id = d.id
@@ -147,7 +147,7 @@ export class RelatorioController {
           r.data_reserva,
           COUNT(r.id)::int AS total_reservas,
           COUNT(CASE WHEN r.checkin_realizado = true THEN 1 END)::int AS total_checkins,
-          COUNT(CASE WHEN r.status = 'CANCELADA_POR_FALTA' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows
+          COUNT(CASE WHEN r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows
         FROM reservas r
         JOIN usuarios u ON r.usuario_id = u.id
         JOIN cadeiras c ON r.cadeira_id = c.id
@@ -259,7 +259,7 @@ export class RelatorioController {
           situacaoPresenca = 'Presença Confirmada';
         } else if (row.status === 'CANCELADA') {
           situacaoPresenca = 'Cancelada';
-        } else if (row.status === 'CANCELADA_POR_FALTA' || (dataIso < DateTime.now().setZone('America/Sao_Paulo').toISODate()!)) {
+        } else if (row.status === 'EXPIRADA_NOSHOW' || row.status === 'CANCELADA_POR_FALTA' || (dataIso < DateTime.now().setZone('America/Sao_Paulo').toISODate()!)) {
           situacaoPresenca = 'Não Compareceu (No-Show)';
         }
 
@@ -434,7 +434,7 @@ export class RelatorioController {
           situacao = 'PRESENÇA CONFIRMADA';
         } else if (row.status === 'CANCELADA') {
           situacao = 'CANCELADA';
-        } else if (row.status === 'CANCELADA_POR_FALTA' || dataReservaIso < hojeIso) {
+        } else if (row.status === 'EXPIRADA_NOSHOW' || row.status === 'CANCELADA_POR_FALTA' || dataReservaIso < hojeIso) {
           situacao = 'NÃO COMPARECEU (NO-SHOW)';
         }
 
@@ -556,7 +556,7 @@ export class RelatorioController {
       const hojeIso = DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
       const totalNoShows = result.rows.filter((r: any) => {
         const dataIso = typeof r.data_reserva === 'string' ? r.data_reserva : DateTime.fromJSDate(r.data_reserva).toISODate()!;
-        return r.status === 'CANCELADA_POR_FALTA' || (!r.checkin_realizado && r.status === 'ATIVA' && dataIso < hojeIso);
+        return r.status === 'EXPIRADA_NOSHOW' || r.status === 'CANCELADA_POR_FALTA' || (!r.checkin_realizado && r.status === 'ATIVA' && dataIso < hojeIso);
       }).length;
       const taxaPresenca = total > 0 ? ((totalCheckins / total) * 100).toFixed(1) : '0';
 
@@ -677,7 +677,7 @@ export class RelatorioController {
         } else if (row.status === 'CANCELADA') {
           situacao = 'Cancelada';
           situacaoColor = '#DC2626';
-        } else if (row.status === 'CANCELADA_POR_FALTA' || dataReservaIso < hojeIso) {
+        } else if (row.status === 'EXPIRADA_NOSHOW' || row.status === 'CANCELADA_POR_FALTA' || dataReservaIso < hojeIso) {
           situacao = 'No-Show';
           situacaoColor = '#DC2626';
         }

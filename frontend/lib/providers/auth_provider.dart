@@ -1,25 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../core/constants.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../services/secure_storage_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final SecureStorageService _secureStorage = SecureStorageService();
 
   UserModel? _user;
   String? _token;
+  String? _refreshToken;
   String? _adminToken;
   String? _mfaTempToken;
   String? _mfaType;
+  String? _emailMascarado;
   bool _isLoading = false;
   String? _errorMessage;
 
   UserModel? get user => _user;
   String? get token => _token;
+  String? get refreshToken => _refreshToken;
   String? get adminToken => _adminToken ?? _token;
   String? get mfaTempToken => _mfaTempToken;
   String? get mfaType => _mfaType;
+  String? get emailMascarado => _emailMascarado;
   bool get requiresMfaStep => _mfaTempToken != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -27,9 +31,12 @@ class AuthProvider extends ChangeNotifier {
   bool get isAdminStepUpAuthenticated => _user?.isAdmin == true;
 
   Future<void> initAuth() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString(AppConstants.keyToken);
-    final userJson = prefs.getString(AppConstants.keyUserData);
+    // Executa migração transparente de SharedPreferences legados, se houver
+    await _secureStorage.migrateFromSharedPreferences();
+
+    _token = await _secureStorage.getToken();
+    _refreshToken = await _secureStorage.getRefreshToken();
+    final userJson = await _secureStorage.getUserData();
     if (userJson != null) {
       try {
         _user = UserModel.fromJsonString(userJson);
@@ -37,7 +44,7 @@ class AuthProvider extends ChangeNotifier {
         _user = null;
       }
     }
-    _adminToken = prefs.getString(AppConstants.keyAdminToken);
+    _adminToken = await _secureStorage.getAdminToken();
     notifyListeners();
   }
 
@@ -46,6 +53,7 @@ class AuthProvider extends ChangeNotifier {
     _errorMessage = null;
     _mfaTempToken = null;
     _mfaType = null;
+    _emailMascarado = null;
     notifyListeners();
 
     final response = await _apiService.login(login, senha);
@@ -55,16 +63,20 @@ class AuthProvider extends ChangeNotifier {
       if (response.data!['requiresMfa'] == true) {
         _mfaTempToken = response.data!['tempToken'];
         _mfaType = response.data!['mfaType'] ?? 'TOTP';
+        _emailMascarado = response.data!['emailMascarado'];
         notifyListeners();
         return false;
       }
 
       _token = response.data!['token'];
+      _refreshToken = response.data!['refreshToken'];
       _user = response.data!['user'];
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppConstants.keyToken, _token!);
-      await prefs.setString(AppConstants.keyUserData, _user!.toJsonString());
+      await _secureStorage.saveToken(_token!);
+      if (_refreshToken != null) {
+        await _secureStorage.saveRefreshToken(_refreshToken!);
+      }
+      await _secureStorage.saveUserData(_user!.toJsonString());
 
       notifyListeners();
       return true;
@@ -86,13 +98,17 @@ class AuthProvider extends ChangeNotifier {
 
     if (response.success && response.data != null) {
       _token = response.data!['token'];
+      _refreshToken = response.data!['refreshToken'];
       _user = response.data!['user'];
       _mfaTempToken = null;
       _mfaType = null;
+      _emailMascarado = null;
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppConstants.keyToken, _token!);
-      await prefs.setString(AppConstants.keyUserData, _user!.toJsonString());
+      await _secureStorage.saveToken(_token!);
+      if (_refreshToken != null) {
+        await _secureStorage.saveRefreshToken(_refreshToken!);
+      }
+      await _secureStorage.saveUserData(_user!.toJsonString());
 
       notifyListeners();
       return true;
@@ -103,11 +119,64 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> validarLoginEmailMfa(String codigo) async {
+    if (_mfaTempToken == null) return false;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    final response = await _apiService.validarLoginEmailMfa(_mfaTempToken!, codigo);
+    _isLoading = false;
+
+    if (response.success && response.data != null) {
+      _token = response.data!['token'];
+      _refreshToken = response.data!['refreshToken'];
+      _user = response.data!['user'];
+      _mfaTempToken = null;
+      _mfaType = null;
+      _emailMascarado = null;
+
+      await _secureStorage.saveToken(_token!);
+      if (_refreshToken != null) {
+        await _secureStorage.saveRefreshToken(_refreshToken!);
+      }
+      await _secureStorage.saveUserData(_user!.toJsonString());
+
+      notifyListeners();
+      return true;
+    } else {
+      _errorMessage = response.error ?? 'Código de verificação por e-mail inválido ou expirado.';
+      notifyListeners();
+      return false;
+    }
+  }
+
   void cancelarMfaStep() {
     _mfaTempToken = null;
     _mfaType = null;
+    _emailMascarado = null;
     _errorMessage = null;
     notifyListeners();
+  }
+
+  Future<bool> renovarSessaoComRefreshToken() async {
+    if (_refreshToken == null) return false;
+    final res = await _apiService.refreshToken(_refreshToken!);
+    if (res.success && res.data != null) {
+      _token = res.data!['token'];
+      _refreshToken = res.data!['refreshToken'];
+      _user = res.data!['user'];
+      await _secureStorage.saveToken(_token!);
+      if (_refreshToken != null) {
+        await _secureStorage.saveRefreshToken(_refreshToken!);
+      }
+      await _secureStorage.saveUserData(_user!.toJsonString());
+      notifyListeners();
+      return true;
+    } else {
+      await logout();
+      return false;
+    }
   }
 
   Future<bool> solicitarMfa() async {
@@ -133,8 +202,7 @@ class AuthProvider extends ChangeNotifier {
 
     if (res.success && res.data != null) {
       _adminToken = res.data;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(AppConstants.keyAdminToken, _adminToken!);
+      await _secureStorage.saveAdminToken(_adminToken!);
       notifyListeners();
       return true;
     } else {
@@ -144,15 +212,57 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> loginSso({
+    required String provider,
+    required String email,
+    String? name,
+    String? ssoId,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    final response = await _apiService.loginSso(
+      provider: provider,
+      email: email,
+      name: name,
+      ssoId: ssoId,
+    );
+
+    _isLoading = false;
+    if (response.success && response.data != null) {
+      _token = response.data!['token'];
+      _refreshToken = response.data!['refreshToken'];
+      _user = response.data!['user'];
+
+      await _secureStorage.saveToken(_token!);
+      if (_refreshToken != null) {
+        await _secureStorage.saveRefreshToken(_refreshToken!);
+      }
+      await _secureStorage.saveUserData(_user!.toJsonString());
+
+      notifyListeners();
+      return true;
+    } else {
+      _errorMessage = response.error ?? 'Erro ao realizar login via SSO.';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
+    final currentToken = _token;
+    final currentRefresh = _refreshToken;
     _token = null;
+    _refreshToken = null;
     _user = null;
     _adminToken = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(AppConstants.keyToken);
-    await prefs.remove(AppConstants.keyUserData);
-    await prefs.remove(AppConstants.keyAdminToken);
+    await _secureStorage.clearAll();
     notifyListeners();
+
+    if (currentToken != null || currentRefresh != null) {
+      _apiService.logout(currentToken, refreshToken: currentRefresh);
+    }
   }
 }
 

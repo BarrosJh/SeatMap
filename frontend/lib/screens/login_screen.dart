@@ -19,6 +19,28 @@ class _LoginScreenState extends State<LoginScreen> {
   final _apiService = ApiService();
   bool _obscurePassword = true;
 
+  // SSO State
+  bool _ssoEnabled = false;
+  List<dynamic> _ssoProviders = [];
+  List<dynamic> _ssoAllowedDomains = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarSsoConfig();
+  }
+
+  Future<void> _carregarSsoConfig() async {
+    final res = await _apiService.getSsoConfig();
+    if (res.success && res.data != null && mounted) {
+      setState(() {
+        _ssoEnabled = res.data!['ssoEnabled'] == true;
+        _ssoProviders = res.data!['providers'] ?? [];
+        _ssoAllowedDomains = res.data!['allowedDomains'] ?? [];
+      });
+    }
+  }
+
   @override
   void dispose() {
     _loginController.dispose();
@@ -29,6 +51,148 @@ class _LoginScreenState extends State<LoginScreen> {
   void _prefillUser(String login, String senha) {
     _loginController.text = login;
     _senhaController.text = senha;
+  }
+
+  Future<void> _realizarLoginSso(String providerId, String providerNome) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final emailCtrl = TextEditingController(text: _loginController.text.contains('@') ? _loginController.text.trim() : '');
+    final nomeCtrl = TextEditingController();
+    String? erroSso;
+    bool loading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: !loading,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E293B),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Icon(
+                    providerId == 'azure' ? Icons.window_rounded : (providerId == 'google' ? Icons.g_mobiledata_rounded : Icons.shield_rounded),
+                    color: providerId == 'azure' ? const Color(0xFF0078D4) : (providerId == 'google' ? const Color(0xFFEA4335) : const Color(0xFF38BDF8)),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Entrar com $providerNome',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Informe seu e-mail corporativo autorizado para validar as credenciais via $providerNome.',
+                      style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    if (erroSso != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade900.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade700, width: 1),
+                        ),
+                        child: Text(erroSso!, style: TextStyle(color: Colors.red.shade200, fontSize: 12)),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    TextFormField(
+                      controller: emailCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: 'E-mail Corporativo *',
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        hintText: _ssoAllowedDomains.isNotEmpty ? 'nome@${_ssoAllowedDomains.first}' : 'usuario@empresa.com.br',
+                        hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                        prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF38BDF8)),
+                        filled: true,
+                        fillColor: const Color(0xFF334155),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: nomeCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Nome Completo (Opcional no 1º acesso)',
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF38BDF8)),
+                        filled: true,
+                        fillColor: const Color(0xFF334155),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: loading ? null : () => Navigator.pop(ctx),
+                  child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: providerId == 'azure' ? const Color(0xFF0078D4) : (providerId == 'google' ? const Color(0xFFEA4335) : const Color(0xFF2563EB)),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: loading
+                      ? null
+                      : () async {
+                          final email = emailCtrl.text.trim();
+                          if (email.isEmpty || !email.contains('@')) {
+                            setModalState(() => erroSso = 'Informe um e-mail corporativo válido.');
+                            return;
+                          }
+
+                          setModalState(() {
+                            loading = true;
+                            erroSso = null;
+                          });
+
+                          final mainNav = Navigator.of(context);
+                          final dialogNav = Navigator.of(ctx);
+
+                          final ok = await authProvider.loginSso(
+                            provider: providerId,
+                            email: email,
+                            name: nomeCtrl.text.trim().isNotEmpty ? nomeCtrl.text.trim() : null,
+                          );
+
+                          if (ok && mounted) {
+                            dialogNav.pop();
+                            mainNav.pushReplacement(
+                              MaterialPageRoute(builder: (_) => const MainNavigation()),
+                            );
+                          } else if (mounted) {
+                            setModalState(() {
+                              loading = false;
+                              erroSso = authProvider.errorMessage ?? 'Falha na autenticação SSO.';
+                            });
+                          }
+                        },
+                  child: loading
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Autenticar SSO', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _submit() async {
@@ -45,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const MainNavigation()),
       );
     } else if (authProvider.requiresMfaStep && mounted) {
-      _abrirModalTotpMfa(authProvider);
+      _abrirModalMfa(authProvider);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -56,7 +220,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _abrirModalTotpMfa(AuthProvider authProvider) {
+  void _abrirModalMfa(AuthProvider authProvider) {
+    final isEmail = authProvider.mfaType == 'EMAIL';
     final codigoCtrl = TextEditingController();
     bool loading = false;
     String? erroMsg;
@@ -78,12 +243,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: const Color(0xFF2563EB).withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 22),
+                    child: Icon(
+                      isEmail ? Icons.mark_email_read_rounded : Icons.security_rounded,
+                      color: const Color(0xFF38BDF8),
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'Autenticação em 2 Etapas',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  Text(
+                    isEmail ? 'Verificação por E-mail' : 'Autenticação em 2 Etapas (MFA)',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -93,9 +262,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Digite o código de 6 dígitos gerado no seu aplicativo autenticador (Google ou Microsoft Authenticator) ou um código de backup.',
-                      style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                    Text(
+                      isEmail
+                          ? 'Um código PIN de 6 dígitos foi enviado para seu e-mail corporativo (${authProvider.emailMascarado ?? "cadastrado"}). Digite o código abaixo para autenticar.'
+                          : 'Digite o código de 6 dígitos gerado no seu aplicativo autenticador (Google ou Microsoft Authenticator) ou um código de backup.',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
                     ),
                     const SizedBox(height: 16),
                     if (erroMsg != null) ...[
@@ -118,6 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       autofocus: true,
                       textAlign: TextAlign.center,
                       maxLength: 9,
+                      keyboardType: TextInputType.number,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
@@ -164,7 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       : () async {
                           final code = codigoCtrl.text.trim();
                           if (code.isEmpty) {
-                            setModalState(() => erroMsg = 'Informe o código de autenticação.');
+                            setModalState(() => erroMsg = 'Informe o código de verificação.');
                             return;
                           }
                           setModalState(() {
@@ -175,7 +347,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           final navigator = Navigator.of(context);
                           final dialogNav = Navigator.of(ctx);
 
-                          final ok = await authProvider.validarLoginTotp(code);
+                          final ok = isEmail
+                              ? await authProvider.validarLoginEmailMfa(code)
+                              : await authProvider.validarLoginTotp(code);
+
                           if (ok && mounted) {
                             dialogNav.pop();
                             navigator.pushReplacement(
@@ -561,6 +736,66 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Text('Entrar no Sistema', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                       ),
+
+                      // Provedores de Single Sign-On (SSO) Corporativo
+                      if (_ssoEnabled && _ssoProviders.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            const Expanded(child: Divider(color: Colors.white24)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                'OU ACESSE COM',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white.withValues(alpha: 0.5), letterSpacing: 1),
+                              ),
+                            ),
+                            const Expanded(child: Divider(color: Colors.white24)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        ..._ssoProviders.map((prov) {
+                          final String id = prov['id'] ?? '';
+                          final String nome = prov['nome'] ?? 'SSO Corporativo';
+                          final bool isAzure = id == 'azure';
+                          final bool isGoogle = id == 'google';
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: isAzure
+                                    ? const Color(0xFF0078D4).withValues(alpha: 0.12)
+                                    : (isGoogle ? const Color(0xFFEA4335).withValues(alpha: 0.12) : const Color(0xFF334155)),
+                                side: BorderSide(
+                                  color: isAzure
+                                      ? const Color(0xFF0078D4)
+                                      : (isGoogle ? const Color(0xFFEA4335) : const Color(0xFF475569)),
+                                  width: 1.2,
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: auth.isLoading ? null : () => _realizarLoginSso(id, nome),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isAzure ? Icons.window_rounded : (isGoogle ? Icons.g_mobiledata_rounded : Icons.lock_outline),
+                                    color: isAzure ? const Color(0xFF0078D4) : (isGoogle ? const Color(0xFFEA4335) : Colors.white),
+                                    size: isGoogle ? 24 : 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'Entrar com $nome',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
                       const SizedBox(height: 24),
 
                       // Botões de Acesso Rápido para Demonstração

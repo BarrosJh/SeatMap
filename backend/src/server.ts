@@ -6,10 +6,13 @@ import routes from './routes';
 import { wsManager } from './websocket/wsServer';
 import { CronService } from './services/cronService';
 import { globalLimiter } from './middleware/rateLimiter';
+import { validateSecurityConfig } from './config/securityValidation';
 
 dotenv.config();
+validateSecurityConfig();
 
 const app = express();
+app.set('trust proxy', true);
 const server = http.createServer(app);
 
 // Configuração segura de CORS

@@ -160,10 +160,31 @@ class SeatMapProvider extends ChangeNotifier {
       return;
     }
 
+    if (msg['tipo'] == 'STATUS_CADEIRA_ALTERADO') {
+      final cadeiraId = msg['cadeiraId'];
+      final statusOp = msg['statusOperacional'];
+      if (_mapaData != null) {
+        for (final baia in _mapaData!.baias) {
+          for (final cadeira in baia.cadeiras) {
+            if (cadeira.id == cadeiraId) {
+              if (statusOp == 'EM_MANUTENCAO') {
+                cadeira.status = 'manutencao';
+              } else {
+                cadeira.status = 'livre';
+              }
+            }
+          }
+        }
+        notifyListeners();
+      }
+      return;
+    }
+
     if (msg['evento'] == 'assento_atualizado') {
       _handleRealtimeSeatUpdate(msg);
     }
   }
+
 
   void _handleRealtimeSeatUpdate(Map<String, dynamic> update) {
     if (_mapaData == null) return;

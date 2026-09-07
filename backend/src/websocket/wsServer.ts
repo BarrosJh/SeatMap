@@ -15,7 +15,7 @@ export interface SeatUpdatePayload {
   escritorioId: number;
   cadeiraId: number;
   data: string;
-  status: 'livre' | 'ocupada' | 'minha_reserva' | 'expirada';
+  status: 'livre' | 'ocupada' | 'minha_reserva' | 'expirada' | 'manutencao';
   ocupante?: {
     nome: string;
     departamento: string;
@@ -23,10 +23,12 @@ export interface SeatUpdatePayload {
   } | null;
 }
 
+
 export class WsManager {
   private static instance: WsManager;
   private wss: WebSocketServer | null = null;
   private rooms: Map<number, Set<AuthenticatedWebSocket>> = new Map();
+  private pingInterval: NodeJS.Timeout | null = null;
 
   private constructor() {}
 
@@ -41,25 +43,32 @@ export class WsManager {
     this.wss = new WebSocketServer({ server, path: '/ws' });
 
     this.wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
-      ws.isAlive = true;
-      ws.on('pong', () => {
-        ws.isAlive = true;
-      });
-
       const parsedUrl = url.parse(req.url || '', true);
       const token = parsedUrl.query.token as string;
       const initialEscritorioId = parsedUrl.query.escritorioId ? parseInt(parsedUrl.query.escritorioId as string, 10) : undefined;
 
-      if (token) {
-        try {
-          const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-          const decoded = jwt.verify(token, JWT_SECRET) as any;
-          ws.userId = decoded.userId;
-          ws.perfil = decoded.perfil;
-        } catch (err) {
-          console.warn('[WS] Token inválido na conexão WebSocket');
-        }
+      // Validação obrigatória de token no handshake (OBS-01)
+      if (!token) {
+        console.warn('[WS] Conexão rejeitada: token de autenticação não fornecido.');
+        ws.close(4001, 'Token de autenticação obrigatório.');
+        return;
       }
+
+      try {
+        const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        ws.userId = decoded.userId;
+        ws.perfil = decoded.perfil;
+      } catch (err) {
+        console.warn('[WS] Conexão rejeitada: token JWT inválido ou expirado.');
+        ws.close(4001, 'Token JWT inválido ou expirado.');
+        return;
+      }
+
+      ws.isAlive = true;
+      ws.on('pong', () => {
+        ws.isAlive = true;
+      });
 
       if (initialEscritorioId && !isNaN(initialEscritorioId)) {
         this.joinRoom(initialEscritorioId, ws);
@@ -87,8 +96,12 @@ export class WsManager {
       });
     });
 
-    // Heartbeat ping interval
-    setInterval(() => {
+    // Heartbeat ping interval com handle para teardown gracioso
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+    }
+
+    this.pingInterval = setInterval(() => {
       if (!this.wss) return;
       this.wss.clients.forEach((client) => {
         const authWs = client as AuthenticatedWebSocket;
@@ -100,7 +113,25 @@ export class WsManager {
       });
     }, 30000);
 
+    // Desvincula timer do event loop para não bloquear saída em testes/scripts
+    if (this.pingInterval && typeof this.pingInterval.unref === 'function') {
+      this.pingInterval.unref();
+    }
+
     console.log('[WebSocket] Servidor WS nativo inicializado no endpoint /ws');
+  }
+
+  public destroy(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+    if (this.wss) {
+      this.wss.clients.forEach((client) => client.terminate());
+      this.wss.close();
+      this.wss = null;
+    }
+    this.rooms.clear();
   }
 
   public joinRoom(escritorioId: number, ws: AuthenticatedWebSocket): void {

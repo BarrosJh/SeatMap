@@ -28,6 +28,9 @@ class DesksCanvasPainter extends CustomPainter {
   static final Paint _fillSelected = Paint()..color = const Color(0xFF1E88E5)..style = PaintingStyle.fill;
   static final Paint _strokeSelected = Paint()..color = const Color(0xFF1565C0)..style = PaintingStyle.stroke..strokeWidth = 1.0;
 
+  static final Paint _fillMaintenance = Paint()..color = const Color(0xFFF59E0B)..style = PaintingStyle.fill;
+  static final Paint _strokeMaintenance = Paint()..color = const Color(0xFFB45309)..style = PaintingStyle.stroke..strokeWidth = 1.0;
+
   static final Paint _selectionRingPaint = Paint()
     ..color = const Color(0xFF2563EB)
     ..style = PaintingStyle.stroke
@@ -45,6 +48,12 @@ class DesksCanvasPainter extends CustomPainter {
   );
 
   static const TextStyle _textStyleReserved = TextStyle(
+    fontSize: 10.0,
+    fontWeight: FontWeight.bold,
+    color: Color(0xFF78350F),
+  );
+
+  static const TextStyle _textStyleMaintenance = TextStyle(
     fontSize: 10.0,
     fontWeight: FontWeight.bold,
     color: Color(0xFF78350F),
@@ -98,6 +107,10 @@ class DesksCanvasPainter extends CustomPainter {
           canvas.drawRRect(rrect, _fillSelected);
           canvas.drawRRect(rrect, _strokeSelected);
           break;
+        case DeskStatus.maintenance:
+          canvas.drawRRect(rrect, _fillMaintenance);
+          canvas.drawRRect(rrect, _strokeMaintenance);
+          break;
       }
 
       // 2. Highlight for Selected or Hovered Desk
@@ -130,11 +143,15 @@ class DesksCanvasPainter extends CustomPainter {
         case DeskStatus.reserved:
           style = _textStyleReserved;
           break;
+        case DeskStatus.maintenance:
+          style = _textStyleMaintenance;
+          break;
         case DeskStatus.occupied:
         case DeskStatus.selected:
           style = _textStyleWhite;
           break;
       }
+
 
       final textPainter = TextPainter(
         text: TextSpan(text: desk.number, style: style),

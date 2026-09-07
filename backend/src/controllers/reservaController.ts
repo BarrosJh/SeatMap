@@ -5,8 +5,10 @@ import pool from '../config/db';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ConfigService } from '../services/configService';
 import { EmailService } from '../services/emailService';
+import { ReservaHistoryService } from '../services/reservaHistoryService';
 import { wsManager } from '../websocket/wsServer';
 import { getWorkWeekDiff, isProximaSemanaLiberada } from '../utils/workWeekUtils';
+
 
 // Interface do Evento de Mensageria (ex: RabbitMQ / Kafka / BullMQ / Outbox)
 interface ReservaCriadaEvent {
@@ -92,7 +94,7 @@ export class ReservaController {
       // 1. CONTROLE DE CONCORRÊNCIA PESSIMISTA REAL:
       // Trava a linha física da cadeira na tabela 'cadeiras' para serializar qualquer concorrência
       const cadeiraRes = await client.query(`
-        SELECT c.id, c.identificador, c.ativa, b.id AS baia_id, b.nome AS baia_nome, b.escritorio_id
+        SELECT c.id, c.identificador, c.ativa, c.status_operacional, c.motivo_manutencao, c.previsao_retorno, b.id AS baia_id, b.nome AS baia_nome, b.escritorio_id
         FROM cadeiras c
         JOIN baias b ON c.baia_id = b.id
         WHERE c.id = $1 AND c.ativa = true
@@ -104,6 +106,17 @@ export class ReservaController {
         return res.status(404).json({ error: 'Cadeira selecionada não existe ou está inativa.' });
       }
       const cadeira = cadeiraRes.rows[0];
+
+      // 1.1 Bloqueio de Assento em Manutenção Operacional (Facilities / TI)
+      if (cadeira.status_operacional === 'EM_MANUTENCAO') {
+        await client.query('ROLLBACK');
+        const prevMsg = cadeira.previsao_retorno 
+          ? ` Previsão de liberação: ${DateTime.fromJSDate(new Date(cadeira.previsao_retorno)).setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy HH:mm')}.` 
+          : '';
+        return res.status(400).json({
+          error: `Este assento está temporariamente indisponível para manutenção (${cadeira.motivo_manutencao || 'Defeito técnico'}).${prevMsg}`
+        });
+      }
 
       // 2. Verificar se a cadeira já está reservada por outro colaborador para a data
       const cadeiraOcupadaRes = await client.query(`
@@ -196,7 +209,26 @@ export class ReservaController {
         novaReserva = insertRes.rows[0];
       }
 
+      // 7.1 Registrar na Linha do Tempo Forense Imutável (historico_reservas)
+      await ReservaHistoryService.registrarEvento({
+        reservaId: novaReserva.id,
+        cadeiraId: cadeira.id,
+        usuarioId: user.userId,
+        dataReserva: dataAlvoIso,
+        tipoEvento: isTroca ? 'TROCADA' : 'CRIADA',
+        executadoPorUsuarioId: user.userId,
+        motivo: isTroca ? `Troca atômica de assento (Mesa ${reservaAntiga?.identificador} -> Mesa ${cadeira.identificador})` : 'Reserva de assento efetuada',
+        detalhes: {
+          codigoComprovante,
+          escritorioId: cadeira.escritorio_id,
+          cadeiraAntigaId: reservaAntiga?.cadeira_id || null,
+          cadeiraAntigaIdentificador: reservaAntiga?.identificador || null,
+          checkinAutomatico: checkinRealizado
+        }
+      }, client);
+
       await client.query('COMMIT');
+
 
       // 8. Disparar eventos WebSocket pós-COMMIT
       // a) Broadcast para o novo assento
@@ -387,6 +419,21 @@ export class ReservaController {
         WHERE id = $1
       `, [reservaId]);
 
+      // Registrar evento de Check-in na Linha do Tempo
+      await ReservaHistoryService.registrarEvento({
+        reservaId: reserva.id,
+        cadeiraId: reserva.cadeira_id,
+        usuarioId: reserva.usuario_id,
+        dataReserva: dataReservaIso,
+        tipoEvento: 'CHECKIN',
+        executadoPorUsuarioId: user.userId,
+        motivo: user.userId === reserva.usuario_id ? 'Check-in de presença realizado pelo colaborador' : 'Check-in administrativo validado pela Gestão/RH',
+        detalhes: {
+          checkinEm: checkinHoraAtual,
+          comprovante: reserva.codigo_comprovante
+        }
+      });
+
       return res.status(200).json({
         message: 'Presença confirmada com sucesso! Bom trabalho.',
         comprovante: reserva.codigo_comprovante,
@@ -464,6 +511,22 @@ export class ReservaController {
         ? reserva.data_reserva
         : DateTime.fromJSDate(reserva.data_reserva).toISODate()!;
 
+      // Registrar evento de cancelamento na Linha do Tempo
+      await ReservaHistoryService.registrarEvento({
+        reservaId: reserva.id,
+        cadeiraId: reserva.cadeira_id,
+        usuarioId: reserva.usuario_id,
+        dataReserva: dataIso,
+        tipoEvento: user.userId === reserva.usuario_id ? 'CANCELADA_USUARIO' : 'CANCELADA_GESTAO',
+        executadoPorUsuarioId: user.userId,
+        motivo: user.userId === reserva.usuario_id ? 'Cancelamento voluntário pelo colaborador' : 'Cancelamento administrativo por RH/Gestão',
+        detalhes: {
+          codigoComprovante: reserva.codigo_comprovante,
+          cadeiraIdentificador: reserva.cadeira_identificador,
+          escritorioNome: reserva.escritorio_nome
+        }
+      });
+
       // Liberar o assento via WebSocket
       wsManager.broadcastSeatUpdate({
         evento: 'assento_atualizado',
@@ -491,6 +554,21 @@ export class ReservaController {
       return res.status(500).json({ error: 'Erro ao cancelar reserva.' });
     }
   }
+
+  public static async historicoMinhasReservas(req: AuthenticatedRequest, res: Response) {
+    const user = req.user!;
+    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const offset = parseInt(req.query.offset as string, 10) || 0;
+
+    try {
+      const historico = await ReservaHistoryService.getHistoricoUsuario(user.userId, limit, offset);
+      return res.status(200).json(historico);
+    } catch (error) {
+      console.error('[ReservaController.historicoMinhasReservas] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao consultar histórico de movimentações do usuário.' });
+    }
+  }
+
 
   public static async minhasReservas(req: AuthenticatedRequest, res: Response) {
     const user = req.user!;

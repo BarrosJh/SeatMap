@@ -11,9 +11,11 @@ router.use(authLimiter);
 // 1. Login Padrão & SSO
 router.post('/login', AuthController.login);
 router.get('/sso/config', AuthController.getSsoConfig);
+router.post('/sso/login', AuthController.loginSso);
 
-// 2. Validação de Login com TOTP (Passo 2 do 2FA)
+// 2. Validação de Login com TOTP ou E-mail (Passo 2 do 2FA)
 router.post('/totp/validar-login', AuthController.validarLoginTotp);
+router.post('/mfa/validar-login-email', AuthController.validarLoginEmailMfa);
 
 // 3. Gestão de TOTP pelo próprio Usuário Logado
 router.get('/totp/setup', authenticateToken, AuthController.setupTotp);
@@ -24,8 +26,8 @@ router.post('/totp/desativar', authenticateToken, AuthController.desativarTotp);
 router.post('/esqueci-senha', AuthController.solicitarRecuperacaoSenha);
 router.post('/redefinir-senha', AuthController.redefinirSenha);
 
-// 5. MFA Legado por E-mail (Step-Up RH)
-router.post('/mfa/solicitar', authenticateToken, AuthController.solicitarMfa);
-router.post('/mfa/validar', authenticateToken, AuthController.validarMfa);
+// 6. Refresh Token (Rotação de Sessão) & Logout
+router.post('/refresh-token', AuthController.refreshToken);
+router.post('/logout', AuthController.logout);
 
 export default router;

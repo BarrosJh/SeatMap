@@ -13,6 +13,10 @@ router.post('/', authenticateToken, ReservaController.criarReserva);
 // GET /api/reservas/minhas (Listagem de reservas do colaborador conectado)
 router.get('/minhas', authenticateToken, ReservaController.minhasReservas);
 
+// GET /api/reservas/historico (Linha do tempo forense de eventos do usuário)
+router.get('/historico', authenticateToken, ReservaController.historicoMinhasReservas);
+
+
 // POST /api/reservas/:id/checkin (Confirmação de presença manual com trava às 11:00)
 router.post('/:id/checkin', authenticateToken, ReservaController.fazerCheckin);
 

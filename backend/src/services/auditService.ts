@@ -6,6 +6,7 @@ export type TipoEventoAuditoria =
   | 'LOGIN_CONTA_BLOQUEADA'
   | 'LOGIN_USUARIO_INATIVO'
   | 'LOGIN_USUARIO_NAO_ENCONTRADO'
+  | 'LOGIN_SSO_EXIGIDO'
   | 'MFA_SOLICITADO_EMAIL'
   | 'MFA_VALIDADO_EMAIL'
   | 'MFA_FALHA_EMAIL'
@@ -17,6 +18,10 @@ export type TipoEventoAuditoria =
   | 'TOTP_BACKUP_USADO'
   | 'SSO_LOGIN_SUCESSO'
   | 'SSO_LOGIN_FALHA'
+  | 'SSO_FALHA'
+  | 'SSO_DOMINIO_BLOQUEADO'
+  | 'SSO_PROVISIONAMENTO_DESATIVADO'
+  | 'SSO_USUARIO_PROVISIONADO'
   | 'LOGOUT'
   | 'REFRESH_TOKEN_ROTACAO'
   | 'REFRESH_TOKEN_REUSO_SUSPEITO'
@@ -167,10 +172,24 @@ export class AuditService {
    */
   public static getClientIp(req: any): string {
     const forwarded = req.headers['x-forwarded-for'];
+    let ip = '';
     if (forwarded) {
-      return (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',')[0].trim();
+      ip = (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',')[0].trim();
+    } else {
+      ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
     }
-    return req.socket?.remoteAddress || req.ip || '127.0.0.1';
+
+    // Normaliza IPv6 localhost
+    if (ip === '::1') {
+      return '127.0.0.1';
+    }
+
+    // Remove prefixo IPv6-mapped IPv4 (ex: ::ffff:172.18.0.1 -> 172.18.0.1)
+    if (ip.startsWith('::ffff:')) {
+      return ip.substring(7);
+    }
+
+    return ip;
   }
 
   /**

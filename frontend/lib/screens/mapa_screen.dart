@@ -12,6 +12,8 @@ import 'mapa/widgets/baia_card_list_view.dart';
 import 'mapa/widgets/confirm_booking_dialog.dart';
 import 'mapa/widgets/map_control_header.dart';
 import 'mapa/widgets/occupant_details_modal.dart';
+import 'mapa/widgets/seat_maintenance_dialog.dart';
+
 
 class MapaScreen extends StatefulWidget {
   const MapaScreen({super.key});
@@ -196,6 +198,16 @@ class _MapaScreenState extends State<MapaScreen> {
   }
 
   void _onCadeiraTapped(CadeiraModel cadeira, UserModel currentUser, String token) {
+    if (cadeira.isManutencao) {
+      SeatMaintenanceDialog.show(
+        context: context,
+        cadeira: cadeira,
+        currentUser: currentUser,
+        token: token,
+      );
+      return;
+    }
+
     if (cadeira.isLivre) {
       final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
       final isOpen = _isDateOpenForBooking(seatProvider.selectedDate, currentUser);
@@ -236,6 +248,7 @@ class _MapaScreenState extends State<MapaScreen> {
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

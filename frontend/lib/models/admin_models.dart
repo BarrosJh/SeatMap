@@ -5,6 +5,8 @@ class AdminUsuarioModel {
   final String matricula;
   final String perfil;
   final bool permissaoRh;
+  final bool permissaoTi;
+  final bool exigirMfa;
   final bool ativo;
   final int? departamentoId;
   final String? departamentoNome;
@@ -17,6 +19,8 @@ class AdminUsuarioModel {
     required this.matricula,
     required this.perfil,
     this.permissaoRh = false,
+    this.permissaoTi = false,
+    this.exigirMfa = false,
     required this.ativo,
     this.departamentoId,
     this.departamentoNome,
@@ -24,6 +28,7 @@ class AdminUsuarioModel {
   });
 
   bool get isAdmin => permissaoRh || perfil == 'ADMIN_RH';
+  bool get isTi => permissaoTi || perfil == 'ADMIN_TI';
 
   factory AdminUsuarioModel.fromJson(Map<String, dynamic> json) {
     final perfilStr = json['perfil'] as String? ?? 'COLABORADOR';
@@ -31,6 +36,10 @@ class AdminUsuarioModel {
                   json['permissaoRh'] == true || 
                   json['is_admin'] == true || 
                   perfilStr == 'ADMIN_RH';
+    final hasTi = json['permissao_ti'] == true ||
+                  json['permissaoTi'] == true ||
+                  perfilStr == 'ADMIN_TI';
+    final needsMfa = json['exigir_mfa'] == true || json['exigirMfa'] == true;
 
     return AdminUsuarioModel(
       id: json['id'] as int,
@@ -39,6 +48,8 @@ class AdminUsuarioModel {
       matricula: json['matricula'] as String? ?? '',
       perfil: perfilStr,
       permissaoRh: hasRh,
+      permissaoTi: hasTi,
+      exigirMfa: needsMfa,
       ativo: json['ativo'] == true,
       departamentoId: json['departamento_id'] as int?,
       departamentoNome: json['departamento_nome'] as String?,
@@ -54,6 +65,10 @@ class AdminUsuarioModel {
     'perfil': perfil,
     'permissao_rh': permissaoRh,
     'permissaoRh': permissaoRh,
+    'permissao_ti': permissaoTi,
+    'permissaoTi': permissaoTi,
+    'exigir_mfa': exigirMfa,
+    'exigirMfa': exigirMfa,
     'ativo': ativo,
     'departamento_id': departamentoId,
   };
@@ -140,3 +155,127 @@ class AdminReservaModel {
     );
   }
 }
+
+class AdminManutencaoKpisModel {
+  final int totalBloqueadas;
+  final int totalOperacionais;
+  final int totalAtrasadas;
+
+  AdminManutencaoKpisModel({
+    required this.totalBloqueadas,
+    required this.totalOperacionais,
+    required this.totalAtrasadas,
+  });
+
+  factory AdminManutencaoKpisModel.fromJson(Map<String, dynamic> json) {
+    return AdminManutencaoKpisModel(
+      totalBloqueadas: json['totalBloqueadas'] ?? json['total_bloqueadas'] ?? 0,
+      totalOperacionais: json['totalOperacionais'] ?? json['total_operacionais'] ?? 0,
+      totalAtrasadas: json['totalAtrasadas'] ?? json['total_atrasadas'] ?? 0,
+    );
+  }
+}
+
+class AdminManutencaoModel {
+  final int id;
+  final String identificador;
+  final String statusOperacional;
+  final String? motivoManutencao;
+  final String? previsaoRetorno;
+  final int? manutencaoPorUsuarioId;
+  final int baiaId;
+  final String baiaNome;
+  final int escritorioId;
+  final String escritorioNome;
+  final String escritorioCidade;
+  final String? responsavelNome;
+  final String? responsavelEmail;
+  final String? dataBloqueio;
+
+  AdminManutencaoModel({
+    required this.id,
+    required this.identificador,
+    required this.statusOperacional,
+    this.motivoManutencao,
+    this.previsaoRetorno,
+    this.manutencaoPorUsuarioId,
+    required this.baiaId,
+    required this.baiaNome,
+    required this.escritorioId,
+    required this.escritorioNome,
+    required this.escritorioCidade,
+    this.responsavelNome,
+    this.responsavelEmail,
+    this.dataBloqueio,
+  });
+
+  bool get isAtrasada {
+    if (previsaoRetorno == null) return false;
+    final dt = DateTime.tryParse(previsaoRetorno!);
+    if (dt == null) return false;
+    return dt.isBefore(DateTime.now());
+  }
+
+  factory AdminManutencaoModel.fromJson(Map<String, dynamic> json) {
+    return AdminManutencaoModel(
+      id: json['id'] as int,
+      identificador: json['identificador'] as String? ?? '',
+      statusOperacional: json['status_operacional'] as String? ?? 'DISPONIVEL',
+      motivoManutencao: json['motivo_manutencao'] as String?,
+      previsaoRetorno: json['previsao_retorno'] as String?,
+      manutencaoPorUsuarioId: json['manutencao_por_usuario_id'] as int?,
+      baiaId: json['baia_id'] as int? ?? 0,
+      baiaNome: json['baia_nome'] as String? ?? '',
+      escritorioId: json['escritorio_id'] as int? ?? 0,
+      escritorioNome: json['escritorio_nome'] as String? ?? '',
+      escritorioCidade: json['escritorio_cidade'] as String? ?? '',
+      responsavelNome: json['responsavel_nome'] as String?,
+      responsavelEmail: json['responsavel_email'] as String?,
+      dataBloqueio: json['data_bloqueio'] as String?,
+    );
+  }
+}
+
+class AdminCadeiraOptionModel {
+  final int id;
+  final String identificador;
+  final String statusOperacional;
+  final String? motivoManutencao;
+  final String? previsaoRetorno;
+  final int baiaId;
+  final String baiaNome;
+  final int escritorioId;
+  final String escritorioNome;
+  final String escritorioCidade;
+
+  AdminCadeiraOptionModel({
+    required this.id,
+    required this.identificador,
+    required this.statusOperacional,
+    this.motivoManutencao,
+    this.previsaoRetorno,
+    required this.baiaId,
+    required this.baiaNome,
+    required this.escritorioId,
+    required this.escritorioNome,
+    required this.escritorioCidade,
+  });
+
+  bool get isEmManutencao => statusOperacional == 'EM_MANUTENCAO';
+
+  factory AdminCadeiraOptionModel.fromJson(Map<String, dynamic> json) {
+    return AdminCadeiraOptionModel(
+      id: json['id'] as int,
+      identificador: json['identificador'] as String? ?? '',
+      statusOperacional: json['status_operacional'] as String? ?? 'DISPONIVEL',
+      motivoManutencao: json['motivo_manutencao'] as String?,
+      previsaoRetorno: json['previsao_retorno'] as String?,
+      baiaId: json['baia_id'] as int? ?? 0,
+      baiaNome: json['baia_nome'] as String? ?? '',
+      escritorioId: json['escritorio_id'] as int? ?? 0,
+      escritorioNome: json['escritorio_nome'] as String? ?? '',
+      escritorioCidade: json['escritorio_cidade'] as String? ?? '',
+    );
+  }
+}
+

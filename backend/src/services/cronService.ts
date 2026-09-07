@@ -1,7 +1,9 @@
 import cron, { ScheduledTask } from 'node-cron';
 import { DateTime } from 'luxon';
 import pool from '../config/db';
+import { ReservaHistoryService } from './reservaHistoryService';
 import { wsManager } from '../websocket/wsServer';
+
 
 export class CronService {
   private static task: ScheduledTask | null = null;
@@ -24,6 +26,17 @@ export class CronService {
 
     try {
       await client.query('BEGIN');
+
+      // ARCH-02: Lock distribuído no PostgreSQL para evitar execução duplicada em cluster multi-container
+      const lockRes = await client.query(`
+        SELECT pg_try_advisory_xact_lock(hashtext('seatmap_cron_noshow_lock')) AS obtido;
+      `);
+
+      if (!lockRes.rows[0]?.obtido) {
+        await client.query('ROLLBACK');
+        console.log('[Cron No-Show] Outra instância/processo já está executando a rotina de No-Show. Execução concorrente ignorada.');
+        return { totalExpiradas: 0, reservas: [] };
+      }
 
       // Buscar reservas ativas sem checkin na data especificada com dados de escritório e cadeira
       const selectRes = await client.query(`
@@ -52,7 +65,25 @@ export class CronService {
         WHERE id = ANY($1::int[]);
       `, [ids]);
 
+      // Registrar evento de No-Show na Linha do Tempo forense
+      for (const row of selectRes.rows) {
+        await ReservaHistoryService.registrarEvento({
+          reservaId: row.id,
+          cadeiraId: row.cadeira_id,
+          usuarioId: row.usuario_id,
+          dataReserva: row.data_reserva,
+          tipoEvento: 'EXPIRADA_NOSHOW',
+          executadoPorUsuarioId: null,
+          motivo: 'Cancelamento automático por ausência de check-in diário até o horário limite (No-Show)',
+          detalhes: {
+            identificadorCadeira: row.identificador,
+            escritorioId: row.escritorio_id
+          }
+        }, client);
+      }
+
       await client.query('COMMIT');
+
 
       // Emitir broadcast WebSocket liberando as cadeiras instantaneamente
       for (const row of selectRes.rows) {

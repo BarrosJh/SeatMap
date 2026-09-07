@@ -382,6 +382,72 @@ export class EmailService {
     }
   }
 
+  /**
+   * 5. Envio de Aviso de Cancelamento por Manutenção de Assento (Facilities / TI)
+   */
+  public static async enviarAvisoCancelamentoManutencao(
+    para: string,
+    nome: string,
+    dados: {
+      cadeiraIdentificador: string;
+      dataReserva: string;
+      escritorioNome: string;
+      motivo?: string;
+      previsaoRetorno?: string;
+    }
+  ): Promise<boolean> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8FAFC; margin: 0; padding: 20px; }
+          .container { max-width: 560px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; border: 1px solid #E2E8F0; overflow: hidden; }
+          .header { background: #B45309; padding: 24px; text-align: center; }
+          .header h1 { color: #FFFFFF; font-size: 20px; margin: 0; letter-spacing: 0.5px; }
+          .content { padding: 24px; }
+          .warning-box { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 18px; margin: 20px 0; color: #92400E; }
+          .footer { background: #F8FAFC; padding: 16px; text-align: center; border-top: 1px solid #E2E8F0; font-size: 11px; color: #94A3B8; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>SeatMap - Comunicado de Manutenção</h1>
+          </div>
+          <div class="content">
+            <h2 style="margin: 0 0 8px 0; color: #1E293B; font-size: 18px;">Aviso de Readequação de Assento</h2>
+            <p style="color: #475569; font-size: 14px; margin: 0;">Olá, <strong>${nome}</strong>.</p>
+            <div class="warning-box">
+              <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600;">
+                Sua reserva para a <strong>Mesa ${dados.cadeiraIdentificador}</strong> no dia <strong>${dados.dataReserva}</strong> (${dados.escritorioNome}) precisou ser cancelada preventivamente pela equipe técnica.
+              </p>
+              <p style="margin: 0; font-size: 13px;">
+                <strong>Motivo da Manutenção:</strong> ${dados.motivo || 'Intervenção técnica preventiva / Facilities'}<br>
+                ${dados.previsaoRetorno ? `<strong>Previsão de Conclusão:</strong> ${dados.previsaoRetorno}<br>` : ''}
+              </p>
+            </div>
+            <p style="font-size: 13px; color: #475569; line-height: 1.5;">
+              Pedimos desculpas pelo inconveniente. Acesse o aplicativo SeatMap para escolher outro assento disponível no escritório para o seu dia presencial.
+            </p>
+          </div>
+          <div class="footer">
+            © ${new Date().getFullYear()} SeatMap Corporate. Mensagem automática de Facilities & TI.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    return this.despacharEmail({
+      to: para,
+      subject: `[SeatMap] Manutenção no Assento - Reserva Mesa ${dados.cadeiraIdentificador} (${dados.dataReserva})`,
+      html,
+      tipoLog: 'CANCELAMENTO_MANUTENCAO'
+    });
+  }
+
   public static async enviarEmailGenerico(
     para: string,
     assunto: string,
@@ -395,4 +461,5 @@ export class EmailService {
     });
   }
 }
+
 

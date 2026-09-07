@@ -47,6 +47,9 @@ export class EscritorioController {
           c.posicao_x,
           c.posicao_y,
           c.ativa,
+          c.status_operacional,
+          c.motivo_manutencao,
+          c.previsao_retorno,
           r.id AS reserva_id,
           r.usuario_id,
           r.checkin_realizado,
@@ -76,6 +79,7 @@ export class EscritorioController {
           totalCadeiras: 0,
           totalOcupadas: 0,
           totalLivres: 0,
+          totalManutencao: 0,
           distribuicaoDepartamentos: {} as Record<string, { count: number; percentual: number }>,
           resumoOcupacao: '',
           cadeiras: []
@@ -88,10 +92,13 @@ export class EscritorioController {
 
         baia.totalCadeiras++;
 
-        let status: 'livre' | 'ocupada' | 'minha_reserva' = 'livre';
+        let status: 'livre' | 'ocupada' | 'minha_reserva' | 'manutencao' = 'livre';
         let ocupante = null;
 
-        if (row.reserva_id && row.reserva_status === 'ATIVA') {
+        if (row.status_operacional === 'EM_MANUTENCAO') {
+          status = 'manutencao';
+          baia.totalManutencao++;
+        } else if (row.reserva_id && row.reserva_status === 'ATIVA') {
           if (currentUserId && row.usuario_id === currentUserId) {
             status = 'minha_reserva';
           } else {
@@ -125,10 +132,14 @@ export class EscritorioController {
           posicaoX: row.posicao_x,
           posicaoY: row.posicao_y,
           status,
+          statusOperacional: row.status_operacional || 'DISPONIVEL',
+          motivoManutencao: row.motivo_manutencao || null,
+          previsaoRetorno: row.previsao_retorno || null,
           reservaId: row.reserva_id || null,
           ocupante
         });
       }
+
 
       // Calcular percentuais finais e gerar resumo textual (ex: "50% Jurídico | 25% TI | 25% Livre")
       const baiasArray = Object.values(baiasMap).map((baia: any) => {

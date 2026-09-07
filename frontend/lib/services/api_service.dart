@@ -61,7 +61,9 @@ class ApiService {
               'requiresMfa': true,
               'mfaType': body['mfaType'] ?? 'TOTP',
               'tempToken': body['tempToken'],
-              'message': body['message'] ?? 'Insira o código do autenticador.',
+              'emailMascarado': body['emailMascarado'],
+              'expiraEmMinutos': body['expiraEmMinutos'],
+              'message': body['message'] ?? 'Insira o código de verificação.',
             },
             statusCode: response.statusCode,
           );
@@ -71,6 +73,7 @@ class ApiService {
           success: true,
           data: {
             'token': body['token'],
+            'refreshToken': body['refreshToken'],
             'user': UserModel.fromJson(body['user']),
           },
           statusCode: response.statusCode,
@@ -101,6 +104,7 @@ class ApiService {
           success: true,
           data: {
             'token': body['token'],
+            'refreshToken': body['refreshToken'],
             'user': UserModel.fromJson(body['user']),
           },
           statusCode: response.statusCode,
@@ -114,6 +118,85 @@ class ApiService {
       }
     } catch (e) {
       return ApiResponse(success: false, error: 'Erro de conexão com o servidor: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> validarLoginEmailMfa(String tempToken, String codigo) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/mfa/validar-login-email'),
+        headers: _headers(null),
+        body: jsonEncode({'tempToken': tempToken, 'codigo': codigo}),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: {
+            'token': body['token'],
+            'refreshToken': body['refreshToken'],
+            'user': UserModel.fromJson(body['user']),
+          },
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Código de verificação incorreto ou expirado.',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão com o servidor: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> refreshToken(String refreshToken) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/refresh-token'),
+        headers: _headers(null),
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: {
+            'token': body['token'],
+            'refreshToken': body['refreshToken'],
+            'user': UserModel.fromJson(body['user']),
+          },
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Sessão expirada. Faça login novamente.',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão ao renovar sessão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<void>> logout(String? token, {String? refreshToken}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/logout'),
+        headers: _headers(token),
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+      return ApiResponse(
+        success: response.statusCode == 200,
+        message: 'Sessão encerrada com sucesso.',
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
     }
   }
 
@@ -224,6 +307,47 @@ class ApiService {
         return ApiResponse(
           success: false,
           error: body['error'] ?? 'Erro ao redefinir senha.',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> loginSso({
+    required String provider,
+    required String email,
+    String? name,
+    String? ssoId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/sso/login'),
+        headers: _headers(null),
+        body: jsonEncode({
+          'provider': provider,
+          'email': email,
+          if (name != null) 'name': name,
+          if (ssoId != null) 'ssoId': ssoId,
+        }),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: {
+            'token': body['token'],
+            'refreshToken': body['refreshToken'],
+            'user': UserModel.fromJson(body['user']),
+          },
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Falha na autenticação SSO.',
           statusCode: response.statusCode,
         );
       }
@@ -1080,4 +1204,166 @@ class ApiService {
       return ApiResponse(success: false, error: 'Erro ao exportar PDF: $e', statusCode: 0);
     }
   }
+
+  // ==========================================
+  // GESTÃO OPERACIONAL DE ASSENTOS & LINHA DO TEMPO (FACILITIES & TI)
+  // ==========================================
+  Future<ApiResponse<Map<String, dynamic>>> colocarCadeiraEmManutencao(
+    String token,
+    String? adminToken,
+    int cadeiraId, {
+
+    required String motivo,
+    String? previsaoRetorno,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/admin/cadeiras/$cadeiraId/manutencao'),
+        headers: _headers(token, adminToken: adminToken),
+        body: jsonEncode({
+          'motivo': motivo,
+          if (previsaoRetorno != null) 'previsaoRetorno': previsaoRetorno,
+        }),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: body, message: body['message'], statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: body['error'] ?? 'Falha ao colocar assento em manutenção.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> liberarCadeiraManutencao(
+    String token,
+    String? adminToken,
+    int cadeiraId,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/admin/cadeiras/$cadeiraId/liberar'),
+        headers: _headers(token, adminToken: adminToken),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: body, message: body['message'], statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: body['error'] ?? 'Falha ao liberar assento da manutenção.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<List<HistoricoReservaModel>>> getHistoricoCadeira(
+    String token,
+    String? adminToken,
+    int cadeiraId,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/admin/cadeiras/$cadeiraId/historico'),
+        headers: _headers(token, adminToken: adminToken),
+      );
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final list = body['historico'] as List? ?? [];
+        final itens = list.map((item) => HistoricoReservaModel.fromJson(item)).toList();
+        return ApiResponse(success: true, data: itens, statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: 'Falha ao buscar histórico do assento.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<List<HistoricoReservaModel>>> getHistoricoReservasUsuario(
+    String token,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/reservas/historico'),
+        headers: _headers(token),
+      );
+
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List? ?? [];
+        final itens = list.map((item) => HistoricoReservaModel.fromJson(item)).toList();
+        return ApiResponse(success: true, data: itens, statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: 'Falha ao buscar histórico do usuário.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getCadeirasManutencao(
+    String token,
+    String? adminToken, {
+    String? escritorioId,
+    String? busca,
+  }) async {
+    try {
+      final queryParams = {
+        if (escritorioId != null && escritorioId != 'todos') 'escritorioId': escritorioId,
+        if (busca != null && busca.trim().isNotEmpty) 'busca': busca.trim(),
+      };
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/admin/cadeiras/manutencao').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: _headers(token, adminToken: adminToken));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        final kpis = AdminManutencaoKpisModel.fromJson(body['kpis'] ?? {});
+        final list = body['manutencoes'] as List? ?? [];
+        final itens = list.map((item) => AdminManutencaoModel.fromJson(item)).toList();
+        return ApiResponse(
+          success: true,
+          data: {
+            'kpis': kpis,
+            'manutencoes': itens,
+          },
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(success: false, error: 'Falha ao buscar manutenções.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<List<AdminCadeiraOptionModel>>> getTodasCadeiras(
+    String token,
+    String? adminToken, {
+    String? escritorioId,
+  }) async {
+    try {
+      final queryParams = {
+        if (escritorioId != null && escritorioId != 'todos') 'escritorioId': escritorioId,
+      };
+
+      final uri = Uri.parse('${AppConstants.baseUrl}/admin/cadeiras/todas').replace(queryParameters: queryParams);
+      final response = await http.get(uri, headers: _headers(token, adminToken: adminToken));
+
+      if (response.statusCode == 200) {
+        final list = jsonDecode(response.body) as List? ?? [];
+        final itens = list.map((item) => AdminCadeiraOptionModel.fromJson(item)).toList();
+        return ApiResponse(success: true, data: itens, statusCode: response.statusCode);
+      } else {
+        return ApiResponse(success: false, error: 'Falha ao listar cadeiras.', statusCode: response.statusCode);
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
 }
+
+

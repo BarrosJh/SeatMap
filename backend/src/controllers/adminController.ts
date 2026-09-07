@@ -5,7 +5,10 @@ import pool from '../config/db';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ConfigService } from '../services/configService';
 import { CronService } from '../services/cronService';
+import { EmailService } from '../services/emailService';
+import { ReservaHistoryService } from '../services/reservaHistoryService';
 import { wsManager } from '../websocket/wsServer';
+
 
 export class AdminController {
   // ==========================================
@@ -189,6 +192,8 @@ export class AdminController {
           u.perfil,
           COALESCE(u.permissao_rh, false) AS permissao_rh,
           COALESCE(u.permissao_ti, false) AS permissao_ti,
+          COALESCE(u.exigir_mfa, false) AS exigir_mfa,
+          COALESCE(u.totp_ativo, false) AS totp_ativo,
           u.ativo,
           u.departamento_id,
           d.nome AS departamento_nome,
@@ -228,6 +233,8 @@ export class AdminController {
         permissao_rh, 
         permissaoTi,
         permissao_ti,
+        exigirMfa,
+        exigir_mfa,
         ativo = true 
       } = req.body;
 
@@ -245,6 +252,9 @@ export class AdminController {
       const hasTi = permissaoTi !== undefined
         ? Boolean(permissaoTi)
         : (permissao_ti !== undefined ? Boolean(permissao_ti) : perfil === 'ADMIN_TI');
+      const needsMfa = exigirMfa !== undefined
+        ? Boolean(exigirMfa)
+        : (exigir_mfa !== undefined ? Boolean(exigir_mfa) : false);
       const perfilFinal = perfil === 'ADMIN_RH' ? 'GESTAO' : (perfil === 'ADMIN_TI' ? 'ADMIN_TI' : perfil);
 
       // Checar duplicidade
@@ -259,9 +269,9 @@ export class AdminController {
       const senhaHash = await bcrypt.hash(senha, 10);
 
       const insertRes = await pool.query(`
-        INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, permissao_ti, ativo)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id, nome, email, matricula, departamento_id, perfil, permissao_rh, permissao_ti, ativo
+        INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, permissao_ti, exigir_mfa, ativo)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, nome, email, matricula, departamento_id, perfil, permissao_rh, permissao_ti, exigir_mfa, ativo
       `, [
         nome.trim(),
         email.trim().toLowerCase(),
@@ -271,6 +281,7 @@ export class AdminController {
         perfilFinal,
         hasRh,
         hasTi,
+        needsMfa,
         ativo !== undefined ? Boolean(ativo) : true
       ]);
 
@@ -299,6 +310,8 @@ export class AdminController {
         permissao_rh, 
         permissaoTi,
         permissao_ti,
+        exigirMfa,
+        exigir_mfa,
         ativo 
       } = req.body;
 
@@ -324,6 +337,9 @@ export class AdminController {
       const hasTi = permissaoTi !== undefined
         ? Boolean(permissaoTi)
         : (permissao_ti !== undefined ? Boolean(permissao_ti) : (perfil === 'ADMIN_TI' ? true : null));
+      const needsMfa = exigirMfa !== undefined
+        ? Boolean(exigirMfa)
+        : (exigir_mfa !== undefined ? Boolean(exigir_mfa) : null);
       const perfilFinal = perfil === 'ADMIN_RH' ? 'GESTAO' : (perfil === 'ADMIN_TI' ? 'ADMIN_TI' : (perfil || null));
 
       const updateRes = await pool.query(`
@@ -336,9 +352,10 @@ export class AdminController {
           perfil = COALESCE($6, perfil),
           permissao_rh = COALESCE($7, permissao_rh),
           permissao_ti = COALESCE($8, permissao_ti),
-          ativo = COALESCE($9, ativo)
-        WHERE id = $10
-        RETURNING id, nome, email, matricula, departamento_id, perfil, permissao_rh, permissao_ti, ativo
+          exigir_mfa = COALESCE($9, exigir_mfa),
+          ativo = COALESCE($10, ativo)
+        WHERE id = $11
+        RETURNING id, nome, email, matricula, departamento_id, perfil, permissao_rh, permissao_ti, exigir_mfa, ativo
       `, [
         nome ? nome.trim() : null,
         email ? email.trim().toLowerCase() : null,
@@ -348,6 +365,7 @@ export class AdminController {
         perfilFinal,
         hasRh,
         hasTi,
+        needsMfa,
         ativo !== undefined ? Boolean(ativo) : null,
         id
       ]);
@@ -469,7 +487,13 @@ export class AdminController {
         const hasRh = u.permissaoRh !== undefined 
           ? Boolean(u.permissaoRh) 
           : (u.permissao_rh !== undefined ? Boolean(u.permissao_rh) : u.perfil === 'ADMIN_RH');
-        const perfil = u.perfil === 'ADMIN_RH' ? 'GESTAO' : (['COLABORADOR', 'GESTAO'].includes(u.perfil) ? u.perfil : 'COLABORADOR');
+        const hasTi = u.permissaoTi !== undefined
+          ? Boolean(u.permissaoTi)
+          : (u.permissao_ti !== undefined ? Boolean(u.permissao_ti) : u.perfil === 'ADMIN_TI');
+        const needsMfa = u.exigirMfa !== undefined
+          ? Boolean(u.exigirMfa)
+          : (u.exigir_mfa !== undefined ? Boolean(u.exigir_mfa) : false);
+        const perfil = u.perfil === 'ADMIN_RH' ? 'GESTAO' : (u.perfil === 'ADMIN_TI' ? 'ADMIN_TI' : (['COLABORADOR', 'GESTAO'].includes(u.perfil) ? u.perfil : 'COLABORADOR'));
         const ativo = u.ativo !== undefined ? Boolean(u.ativo) : true;
 
         // Resolução do Departamento
@@ -496,17 +520,19 @@ export class AdminController {
 
         // Upsert na tabela de usuários
         const upsertRes = await client.query(`
-          INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, ativo)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, permissao_ti, exigir_mfa, ativo)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           ON CONFLICT (email) DO UPDATE SET
             nome = EXCLUDED.nome,
             matricula = EXCLUDED.matricula,
             departamento_id = COALESCE(EXCLUDED.departamento_id, usuarios.departamento_id),
             perfil = EXCLUDED.perfil,
             permissao_rh = EXCLUDED.permissao_rh,
+            permissao_ti = EXCLUDED.permissao_ti,
+            exigir_mfa = COALESCE(EXCLUDED.exigir_mfa, usuarios.exigir_mfa),
             ativo = EXCLUDED.ativo
           RETURNING (xmax = 0) AS inserido
-        `, [nome, email, matricula, senhaHash, depId, perfil, hasRh, ativo]);
+        `, [nome, email, matricula, senhaHash, depId, perfil, hasRh, hasTi, needsMfa, ativo]);
 
         if (upsertRes.rows[0].inserido) {
           criados++;
@@ -693,6 +719,7 @@ export class AdminController {
   }
 
   public static async cancelarReservaAdmin(req: AuthenticatedRequest, res: Response) {
+    const user = req.user!;
     try {
       const { id } = req.params;
       const { justificativa } = req.body;
@@ -701,10 +728,13 @@ export class AdminController {
       const resRes = await pool.query(`
         SELECT 
           r.id,
+          r.usuario_id,
           r.cadeira_id,
           r.data_reserva,
           r.status,
+          r.codigo_comprovante,
           b.escritorio_id,
+          c.identificador AS cadeira_identificador,
           u.nome AS usuario_nome
         FROM reservas r
         JOIN cadeiras c ON r.cadeira_id = c.id
@@ -734,6 +764,22 @@ export class AdminController {
         ? reserva.data_reserva
         : DateTime.fromJSDate(reserva.data_reserva).toISODate()!;
 
+      // Gravar na Linha do Tempo Forense
+      await ReservaHistoryService.registrarEvento({
+        reservaId: reserva.id,
+        cadeiraId: reserva.cadeira_id,
+        usuarioId: reserva.usuario_id,
+        dataReserva: dataFormatada,
+        tipoEvento: 'CANCELADA_GESTAO',
+        executadoPorUsuarioId: user.userId,
+        motivo: justificativa || 'Cancelamento administrativo realizado pelo RH/Gestor',
+        detalhes: {
+          comprovante: reserva.codigo_comprovante,
+          cadeiraIdentificador: reserva.cadeira_identificador,
+          justificativa: justificativa || 'Não informada'
+        }
+      });
+
       // Liberar cadeira via WebSocket em tempo real
       wsManager.broadcastSeatUpdate({
         evento: 'assento_atualizado',
@@ -755,4 +801,341 @@ export class AdminController {
       return res.status(500).json({ error: 'Erro ao cancelar reserva.' });
     }
   }
+
+  // ==========================================
+  // 6. GESTÃO OPERACIONAL DE ASSENTOS & MANUTENÇÃO (FACILITIES & TI)
+  // ==========================================
+  public static async colocarCadeiraEmManutencao(req: AuthenticatedRequest, res: Response) {
+    const user = req.user!;
+    const cadeiraId = parseInt(req.params.id, 10);
+    const { motivo, previsaoRetorno } = req.body;
+
+    if (isNaN(cadeiraId)) {
+      return res.status(400).json({ error: 'ID de cadeira inválido.' });
+    }
+
+    if (!motivo || typeof motivo !== 'string' || motivo.trim().length === 0) {
+      return res.status(400).json({ error: 'O motivo da manutenção é obrigatório (ex: monitor quebrado, tomada sem energia).' });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Bloquear linha da cadeira
+      const cadeiraRes = await client.query(`
+        SELECT c.id, c.identificador, c.status_operacional, b.id AS baia_id, b.nome AS baia_nome, b.escritorio_id, e.nome AS escritorio_nome
+        FROM cadeiras c
+        JOIN baias b ON c.baia_id = b.id
+        JOIN escritorios e ON b.escritorio_id = e.id
+        WHERE c.id = $1
+        FOR UPDATE
+      `, [cadeiraId]);
+
+      if (cadeiraRes.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Cadeira não encontrada.' });
+      }
+
+      const cadeira = cadeiraRes.rows[0];
+
+      // 2. Atualizar status da cadeira para EM_MANUTENCAO
+      await client.query(`
+        UPDATE cadeiras
+        SET status_operacional = 'EM_MANUTENCAO',
+            motivo_manutencao = $1,
+            previsao_retorno = $2,
+            manutencao_por_usuario_id = $3
+        WHERE id = $4
+      `, [
+        motivo.trim(),
+        previsaoRetorno ? new Date(previsaoRetorno) : null,
+        user.userId,
+        cadeiraId
+      ]);
+
+      // 3. Buscar todas as reservas ATIVAS futuras ou de hoje para esta cadeira
+      const reservasAfetadasRes = await client.query(`
+        SELECT r.id, r.usuario_id, r.data_reserva, r.codigo_comprovante, u.nome AS usuario_nome, u.email AS usuario_email
+        FROM reservas r
+        JOIN usuarios u ON r.usuario_id = u.id
+        WHERE r.cadeira_id = $1
+          AND r.data_reserva >= CURRENT_DATE
+          AND r.status = 'ATIVA'
+        FOR UPDATE
+      `, [cadeiraId]);
+
+      const reservasAfetadas = reservasAfetadasRes.rows;
+
+      if (reservasAfetadas.length > 0) {
+        const ids = reservasAfetadas.map(r => r.id);
+        await client.query(`
+          UPDATE reservas
+          SET status = 'CANCELADA'
+          WHERE id = ANY($1::int[])
+        `, [ids]);
+
+        // Registrar cancelamento preventivo de cada reserva no histórico
+        for (const resItem of reservasAfetadas) {
+          const dataIso = typeof resItem.data_reserva === 'string'
+            ? resItem.data_reserva
+            : DateTime.fromJSDate(resItem.data_reserva).toISODate()!;
+
+          await ReservaHistoryService.registrarEvento({
+            reservaId: resItem.id,
+            cadeiraId: cadeira.id,
+            usuarioId: resItem.usuario_id,
+            dataReserva: dataIso,
+            tipoEvento: 'CANCELADA_MANUTENCAO',
+            executadoPorUsuarioId: user.userId,
+            motivo: `Bloqueio operacional de manutenção do assento: ${motivo.trim()}`,
+            detalhes: {
+              motivoManutencao: motivo.trim(),
+              previsaoRetorno: previsaoRetorno || null,
+              comprovante: resItem.codigo_comprovante,
+              cadeiraIdentificador: cadeira.identificador
+            }
+          }, client);
+        }
+      }
+
+      await client.query('COMMIT');
+
+      // 4. Pós-Commit: Notificações em tempo real e e-mails aos colaboradores afetados
+      for (const resItem of reservasAfetadas) {
+        const dataIso = typeof resItem.data_reserva === 'string'
+          ? resItem.data_reserva
+          : DateTime.fromJSDate(resItem.data_reserva).toISODate()!;
+
+        // Broadcast de liberação/manutenção para a data da reserva
+        wsManager.broadcastSeatUpdate({
+          evento: 'assento_atualizado',
+          escritorioId: cadeira.escritorio_id,
+          cadeiraId: cadeira.id,
+          data: dataIso,
+          status: 'manutencao',
+          ocupante: null
+        });
+
+        // Enviar e-mail de alerta preventivo
+        EmailService.enviarAvisoCancelamentoManutencao(resItem.usuario_email, resItem.usuario_nome, {
+          cadeiraIdentificador: cadeira.identificador,
+          dataReserva: dataIso,
+          escritorioNome: cadeira.escritorio_nome,
+          motivo: motivo.trim(),
+          previsaoRetorno: previsaoRetorno ? DateTime.fromISO(previsaoRetorno).setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy HH:mm') : undefined
+        }).catch(err => console.error('[AdminController] Erro ao despachar email de manutencao:', err));
+      }
+
+      // Broadcast geral informando mudança no mapa
+      wsManager.broadcastToAll({
+        tipo: 'STATUS_CADEIRA_ALTERADO',
+        cadeiraId: cadeira.id,
+        escritorioId: cadeira.escritorio_id,
+        statusOperacional: 'EM_MANUTENCAO',
+        motivo: motivo.trim()
+      });
+
+      return res.status(200).json({
+        message: `Mesa ${cadeira.identificador} colocada em manutenção com sucesso.`,
+        reservasCanceladas: reservasAfetadas.length,
+        cadeira: {
+          id: cadeira.id,
+          identificador: cadeira.identificador,
+          statusOperacional: 'EM_MANUTENCAO',
+          motivoManutencao: motivo.trim(),
+          previsaoRetorno
+        }
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('[AdminController.colocarCadeiraEmManutencao] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao bloquear assento para manutenção.' });
+    } finally {
+      client.release();
+    }
+  }
+
+  public static async liberarCadeiraManutencao(req: AuthenticatedRequest, res: Response) {
+    const cadeiraId = parseInt(req.params.id, 10);
+
+    if (isNaN(cadeiraId)) {
+      return res.status(400).json({ error: 'ID de cadeira inválido.' });
+    }
+
+    try {
+      const updateRes = await pool.query(`
+        UPDATE cadeiras c
+        SET status_operacional = 'DISPONIVEL',
+            motivo_manutencao = NULL,
+            previsao_retorno = NULL,
+            manutencao_por_usuario_id = NULL
+        FROM baias b
+        WHERE c.id = $1 AND c.baia_id = b.id
+        RETURNING c.id, c.identificador, b.escritorio_id
+      `, [cadeiraId]);
+
+      if (updateRes.rowCount === 0) {
+        return res.status(404).json({ error: 'Cadeira não encontrada.' });
+      }
+
+      const cadeira = updateRes.rows[0];
+
+      // Broadcast geral informando liberação
+      wsManager.broadcastToAll({
+        tipo: 'STATUS_CADEIRA_ALTERADO',
+        cadeiraId: cadeira.id,
+        escritorioId: cadeira.escritorio_id,
+        statusOperacional: 'DISPONIVEL'
+      });
+
+      return res.status(200).json({
+        message: `Mesa ${cadeira.identificador} liberada para reservas gerais.`,
+        cadeiraId: cadeira.id,
+        statusOperacional: 'DISPONIVEL'
+      });
+    } catch (error) {
+      console.error('[AdminController.liberarCadeiraManutencao] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao liberar cadeira de manutenção.' });
+    }
+  }
+
+  public static async getHistoricoCadeira(req: AuthenticatedRequest, res: Response) {
+    const cadeiraId = parseInt(req.params.id, 10);
+    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const offset = parseInt(req.query.offset as string, 10) || 0;
+
+    if (isNaN(cadeiraId)) {
+      return res.status(400).json({ error: 'ID de cadeira inválido.' });
+    }
+
+    try {
+      const historico = await ReservaHistoryService.getHistoricoCadeira(cadeiraId, limit, offset);
+      return res.status(200).json({
+        cadeiraId,
+        total: historico.length,
+        historico
+      });
+    } catch (error) {
+      console.error('[AdminController.getHistoricoCadeira] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao consultar linha do tempo do assento.' });
+    }
+  }
+
+  public static async getCadeirasManutencao(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { escritorioId, busca } = req.query;
+
+      const conditions: string[] = ["c.ativa = true"];
+      const values: any[] = [];
+      let idx = 1;
+
+      if (escritorioId && escritorioId !== 'todos') {
+        conditions.push(`b.escritorio_id = $${idx}`);
+        values.push(parseInt(escritorioId as string, 10));
+        idx++;
+      }
+
+      if (busca && typeof busca === 'string' && busca.trim().length > 0) {
+        conditions.push(`(c.identificador ILIKE $${idx} OR b.nome ILIKE $${idx} OR c.motivo_manutencao ILIKE $${idx} OR u.nome ILIKE $${idx})`);
+        values.push(`%${busca.trim()}%`);
+        idx++;
+      }
+
+      // 1. KPIs
+      const kpiRes = await pool.query(`
+        SELECT 
+          COUNT(CASE WHEN c.status_operacional = 'EM_MANUTENCAO' THEN 1 END)::int AS total_bloqueadas,
+          COUNT(CASE WHEN c.status_operacional = 'DISPONIVEL' OR c.status_operacional IS NULL THEN 1 END)::int AS total_operacionais,
+          COUNT(CASE WHEN c.status_operacional = 'EM_MANUTENCAO' AND c.previsao_retorno IS NOT NULL AND c.previsao_retorno < NOW() THEN 1 END)::int AS total_atrasadas
+        FROM cadeiras c
+        JOIN baias b ON c.baia_id = b.id
+        WHERE c.ativa = true
+      `);
+
+      const kpis = kpiRes.rows[0] || { total_bloqueadas: 0, total_operacionais: 0, total_atrasadas: 0 };
+
+      // 2. Cadeiras em manutenção filtradas
+      const listQuery = `
+        SELECT 
+          c.id,
+          c.identificador,
+          c.status_operacional,
+          c.motivo_manutencao,
+          c.previsao_retorno,
+          c.manutencao_por_usuario_id,
+          b.id AS baia_id,
+          b.nome AS baia_nome,
+          e.id AS escritorio_id,
+          e.nome AS escritorio_nome,
+          e.cidade AS escritorio_cidade,
+          u.nome AS responsavel_nome,
+          u.email AS responsavel_email,
+          (
+            SELECT MAX(h.criado_em) 
+            FROM historico_reservas h 
+            WHERE h.cadeira_id = c.id AND h.tipo_evento = 'CANCELADA_MANUTENCAO'
+          ) AS data_bloqueio
+        FROM cadeiras c
+        JOIN baias b ON c.baia_id = b.id
+        JOIN escritorios e ON b.escritorio_id = e.id
+        LEFT JOIN usuarios u ON c.manutencao_por_usuario_id = u.id
+        WHERE c.status_operacional = 'EM_MANUTENCAO' AND ${conditions.join(' AND ')}
+        ORDER BY c.previsao_retorno ASC NULLS LAST, e.nome ASC, b.nome ASC, c.identificador ASC
+      `;
+
+      const listRes = await pool.query(listQuery, values);
+
+      return res.status(200).json({
+        kpis: {
+          totalBloqueadas: kpis.total_bloqueadas,
+          totalOperacionais: kpis.total_operacionais,
+          totalAtrasadas: kpis.total_atrasadas
+        },
+        manutencoes: listRes.rows
+      });
+    } catch (error) {
+      console.error('[AdminController.getCadeirasManutencao] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao buscar assentos em manutenção.' });
+    }
+  }
+
+  public static async getTodasCadeiras(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { escritorioId } = req.query;
+      const conditions: string[] = ["c.ativa = true"];
+      const values: any[] = [];
+
+      if (escritorioId && escritorioId !== 'todos') {
+        conditions.push(`b.escritorio_id = $1`);
+        values.push(parseInt(escritorioId as string, 10));
+      }
+
+      const result = await pool.query(`
+        SELECT 
+          c.id,
+          c.identificador,
+          c.status_operacional,
+          c.motivo_manutencao,
+          c.previsao_retorno,
+          b.id AS baia_id,
+          b.nome AS baia_nome,
+          e.id AS escritorio_id,
+          e.nome AS escritorio_nome,
+          e.cidade AS escritorio_cidade
+        FROM cadeiras c
+        JOIN baias b ON c.baia_id = b.id
+        JOIN escritorios e ON b.escritorio_id = e.id
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY e.nome ASC, b.nome ASC, c.identificador ASC
+      `, values);
+
+      return res.status(200).json(result.rows);
+    } catch (error) {
+      console.error('[AdminController.getTodasCadeiras] Erro:', error);
+      return res.status(500).json({ error: 'Erro ao listar todas as cadeiras.' });
+    }
+  }
 }
+
+

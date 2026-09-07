@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { ConfigService } from '../services/configService';
 
 export interface AuthUser {
   userId: number;
@@ -57,9 +58,52 @@ export const requireTi = (req: AuthenticatedRequest, res: Response, next: NextFu
   next();
 };
 
-export const authenticateAdminMfa = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  // MFA temporariamente desativado a pedido do usuário
-  req.isAdminMfaValidated = true;
+export const requireAdminOrTi = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const hasAccess = req.user?.permissaoRh === true ||
+                    req.user?.permissaoTi === true ||
+                    req.user?.is_admin === true ||
+                    req.user?.perfil === 'ADMIN_RH' ||
+                    req.user?.perfil === 'ADMIN_TI';
+  if (!req.user || !hasAccess) {
+    return res.status(403).json({ error: 'Acesso restrito à equipe de Administração de RH ou TI' });
+  }
   next();
+};
+
+export const authenticateAdminMfa = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const mfaPolicy = await ConfigService.get('MFA_POLICY', 'DESATIVADO');
+    const isMfaEnforcedForRh = mfaPolicy === 'OBRIGATORIO_RH' || mfaPolicy === 'OBRIGATORIO_TODOS';
+
+    // Se MFA estiver DESATIVADO ou OPCIONAL (padrão de desenvolvimento), autoriza diretamente
+    if (!isMfaEnforcedForRh) {
+      req.isAdminMfaValidated = true;
+      return next();
+    }
+
+    // Se MFA for exigido por política administrativa, valida o x-admin-token
+    const adminToken = req.headers['x-admin-token'] as string;
+    if (!adminToken) {
+      return res.status(403).json({
+        requiresAdminMfa: true,
+        error: 'Autenticação em duas etapas (MFA) necessária para acessar o painel administrativo.'
+      });
+    }
+
+    jwt.verify(adminToken, JWT_ADMIN_SECRET, (err, decoded: any) => {
+      if (err || !decoded || decoded.userId !== req.user?.userId) {
+        return res.status(403).json({
+          requiresAdminMfa: true,
+          error: 'Sessão MFA de administrador expirada ou inválida.'
+        });
+      }
+      req.isAdminMfaValidated = true;
+      next();
+    });
+  } catch (error) {
+    console.error('[authenticateAdminMfa] Erro ao verificar política de MFA:', error);
+    req.isAdminMfaValidated = true;
+    next();
+  }
 };
 

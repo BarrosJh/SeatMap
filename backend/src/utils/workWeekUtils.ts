@@ -65,8 +65,8 @@ export async function isProximaSemanaLiberada(
     const diaAberturaGestao = await ConfigService.getNumber('DIA_ABERTURA_GESTAO', 5);
     const horarioAberturaGestao = await ConfigService.get('HORARIO_ABERTURA_GESTAO', '08:00');
 
-    // Durante os dias úteis (Seg a Sex), verifica se atingiu o dia e horário
-    const isAberto = (diaSemanaHoje <= 5) && (
+    // Finais de semana (Sáb/Dom) ou após o dia/horário de abertura durante a semana
+    const isAberto = (diaSemanaHoje >= 6) || (
       (diaSemanaHoje > diaAberturaGestao) ||
       (diaSemanaHoje === diaAberturaGestao && horaAtual >= horarioAberturaGestao)
     );
@@ -83,7 +83,8 @@ export async function isProximaSemanaLiberada(
     const diaAberturaColab = await ConfigService.getNumber('DIA_ABERTURA_COLABORADOR', 5);
     const horarioAberturaColab = await ConfigService.get('HORARIO_ABERTURA_COLABORADOR', '12:00');
 
-    const isAberto = (diaSemanaHoje <= 5) && (
+    // Finais de semana (Sáb/Dom) ou após o dia/horário de abertura durante a semana
+    const isAberto = (diaSemanaHoje >= 6) || (
       (diaSemanaHoje > diaAberturaColab) ||
       (diaSemanaHoje === diaAberturaColab && horaAtual >= horarioAberturaColab)
     );

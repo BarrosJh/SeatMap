@@ -120,7 +120,14 @@ class BaiaCardListView extends StatelessWidget {
         cadeira.ocupante!.departamentoId != null &&
         cadeira.ocupante!.departamentoId == currentUser.departamentoId;
 
-    if (cadeira.isMinhaReserva) {
+    if (cadeira.isManutencao) {
+      bgColor = const Color(0xFFFEF3C7);
+      borderColor = const Color(0xFFF59E0B);
+      textColor = const Color(0xFF92400E);
+      statusColor = const Color(0xFFD97706);
+      statusLabel = 'Manutenção';
+      statusIcon = Icons.build_rounded;
+    } else if (cadeira.isMinhaReserva) {
       bgColor = const Color(0xFFEFF6FF);
       borderColor = const Color(0xFF2563EB);
       textColor = const Color(0xFF1E3A8A);
@@ -144,6 +151,7 @@ class BaiaCardListView extends StatelessWidget {
         statusIcon = Icons.person_outline;
       }
     }
+
 
     return Material(
       color: Colors.transparent,

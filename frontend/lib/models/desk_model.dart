@@ -5,7 +5,8 @@ enum DeskStatus {
   available,
   occupied,
   reserved,
-  selected;
+  selected,
+  maintenance;
 
   /// Material 3 fill color
   Color get color {
@@ -18,6 +19,8 @@ enum DeskStatus {
         return const Color(0xFFFFB74D); // Amber / Colega Depto
       case DeskStatus.selected:
         return const Color(0xFF1E88E5); // Vibrant Blue
+      case DeskStatus.maintenance:
+        return const Color(0xFFF59E0B); // Amber / Manutenção Facilities
     }
   }
 
@@ -32,6 +35,8 @@ enum DeskStatus {
         return const Color(0xFFFFFBEB);
       case DeskStatus.selected:
         return const Color(0xFFE3F2FD);
+      case DeskStatus.maintenance:
+        return const Color(0xFFFEF3C7);
     }
   }
 
@@ -46,6 +51,8 @@ enum DeskStatus {
         return const Color(0xFFB45309);
       case DeskStatus.selected:
         return const Color(0xFF1565C0);
+      case DeskStatus.maintenance:
+        return const Color(0xFF92400E);
     }
   }
 
@@ -60,6 +67,8 @@ enum DeskStatus {
         return 'Colega Depto';
       case DeskStatus.selected:
         return 'Sua Reserva';
+      case DeskStatus.maintenance:
+        return 'Em Manutenção';
     }
   }
 
@@ -74,6 +83,8 @@ enum DeskStatus {
         return Icons.access_time_rounded;
       case DeskStatus.selected:
         return Icons.radio_button_checked_rounded;
+      case DeskStatus.maintenance:
+        return Icons.build_rounded;
     }
   }
 }
@@ -113,6 +124,8 @@ class DeskModel {
   bool get isOccupied => status == DeskStatus.occupied;
   bool get isReserved => status == DeskStatus.reserved;
   bool get isSelected => status == DeskStatus.selected;
+  bool get isMaintenance => status == DeskStatus.maintenance;
+
 
   DeskModel copyWith({
     String? id,

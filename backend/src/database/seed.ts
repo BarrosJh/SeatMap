@@ -313,6 +313,9 @@ async function runSeed() {
       ('PERMITIR_TROCA_MESMO_DIA', 'true', 'Permite que o colaborador troque de assento para a mesma data já reservada'),
       ('CHECKIN_AUTOMATICO_GESTAO', 'true', 'Realiza o check-in automático ao reservar para usuários com perfil GESTAO'),
       ('AVISO_GLOBAL_SISTEMA', '', 'Mensagem institucional de aviso em tempo real exibida no topo do app'),
+      ('MFA_POLICY', 'DESATIVADO', 'Política de obrigatoriedade de MFA (DESATIVADO, OPCIONAL, OBRIGATORIO_RH, OBRIGATORIO_TODOS)'),
+      ('MFA_EMAIL_ENABLED', 'true', 'Habilita envio de código MFA por e-mail corporativo'),
+      ('MFA_TOTP_ENABLED', 'true', 'Habilita autenticação em duas etapas via aplicativo TOTP (Google/MS Authenticator)'),
       ('MFA_EXPIRACAO_MINUTOS', '10', 'Tempo de validade do código MFA enviado por e-mail (em minutos)'),
       ('MFA_MAX_TENTATIVAS', '3', 'Quantidade máxima de tentativas inválidas de MFA antes de bloquear o código'),
       ('SMTP_HOST', '', 'Servidor SMTP para envio de e-mails'),
@@ -321,7 +324,19 @@ async function runSeed() {
       ('SMTP_USER', '', 'Usuário ou e-mail de autenticação SMTP'),
       ('SMTP_PASS', '', 'Senha de aplicativo ou token de autenticação SMTP'),
       ('EMAIL_FROM', '"SeatMap Corporativo" <nao-responda@seatmap.local>', 'Nome e e-mail remetente padrão'),
-      ('TIMEZONE', 'America/Sao_Paulo', 'Fuso horário oficial do sistema')
+      ('TIMEZONE', 'America/Sao_Paulo', 'Fuso horário oficial do sistema'),
+      ('SSO_ENABLED', 'false', 'SSO Corporativo ativo/inativo'),
+      ('SSO_ALLOWED_DOMAINS', '', 'Domínios corporativos permitidos para SSO (separados por vírgula)'),
+      ('SSO_AUTO_PROVISION', 'true', 'Auto-provisionamento de colaboradores via SSO'),
+      ('SSO_DEFAULT_ROLE', 'COLABORADOR', 'Perfil padrão atribuído a novos usuários via SSO'),
+      ('SSO_ENFORCE_FOR_DOMAINS', 'false', 'Forçar uso exclusivo de SSO para domínios corporativos'),
+      ('SSO_GOOGLE_ENABLED', 'false', 'Google Workspace SSO ativo/inativo'),
+      ('SSO_GOOGLE_CLIENT_ID', '', 'Google OAuth2 Client ID'),
+      ('SSO_AZURE_ENABLED', 'false', 'Microsoft Entra ID / Azure AD SSO ativo/inativo'),
+      ('SSO_AZURE_CLIENT_ID', '', 'Azure AD Application (client) ID'),
+      ('SSO_AZURE_TENANT_ID', '', 'Azure AD Directory (tenant) ID'),
+      ('SSO_OKTA_ENABLED', 'false', 'Okta Enterprise SSO ativo/inativo'),
+      ('SSO_OKTA_CLIENT_ID', '', 'Okta Client ID')
       ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, descricao = EXCLUDED.descricao;
     `);
 
