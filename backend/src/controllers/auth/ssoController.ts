@@ -9,6 +9,7 @@ import { SsoService } from '../../services/ssoService';
 import { TokenService } from '../../services/tokenService';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
+import { toUserResponseDto } from '../../utils/userDtoMapper';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -53,6 +54,7 @@ export class SsoController {
         if (verified.name) name = verified.name;
         if (verified.ssoId) ssoId = verified.ssoId;
       } catch (err: any) {
+        logger.error('[SsoController.loginSso] Falha na validação do idToken:', { correlationId: (req as any).correlationId, error: err });
         AuditService.log({
           loginInformado: rawEmail || 'token_invalido',
           tipoEvento: 'SSO_FALHA',
@@ -61,7 +63,7 @@ export class SsoController {
           userAgent,
           detalhes: { motivo: 'Falha na validação de assinatura do idToken', erro: err.message }
         });
-        return res.status(401).json({ error: `Falha na validação do token SSO: ${err.message}` });
+        return res.status(401).json({ error: 'Falha na validação do token de autenticação SSO.' });
       }
     } else {
       AuditService.log({
@@ -212,18 +214,7 @@ export class SsoController {
       return res.status(200).json({
         token,
         refreshToken,
-        user: {
-          id: user.id,
-          nome: user.nome,
-          email: user.email,
-          matricula: user.matricula,
-          perfil: user.perfil,
-          permissaoRh: user.permissao_rh === true || user.perfil === 'ADMIN_RH',
-          permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
-          departamentoId: user.departamento_id,
-          departamentoNome: user.departamento_nome,
-          totpAtivo: user.totp_ativo === true
-        }
+        user: toUserResponseDto(user)
       });
     } catch (error) {
       logger.error('[SsoController.loginSso] Erro:', { correlationId: (req as any).correlationId, error });

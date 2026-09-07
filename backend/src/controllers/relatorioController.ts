@@ -5,14 +5,32 @@ import { DateTime } from 'luxon';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { logger } from '../utils/logger';
+import { escapeSqlWildcards } from '../utils/sanitizer';
+import { normalizeIsoDate } from '../utils/workWeekUtils';
 
 export class RelatorioController {
+  private static readonly DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
   /**
-   * Helper para construir cláusula WHERE e parâmetros dinâmicos
+   * Helper para construir cláusula WHERE e parâmetros dinâmicos com validação estrita de datas
    */
   private static buildWhereClause(query: any) {
-    const dataInicio = query.dataInicio as string || DateTime.now().setZone('America/Sao_Paulo').startOf('month').toISODate()!;
-    const dataFim = query.dataFim as string || DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
+    const { dataInicio: rawInicio, dataFim: rawFim } = query;
+
+    if (rawInicio && (typeof rawInicio !== 'string' || !RelatorioController.DATE_REGEX.test(rawInicio) || !DateTime.fromISO(rawInicio).isValid)) {
+      const err: any = new Error('Parâmetro dataInicio inválido. Utilize o formato YYYY-MM-DD.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (rawFim && (typeof rawFim !== 'string' || !RelatorioController.DATE_REGEX.test(rawFim) || !DateTime.fromISO(rawFim).isValid)) {
+      const err: any = new Error('Parâmetro dataFim inválido. Utilize o formato YYYY-MM-DD.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const dataInicio = (rawInicio as string) || DateTime.now().setZone('America/Sao_Paulo').startOf('month').toISODate()!;
+    const dataFim = (rawFim as string) || DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
     const escritorioId = query.escritorioId as string;
     const departamentoId = query.departamentoId as string;
     const status = query.status as string;
@@ -53,7 +71,7 @@ export class RelatorioController {
 
     if (busca && busca.trim().length > 0) {
       conditions.push(`(u.nome ILIKE $${paramIndex} OR u.matricula ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR c.identificador ILIKE $${paramIndex} OR r.codigo_comprovante ILIKE $${paramIndex})`);
-      params.push(`%${busca.trim()}%`);
+      params.push(`%${escapeSqlWildcards(busca.trim())}%`);
       paramIndex++;
     }
 
@@ -161,7 +179,7 @@ export class RelatorioController {
       const diarioResult = await pool.query(diarioQuery, params);
 
       const diarioFormatado = diarioResult.rows.map((row: any) => ({
-        data: typeof row.data_reserva === 'string' ? row.data_reserva : DateTime.fromJSDate(row.data_reserva).toISODate()!,
+        data: normalizeIsoDate(row.data_reserva),
         totalReservas: row.total_reservas,
         totalCheckins: row.total_checkins,
         totalNoShows: row.total_noshows
@@ -182,7 +200,10 @@ export class RelatorioController {
         tendenciaDiaria: diarioFormatado,
         periodo: { dataInicio, dataFim }
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.statusCode === 400) {
+        return res.status(400).json({ error: error.message });
+      }
       logger.error('[RelatorioController.getAnalytics] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao consolidar analytics do relatório.' });
     }
@@ -251,9 +272,7 @@ export class RelatorioController {
       const dataResult = await pool.query(dataQuery, dataParams);
 
       const rows = dataResult.rows.map((row: any) => {
-        const dataIso = typeof row.data_reserva === 'string'
-          ? row.data_reserva
-          : DateTime.fromJSDate(row.data_reserva).toISODate()!;
+        const dataIso = normalizeIsoDate(row.data_reserva);
         
         let situacaoPresenca = 'Pendente';
         if (row.checkin_realizado) {
@@ -300,7 +319,10 @@ export class RelatorioController {
         totalPages: Math.ceil(total / limit),
         registros: rows
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.statusCode === 400) {
+        return res.status(400).json({ error: error.message });
+      }
       logger.error('[RelatorioController.getDadosRelatorio] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao buscar dados do relatório.' });
     }
@@ -419,17 +441,12 @@ export class RelatorioController {
       const hojeIso = DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
 
       for (const row of result.rows) {
-        const dataFormatada = typeof row.data_reserva === 'string'
-          ? DateTime.fromISO(row.data_reserva).toFormat('dd/MM/yyyy')
-          : DateTime.fromJSDate(row.data_reserva).toFormat('dd/MM/yyyy');
+        const dataReservaIso = normalizeIsoDate(row.data_reserva);
+        const dataFormatada = DateTime.fromISO(dataReservaIso).toFormat('dd/MM/yyyy');
         
         const checkinFormatado = row.checkin_em
           ? DateTime.fromJSDate(row.checkin_em).setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy HH:mm:ss')
           : '-';
-
-        const dataReservaIso = typeof row.data_reserva === 'string'
-          ? row.data_reserva
-          : DateTime.fromJSDate(row.data_reserva).toISODate()!;
 
         let situacao = 'Pendente';
         if (row.checkin_realizado) {
@@ -512,7 +529,10 @@ export class RelatorioController {
 
       await workbook.xlsx.write(res);
       return res.end();
-    } catch (error) {
+    } catch (error: any) {
+      if (error.statusCode === 400) {
+        return res.status(400).json({ error: error.message });
+      }
       logger.error('[RelatorioController.exportarXlsx] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao gerar planilha Excel.' });
     }
@@ -558,7 +578,7 @@ export class RelatorioController {
       const totalCanceladas = result.rows.filter((r: any) => r.status === 'CANCELADA').length;
       const hojeIso = DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
       const totalNoShows = result.rows.filter((r: any) => {
-        const dataIso = typeof r.data_reserva === 'string' ? r.data_reserva : DateTime.fromJSDate(r.data_reserva).toISODate()!;
+        const dataIso = normalizeIsoDate(r.data_reserva);
         return r.status === 'EXPIRADA_NOSHOW' || r.status === 'CANCELADA_POR_FALTA' || (!r.checkin_realizado && r.status === 'ATIVA' && dataIso < hojeIso);
       }).length;
       const taxaPresenca = total > 0 ? ((totalCheckins / total) * 100).toFixed(1) : '0';
@@ -575,7 +595,7 @@ export class RelatorioController {
         if (!res.headersSent) {
           res.status(500).json({ error: 'Erro ao renderizar relatório em PDF.' });
         } else {
-          res.end();
+          res.destroy();
         }
       });
 
@@ -673,13 +693,8 @@ export class RelatorioController {
         const isEven = i % 2 === 0;
         doc.rect(30, y, 782, rowHeight).fill(isEven ? '#F8FAFC' : '#FFFFFF');
 
-        const dataFormatada = typeof row.data_reserva === 'string'
-          ? DateTime.fromISO(row.data_reserva).toFormat('dd/MM/yyyy')
-          : DateTime.fromJSDate(row.data_reserva).toFormat('dd/MM/yyyy');
-
-        const dataReservaIso = typeof row.data_reserva === 'string'
-          ? row.data_reserva
-          : DateTime.fromJSDate(row.data_reserva).toISODate()!;
+        const dataReservaIso = normalizeIsoDate(row.data_reserva);
+        const dataFormatada = DateTime.fromISO(dataReservaIso).toFormat('dd/MM/yyyy');
 
         let situacao = 'Pendente';
         let situacaoColor = '#64748B';
@@ -722,12 +737,17 @@ export class RelatorioController {
       }
 
       doc.end();
-    } catch (error) {
+    } catch (error: any) {
+      if (error.statusCode === 400) {
+        if (!res.headersSent) {
+          return res.status(400).json({ error: error.message });
+        }
+      }
       logger.error('[RelatorioController.exportarPdf] Erro:', { correlationId: req.correlationId, error });
       if (!res.headersSent) {
         return res.status(500).json({ error: 'Erro ao gerar relatório em PDF.' });
       }
-      res.end();
+      res.destroy();
     }
   }
 }

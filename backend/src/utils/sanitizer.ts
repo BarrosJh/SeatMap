@@ -1,6 +1,6 @@
 /**
  * Sanitizer utility for enterprise input sanitation and log security.
- * Prevents Stored XSS, Log Injection/Forgery (CRLF), and Sensitive Data Leaks in logs.
+ * Prevents Stored XSS, Log Injection/Forgery (CRLF), CSV/Formula Injection, and SQL Wildcard DoS.
  */
 
 const SENSITIVE_KEYS = new Set([
@@ -95,3 +95,13 @@ export function sanitizeCsvCell(value: any): string {
   return `"${escaped}"`;
 }
 
+/**
+ * Escapes SQL wildcards (% and _) in ILIKE search patterns to prevent Full Table Scan DoS (SEC-05).
+ */
+export function escapeSqlWildcards(input: string): string {
+  if (!input || typeof input !== 'string') return '';
+  return input
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_');
+}

@@ -6,6 +6,9 @@ import { PasswordResetController } from '../controllers/auth/passwordResetContro
 import { authenticateToken } from '../middleware/auth';
 import { authLimiter } from '../middleware/rateLimiter';
 
+import { validateBody } from '../middleware/validate';
+import { loginSchema } from '../validation/schemas';
+
 const router = Router();
 
 // Rate limiting estrito para autenticação e recuperação de senha
@@ -13,7 +16,7 @@ router.use(authLimiter);
 
 // 1. Login Padrão, Configurações de Segurança & SSO
 router.get('/config-seguranca', LoginController.getConfigSeguranca);
-router.post('/login', LoginController.login);
+router.post('/login', validateBody(loginSchema), LoginController.login);
 router.get('/sso/config', SsoController.getSsoConfig);
 router.post('/sso/login', SsoController.loginSso);
 

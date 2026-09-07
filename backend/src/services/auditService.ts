@@ -1,4 +1,5 @@
 import pool from '../config/db';
+import { logger } from '../utils/logger';
 
 export type TipoEventoAuditoria =
   | 'LOGIN_SUCESSO'
@@ -41,36 +42,97 @@ export interface AuditLogParams {
 }
 
 export class AuditService {
+  private static buffer: AuditLogParams[] = [];
+  private static flushTimer: NodeJS.Timeout | null = null;
+  private static isFlushing = false;
+  private static readonly MAX_BUFFER_SIZE = 50;
+  private static readonly FLUSH_INTERVAL_MS = 1500;
+
+  static {
+    // Inicializa timer de flush periódico para garantir persistência contínua
+    this.startFlushTimer();
+  }
+
+  private static startFlushTimer(): void {
+    if (!this.flushTimer) {
+      this.flushTimer = setInterval(() => {
+        this.flush().catch(err => {
+          logger.error('[AuditService.flushTimer] Falha no flush periódico de auditoria:', { error: err });
+        });
+      }, this.FLUSH_INTERVAL_MS);
+      if (typeof this.flushTimer.unref === 'function') {
+        this.flushTimer.unref();
+      }
+    }
+  }
+
   /**
-   * Registra um evento de segurança/acesso no banco de forma assíncrona
+   * Adiciona um evento de auditoria ao buffer em memória para gravação em lote (REL-01).
    */
   public static log(params: AuditLogParams): void {
-    const {
-      usuarioId = null,
-      loginInformado = '',
-      tipoEvento,
-      sucesso,
-      ip = 'Desconhecido',
-      userAgent = 'Desconhecido',
-      detalhes = {}
-    } = params;
+    this.buffer.push(params);
 
-    // Executa em segundo plano sem bloquear a resposta HTTP do usuário
-    pool.query(`
-      INSERT INTO auditoria_acessos (
-        usuario_id, login_informado, tipo_evento, sucesso, ip, user_agent, detalhes, criado_em
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-    `, [
-      usuarioId,
-      loginInformado ? loginInformado.substring(0, 255) : null,
-      tipoEvento,
-      sucesso,
-      ip ? ip.substring(0, 100) : 'Desconhecido',
-      userAgent || 'Desconhecido',
-      JSON.stringify(detalhes)
-    ]).catch(err => {
-      console.error('[AuditService.log Error]: Falha ao persistir log de auditoria:', err);
-    });
+    // Se o buffer atingir o limite máximo, dispara flush imediato
+    if (this.buffer.length >= this.MAX_BUFFER_SIZE) {
+      this.flush().catch(err => {
+        logger.error('[AuditService.log] Falha no flush síncrono por estouro de buffer:', { error: err });
+      });
+    }
+  }
+
+  /**
+   * Executa a gravação em lote (Batch Insert) de todos os eventos retidos no buffer.
+   */
+  public static async flush(): Promise<void> {
+    if (this.buffer.length === 0 || this.isFlushing) {
+      return;
+    }
+
+    this.isFlushing = true;
+    const items = this.buffer.splice(0, this.buffer.length);
+
+    try {
+      // Monta query parametrizada de inserção em lote
+      const values: any[] = [];
+      const rowPlaceholders: string[] = [];
+
+      items.forEach((item, index) => {
+        const offset = index * 7;
+        rowPlaceholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, NOW())`);
+        values.push(
+          item.usuarioId || null,
+          item.loginInformado ? item.loginInformado.substring(0, 255) : null,
+          item.tipoEvento,
+          item.sucesso,
+          item.ip ? item.ip.substring(0, 100) : 'Desconhecido',
+          item.userAgent || 'Desconhecido',
+          JSON.stringify(item.detalhes || {})
+        );
+      });
+
+      const query = `
+        INSERT INTO auditoria_acessos (
+          usuario_id, login_informado, tipo_evento, sucesso, ip, user_agent, detalhes, criado_em
+        ) VALUES ${rowPlaceholders.join(', ')}
+      `;
+
+      await pool.query(query, values);
+    } catch (err) {
+      logger.error('[AuditService.flush Error]: Falha ao persistir lote de auditoria:', { error: err, count: items.length });
+    } finally {
+      this.isFlushing = false;
+    }
+  }
+
+  /**
+   * Finaliza o serviço de auditoria aguardando o flush do buffer durante o graceful shutdown.
+   */
+  public static async shutdown(): Promise<void> {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    await this.flush();
   }
 
   /**
@@ -103,26 +165,31 @@ export class AuditService {
       values.push(options.sucesso);
     }
 
-    if (options.termo) {
-      conditions.push(`(a.login_informado ILIKE $${idx} OR u.nome ILIKE $${idx} OR u.email ILIKE $${idx} OR a.ip ILIKE $${idx})`);
-      values.push(`%${options.termo}%`);
+    if (options.termo && options.termo.trim().length > 0) {
+      conditions.push(`(
+        a.login_informado ILIKE $${idx} OR 
+        u.nome ILIKE $${idx} OR 
+        u.email ILIKE $${idx} OR 
+        a.ip ILIKE $${idx}
+      )`);
+      values.push(`%${options.termo.trim()}%`);
       idx++;
     }
 
     if (options.dataInicio) {
       conditions.push(`a.criado_em >= $${idx++}`);
-      values.push(options.dataInicio);
+      values.push(new Date(`${options.dataInicio}T00:00:00`));
     }
 
     if (options.dataFim) {
       conditions.push(`a.criado_em <= $${idx++}`);
-      values.push(options.dataFim);
+      values.push(new Date(`${options.dataFim}T23:59:59`));
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const countQuery = `
-      SELECT COUNT(*) AS total
+      SELECT COUNT(*)::int as total
       FROM auditoria_acessos a
       LEFT JOIN usuarios u ON a.usuario_id = u.id
       ${whereClause}
@@ -131,17 +198,18 @@ export class AuditService {
     const dataQuery = `
       SELECT 
         a.id,
-        a.usuario_id AS "usuarioId",
-        u.nome AS "usuarioNome",
-        u.email AS "usuarioEmail",
-        u.perfil AS "usuarioPerfil",
-        a.login_informado AS "loginInformado",
-        a.tipo_evento AS "tipoEvento",
+        a.usuario_id,
+        a.login_informado,
+        a.tipo_evento,
         a.sucesso,
         a.ip,
-        a.user_agent AS "userAgent",
+        a.user_agent,
         a.detalhes,
-        a.criado_em AS "criadoEm"
+        a.criado_em,
+        u.nome as usuario_nome,
+        u.email as usuario_email,
+        u.perfil as usuario_perfil,
+        u.matricula as usuario_matricula
       FROM auditoria_acessos a
       LEFT JOIN usuarios u ON a.usuario_id = u.id
       ${whereClause}
@@ -149,55 +217,30 @@ export class AuditService {
       LIMIT $${idx++} OFFSET $${idx++}
     `;
 
+    const countRes = await pool.query(countQuery, values);
+    const total = countRes.rows[0]?.total || 0;
+
     values.push(limite, offset);
-
-    const [countRes, dataRes] = await Promise.all([
-      pool.query(countQuery, values.slice(0, idx - 3)),
-      pool.query(dataQuery, values)
-    ]);
-
-    const total = parseInt(countRes.rows[0]?.total || '0', 10);
-    const totalPaginas = Math.ceil(total / limite);
+    const dataRes = await pool.query(dataQuery, values);
 
     return {
       pagina,
       limite,
       total,
-      totalPaginas,
+      totalPaginas: Math.ceil(total / limite),
       logs: dataRes.rows
     };
   }
 
-  /**
-   * Helper para extrair IP do cliente a partir da Request do Express
-   */
   public static getClientIp(req: any): string {
     const forwarded = req.headers['x-forwarded-for'];
-    let ip = '';
-    if (forwarded) {
-      ip = (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',')[0].trim();
-    } else {
-      ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+    if (forwarded && typeof forwarded === 'string') {
+      return forwarded.split(',')[0].trim();
     }
-
-    // Normaliza IPv6 localhost
-    if (ip === '::1') {
-      return '127.0.0.1';
-    }
-
-    // Remove prefixo IPv6-mapped IPv4 (ex: ::ffff:172.18.0.1 -> 172.18.0.1)
-    if (ip.startsWith('::ffff:')) {
-      return ip.substring(7);
-    }
-
-    return ip;
+    return req.socket?.remoteAddress || req.ip || '127.0.0.1';
   }
 
-  /**
-   * Helper para extrair User Agent
-   */
   public static getUserAgent(req: any): string {
     return req.headers['user-agent'] || 'Desconhecido';
   }
 }
-

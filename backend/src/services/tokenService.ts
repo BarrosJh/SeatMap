@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/db';
 import { AuditService } from './auditService';
 import { env } from '../config/env';
+import { toUserResponseDto } from '../utils/userDtoMapper';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -169,17 +170,7 @@ export class TokenService {
         success: true,
         token: novoAccessToken,
         refreshToken: novoRefreshToken,
-        user: {
-          id: user.id,
-          nome: user.nome,
-          email: user.email,
-          matricula: user.matricula,
-          perfil: user.perfil,
-          permissaoRh: user.permissao_rh,
-          permissaoTi: user.permissao_ti,
-          departamentoId: user.departamento_id,
-          departamentoNome: user.departamento_nome
-        }
+        user: toUserResponseDto(user)
       };
     } catch (error) {
       console.error('[TokenService.rotacionarRefreshToken Error]:', error);

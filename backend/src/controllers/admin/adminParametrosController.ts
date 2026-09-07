@@ -20,6 +20,75 @@ export class AdminParametrosController {
     }
   }
 
+  private static readonly TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+  private static validateConfigParam(chave: string, valor: string): { valid: boolean; error?: string } {
+    const val = String(valor).trim();
+
+    switch (chave) {
+      case 'LIMITE_SEMANAL_RESERVAS': {
+        const num = parseInt(val, 10);
+        if (isNaN(num) || num < 1 || num > 7) {
+          return { valid: false, error: 'LIMITE_SEMANAL_RESERVAS deve ser um número inteiro entre 1 e 7.' };
+        }
+        return { valid: true };
+      }
+      case 'HORARIO_CORTE_NOSHOW':
+      case 'HORARIO_ABERTURA_GESTAO':
+      case 'HORARIO_ABERTURA_COLABORADOR': {
+        if (!AdminParametrosController.TIME_REGEX.test(val)) {
+          return { valid: false, error: `${chave} deve estar no formato de horário HH:mm (00:00 a 23:59).` };
+        }
+        return { valid: true };
+      }
+      case 'MFA_EXPIRACAO_MINUTOS':
+      case 'AUTO_LOCK_MINUTOS': {
+        const num = parseInt(val, 10);
+        if (isNaN(num) || num < 1 || num > 1440) {
+          return { valid: false, error: `${chave} deve ser um valor inteiro positivo em minutos (1 a 1440).` };
+        }
+        return { valid: true };
+      }
+      case 'AUTO_LOCK_ATIVO':
+      case 'SSO_GOOGLE_ATIVO':
+      case 'SSO_AZURE_ATIVO':
+      case 'SSO_OKTA_ATIVO':
+      case 'EXIGIR_MFA_ADMINS':
+      case 'EXIGIR_MFA_GLOBAL':
+      case 'SCIM_PROVISIONING_ATIVO':
+      case 'SMTP_SECURE': {
+        if (val !== 'true' && val !== 'false') {
+          return { valid: false, error: `${chave} deve ser um valor booleano ('true' ou 'false').` };
+        }
+        return { valid: true };
+      }
+      case 'AVISO_GLOBAL_SISTEMA': {
+        if (val.length > 1000) {
+          return { valid: false, error: 'AVISO_GLOBAL_SISTEMA não pode exceder 1000 caracteres.' };
+        }
+        return { valid: true };
+      }
+      case 'SMTP_PORT': {
+        const port = parseInt(val, 10);
+        if (isNaN(port) || !/^\d+$/.test(val) || port < 1 || port > 65535) {
+          return { valid: false, error: 'SMTP_PORT deve ser um número de porta TCP válido entre 1 e 65535.' };
+        }
+        return { valid: true };
+      }
+      case 'SMTP_HOST':
+      case 'SMTP_USER':
+      case 'SMTP_PASS':
+      case 'SMTP_FROM': {
+        if (val.length > 500) {
+          return { valid: false, error: `${chave} excede o limite máximo permitido de caracteres.` };
+        }
+        return { valid: true };
+      }
+      default:
+        return { valid: false, error: `A chave de configuração '${chave}' não é permitida ou não existe na whitelist.` };
+    }
+  }
+
   public static async updateParametros(req: AuthenticatedRequest, res: Response) {
     const { configuracoes } = req.body;
 
@@ -28,16 +97,30 @@ export class AdminParametrosController {
     }
 
     try {
+      const itemsToUpdate: { chave: string; valor: string; descricao?: string }[] = [];
+
       if (Array.isArray(configuracoes)) {
         for (const item of configuracoes) {
           if (item.chave && item.valor !== undefined) {
-            await ConfigService.set(item.chave, item.valor.toString(), item.descricao);
+            const validation = AdminParametrosController.validateConfigParam(item.chave, String(item.valor));
+            if (!validation.valid) {
+              return res.status(400).json({ error: validation.error });
+            }
+            itemsToUpdate.push({ chave: item.chave, valor: String(item.valor), descricao: item.descricao });
           }
         }
       } else if (typeof configuracoes === 'object') {
         for (const [chave, valor] of Object.entries(configuracoes)) {
-          await ConfigService.set(chave, String(valor));
+          const validation = AdminParametrosController.validateConfigParam(chave, String(valor));
+          if (!validation.valid) {
+            return res.status(400).json({ error: validation.error });
+          }
+          itemsToUpdate.push({ chave, valor: String(valor) });
         }
+      }
+
+      for (const item of itemsToUpdate) {
+        await ConfigService.set(item.chave, item.valor, item.descricao);
       }
 
       const atualizadas = await ConfigService.getAll();

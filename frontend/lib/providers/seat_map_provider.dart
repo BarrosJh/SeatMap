@@ -409,7 +409,9 @@ class SeatMapProvider extends ChangeNotifier {
           final idVal = decoded['cadeiraId'] ?? decoded['cadeira_id'] ?? decoded['cadeira'] ?? decoded['mesa'] ?? decoded['id'];
           if (idVal != null) return int.tryParse(idVal.toString());
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[SeatMapProvider] Payload QR não é JSON estruturado: $e');
+      }
     }
 
     // 3. Formato DESK_12 / Mesa 12 / 12

@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../../middleware/auth';
 import { ReservaHistoryService } from '../../services/reservaHistoryService';
 import { wsManager } from '../../websocket/wsServer';
 import { logger } from '../../utils/logger';
+import { escapeSqlWildcards } from '../../utils/sanitizer';
 
 export class AdminReservasController {
   public static async getReservas(req: AuthenticatedRequest, res: Response) {
@@ -47,7 +48,7 @@ export class AdminReservasController {
 
       if (busca && typeof busca === 'string' && busca.trim().length > 0) {
         conditions.push(`(u.nome ILIKE $${idx} OR u.matricula ILIKE $${idx} OR c.identificador ILIKE $${idx} OR b.nome ILIKE $${idx})`);
-        values.push(`%${busca.trim()}%`);
+        values.push(`%${escapeSqlWildcards(busca.trim())}%`);
         idx++;
       }
 

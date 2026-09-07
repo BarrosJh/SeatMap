@@ -274,7 +274,7 @@ export class TiController {
       logger.error('[TiController.testarConexaoEmail Error]:', { correlationId: (req as any).correlationId, error });
       res.status(500).json({
         success: false,
-        error: error.message || 'Erro inesperado ao testar conexão SMTP.'
+        error: 'Erro ao testar conexão SMTP. Verifique as credenciais e tente novamente.'
       });
     }
   }

@@ -2,6 +2,34 @@ import { DateTime } from 'luxon';
 import { ConfigService } from '../services/configService';
 
 /**
+ * Normaliza datas provenientes de strings ISO ou objetos Date do driver PG para YYYY-MM-DD (TEC-03).
+ */
+export function normalizeIsoDate(date: string | Date | null | undefined): string {
+  if (!date) return '';
+  if (typeof date === 'string') {
+    // Se vier com timestamp ISO ou YYYY-MM-DD
+    if (date.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+      return date.substring(0, 10);
+    }
+    const parsed = DateTime.fromISO(date, { zone: 'America/Sao_Paulo' });
+    return parsed.isValid ? parsed.toISODate()! : date;
+  }
+  return DateTime.fromJSDate(date).setZone('America/Sao_Paulo').toISODate()!;
+}
+
+/**
+ * Helper para validação e parsing estrito de parâmetros numéricos de rota (TEC-02).
+ */
+export function parseIdParam(param: any): number | null {
+  if (param === null || param === undefined) return null;
+  const parsed = parseInt(String(param), 10);
+  if (isNaN(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+/**
  * Retorna a Segunda-feira que representa o início da semana útil de trabalho de referência.
  * 
  * Regra corporativa:

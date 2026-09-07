@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import routes from './routes';
 import { wsManager } from './websocket/wsServer';
 import { CronService } from './services/cronService';
+import { AuditService } from './services/auditService';
 import { globalLimiter } from './middleware/rateLimiter';
 import { validateSecurityConfig } from './config/securityValidation';
 import { correlationIdMiddleware } from './middleware/correlationId';
@@ -128,8 +129,8 @@ export const gracefulShutdown = async (signal: string): Promise<void> => {
   }
 
   try {
-    // 1. Interromper rotinas agendadas em background
-    CronService.stop();
+    // 1. Aguardar conclusão de tarefas Cron em andamento e parar agendador
+    await CronService.waitForCompletion(5000);
 
     // 2. Encerrar conexões WebSocket ativas
     wsManager.destroy();
@@ -143,7 +144,11 @@ export const gracefulShutdown = async (signal: string): Promise<void> => {
     });
     logger.info('[SeatMap API] Servidor HTTP Express encerrado com sucesso.');
 
-    // 4. Drenar e fechar o pool de conexões do PostgreSQL
+    // 4. Esvaziar buffer de auditoria persistindo logs pendentes
+    await AuditService.shutdown();
+    logger.info('[SeatMap API] Buffer de auditoria descarregado com sucesso.');
+
+    // 5. Drenar e fechar o pool de conexões do PostgreSQL
     await pool.end();
     logger.info('[SeatMap API] Pool PostgreSQL drenado e finalizado.');
 

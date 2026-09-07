@@ -36,8 +36,9 @@ async function runSeed() {
     const rhId = resDeptos.rows[3].id;
     console.log(`[Seed] Inseridos ${resDeptos.rowCount} departamentos.`);
 
-    // 4. Inserir Usuários de Teste
-    const defaultPasswordHash = await bcrypt.hash('123456', 10);
+    // 4. Inserir Usuários de Teste (Senha via ambiente ou padrão de alta entropia)
+    const rawSeedPassword = process.env.SEED_DEFAULT_PASSWORD || 'Mudar@123456Sec';
+    const defaultPasswordHash = await bcrypt.hash(rawSeedPassword, 10);
     const resUsers = await client.query(`
       INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, permissao_ti, ativo) VALUES
       ('Carlos Silva', 'colaborador@seatmap.local', 'COLAB001', $1, $2, 'COLABORADOR', false, false, true),

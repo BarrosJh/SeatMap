@@ -114,7 +114,9 @@ class _ComprovanteDialogState extends State<ComprovanteDialog> {
     try {
       final dt = DateTime.parse(widget.dataReserva);
       dataFormatada = DateFormat("dd/MM/yyyy (EEEE)", 'pt_BR').format(dt);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[ComprovanteDialog] Erro ao formatar data: $e');
+    }
 
     Color headerIconColor;
     Color headerBgColor;

@@ -12,6 +12,7 @@ import { SsoService } from '../../services/ssoService';
 import { TokenService } from '../../services/tokenService';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
+import { toUserResponseDto } from '../../utils/userDtoMapper';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -296,18 +297,7 @@ export class LoginController {
       return res.status(200).json({
         token,
         refreshToken,
-        user: {
-          id: user.id,
-          nome: user.nome,
-          email: user.email,
-          matricula: user.matricula,
-          perfil: user.perfil,
-          permissaoRh: user.permissao_rh === true || user.perfil === 'ADMIN_RH',
-          permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
-          departamentoId: user.departamento_id,
-          departamentoNome: user.departamento_nome,
-          totpAtivo: user.totp_ativo === true
-        }
+        user: toUserResponseDto(user)
       });
     } catch (error) {
       logger.error('[LoginController.login] Erro:', { correlationId: req.correlationId, error });

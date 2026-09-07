@@ -13,6 +13,7 @@ import { CryptoService } from '../../services/cryptoService';
 import { TokenService } from '../../services/tokenService';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
+import { toUserResponseDto } from '../../utils/userDtoMapper';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -204,7 +205,7 @@ export class MfaController {
             await pool.query('UPDATE usuarios SET totp_backup_codes = $1 WHERE id = $2', [updatedEncrypted, user.id]);
           }
         } catch (e) {
-          // JSON parse silencioso
+          logger.error('[MfaController.validarLoginTotp] Falha ao desserializar backup codes:', { correlationId: (req as any).correlationId, error: e });
         }
       }
 
@@ -251,18 +252,7 @@ export class MfaController {
       return res.status(200).json({
         token,
         refreshToken,
-        user: {
-          id: user.id,
-          nome: user.nome,
-          email: user.email,
-          matricula: user.matricula,
-          perfil: user.perfil,
-          permissaoRh: user.permissao_rh === true || user.perfil === 'ADMIN_RH',
-          permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
-          departamentoId: user.departamento_id,
-          departamentoNome: user.departamento_nome,
-          totpAtivo: true
-        }
+        user: toUserResponseDto(user)
       });
     } catch (error) {
       logger.error('[MfaController.validarLoginTotp] Erro:', { correlationId: (req as any).correlationId, error });
@@ -373,18 +363,7 @@ export class MfaController {
       return res.status(200).json({
         token,
         refreshToken,
-        user: {
-          id: user.id,
-          nome: user.nome,
-          email: user.email,
-          matricula: user.matricula,
-          perfil: user.perfil,
-          permissaoRh: user.permissao_rh === true || user.perfil === 'ADMIN_RH',
-          permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
-          departamentoId: user.departamento_id,
-          departamentoNome: user.departamento_nome,
-          totpAtivo: user.totp_ativo === true
-        }
+        user: toUserResponseDto(user)
       });
     } catch (error) {
       logger.error('[MfaController.validarLoginEmailMfa] Erro:', { correlationId: (req as any).correlationId, error });
@@ -397,9 +376,9 @@ export class MfaController {
     const ip = AuditService.getClientIp(req);
     const userAgent = AuditService.getUserAgent(req);
 
-    const hasRhAccess = user?.permissaoRh === true || user?.is_admin === true || user?.perfil === 'ADMIN_RH';
-    if (!user || !hasRhAccess) {
-      return res.status(403).json({ error: 'Apenas usuários com permissão de RH podem solicitar código MFA.' });
+    const hasAdminAccess = user?.permissaoRh === true || user?.permissaoTi === true || user?.is_admin === true || user?.perfil === 'ADMIN_RH' || user?.perfil === 'ADMIN_TI';
+    if (!user || !hasAdminAccess) {
+      return res.status(403).json({ error: 'Apenas administradores com permissão de RH ou TI podem solicitar código MFA.' });
     }
 
     try {
@@ -442,10 +421,10 @@ export class MfaController {
     const ip = AuditService.getClientIp(req);
     const userAgent = AuditService.getUserAgent(req);
 
-    const hasRhAccess = user?.permissaoRh === true || user?.is_admin === true || user?.perfil === 'ADMIN_RH';
+    const hasAdminAccess = user?.permissaoRh === true || user?.permissaoTi === true || user?.is_admin === true || user?.perfil === 'ADMIN_RH' || user?.perfil === 'ADMIN_TI';
 
-    if (!user || !hasRhAccess) {
-      return res.status(403).json({ error: 'Apenas usuários com permissão de RH podem validar código MFA.' });
+    if (!user || !hasAdminAccess) {
+      return res.status(403).json({ error: 'Apenas administradores com permissão de RH ou TI podem validar código MFA.' });
     }
 
     if (!codigo || String(codigo).trim().length !== 6) {
@@ -485,6 +464,8 @@ export class MfaController {
         userId: user.userId,
         nome: user.nome,
         perfil: user.perfil,
+        permissaoRh: user.permissaoRh,
+        permissaoTi: user.permissaoTi,
         role: 'ADMIN_STEP_UP_AUTHENTICATED'
       }, JWT_ADMIN_SECRET, { expiresIn: JWT_ADMIN_EXPIRATION as any });
 

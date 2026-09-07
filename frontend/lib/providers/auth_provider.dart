@@ -62,7 +62,9 @@ class AuthProvider extends ChangeNotifier {
           notifyListeners();
         }
       }
-    } catch (_) {}
+    } catch (e, stackTrace) {
+      debugPrint('[AuthProvider] Erro ao carregar configurações públicas de segurança: $e\n$stackTrace');
+    }
   }
 
   Future<void> initAuth() async {
