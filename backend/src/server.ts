@@ -2,17 +2,34 @@ import express from 'express';
 import http from 'http';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
 import routes from './routes';
 import { wsManager } from './websocket/wsServer';
 import { CronService } from './services/cronService';
 import { globalLimiter } from './middleware/rateLimiter';
 import { validateSecurityConfig } from './config/securityValidation';
+import { correlationIdMiddleware } from './middleware/correlationId';
+import { requestLoggerMiddleware } from './middleware/requestLogger';
+import { logger } from './utils/logger';
 
 dotenv.config();
 validateSecurityConfig();
 
 const app = express();
 app.set('trust proxy', true);
+
+// Injeção de X-Correlation-ID em todas as requisições antes de qualquer outro middleware
+app.use(correlationIdMiddleware);
+
+// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS)
+app.use(helmet({
+  frameguard: { action: 'deny' },
+  contentSecurityPolicy: false, // Permite que a API sirva endpoints REST e SPA
+  crossOriginEmbedderPolicy: false,
+  hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false
+}));
+app.disable('x-powered-by');
+
 const server = http.createServer(app);
 
 // Configuração segura de CORS
@@ -31,9 +48,15 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token', 'x-correlation-id', 'x-request-id'],
+  exposedHeaders: ['X-Correlation-Id']
 }));
-app.use(express.json());
+app.use(express.json({
+  type: ['application/json', 'application/scim+json', 'application/*+json']
+}));
+
+// Logger Estruturado de Requisições HTTP (SIEM / SOC)
+app.use(requestLoggerMiddleware);
 
 // Rate Limiting Global
 app.use('/api', globalLimiter);
@@ -41,13 +64,29 @@ app.use('/api', globalLimiter);
 // Rotas da API
 app.use('/api', routes);
 
-// Health Check
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'seatmap-backend'
+// Middleware Global de Tratamento de Erros (AppSec / SIEM)
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const rawCorr = req.correlationId || req.headers['x-correlation-id'] || 'unknown';
+  const correlationId = Array.isArray(rawCorr) ? rawCorr[0] : String(rawCorr);
+  const reqLogger = req.logger || logger;
+
+  reqLogger.error(`[Unhandled Server Error] ${err.message || err}`, {
+    correlationId,
+    path: req.originalUrl || req.path,
+    method: req.method,
+    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined
   });
+
+  const statusCode = typeof err.statusCode === 'number' ? err.statusCode : (typeof err.status === 'number' ? err.status : 500);
+
+  if (!res.headersSent) {
+    res.status(statusCode).json({
+      error: statusCode >= 500 && process.env.NODE_ENV === 'production'
+        ? 'Erro interno do servidor. Entre em contato com o suporte.'
+        : (err.message || 'Erro inesperado no processamento da requisição.'),
+      correlationId
+    });
+  }
 });
 
 // Inicializar WebSocket nativo
@@ -60,8 +99,8 @@ const PORT = process.env.PORT || 3000;
 
 if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, () => {
-    console.log(`[SeatMap API] Servidor Express ativo em http://localhost:${PORT}`);
-    console.log(`[SeatMap API] WebSocket ativo em ws://localhost:${PORT}/ws`);
+    logger.info(`[SeatMap API] Servidor Express ativo em http://localhost:${PORT}`, { port: PORT });
+    logger.info(`[SeatMap API] WebSocket ativo em ws://localhost:${PORT}/ws`);
   });
 }
 

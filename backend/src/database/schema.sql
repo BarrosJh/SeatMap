@@ -114,8 +114,16 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ultimo_login TIMESTAMP;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS sso_provider VARCHAR(50);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS sso_id VARCHAR(255);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS exigir_mfa BOOLEAN DEFAULT false;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 1 NOT NULL;
 
--- Tabela: auditoria_acessos (Trilha de Auditoria Obrigatória)
+-- Inserir chaves padrão para Bloqueio de Sessão por Inatividade
+INSERT INTO configuracoes_sistema (chave, valor, descricao)
+VALUES 
+    ('AUTO_LOCK_ATIVO', 'true', 'Bloqueio automático de sessão por inatividade (Sim/Não)'),
+    ('AUTO_LOCK_MINUTOS', '15', 'Tempo limite de inatividade em minutos antes do auto-lock')
+ON CONFLICT (chave) DO NOTHING;
+
+-- Tabela: auditoria_acessos
 CREATE TABLE IF NOT EXISTS auditoria_acessos (
     id SERIAL PRIMARY KEY,
     usuario_id INT REFERENCES usuarios(id) ON DELETE SET NULL,
@@ -131,7 +139,7 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_usuario ON auditoria_acessos(usuario_id
 CREATE INDEX IF NOT EXISTS idx_auditoria_tipo ON auditoria_acessos(tipo_evento);
 CREATE INDEX IF NOT EXISTS idx_auditoria_criado_em ON auditoria_acessos(criado_em DESC);
 
--- Tabela: auth_refresh_tokens (Estratégia Opcional de Tokens com Rotação)
+-- Tabela: auth_refresh_tokens (Gestão de sessão com rotação)
 CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
     id SERIAL PRIMARY KEY,
     usuario_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -154,7 +162,7 @@ ALTER TABLE cadeiras ADD COLUMN IF NOT EXISTS motivo_manutencao TEXT;
 ALTER TABLE cadeiras ADD COLUMN IF NOT EXISTS previsao_retorno TIMESTAMP;
 ALTER TABLE cadeiras ADD COLUMN IF NOT EXISTS manutencao_por_usuario_id INT REFERENCES usuarios(id) ON DELETE SET NULL;
 
--- Tabela: historico_reservas (Linha do Tempo Imutável / Event Sourcing de Auditoria Forense)
+-- Tabela: historico_reservas (Trilha de auditoria e ciclo de vida de reservas)
 CREATE TABLE IF NOT EXISTS historico_reservas (
     id SERIAL PRIMARY KEY,
     reserva_id INT REFERENCES reservas(id) ON DELETE SET NULL,
@@ -173,4 +181,26 @@ CREATE INDEX IF NOT EXISTS idx_historico_usuario ON historico_reservas(usuario_i
 CREATE INDEX IF NOT EXISTS idx_historico_reserva ON historico_reservas(reserva_id);
 CREATE INDEX IF NOT EXISTS idx_historico_criado_em ON historico_reservas(criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_historico_tipo ON historico_reservas(tipo_evento);
+
+-- ======================================================================================
+-- GARANTIA DE NÃO-REPÚDIO E IMUTABILIDADE DE LOGS (PADRÃO BANCÁRIO BACEN / CMN 4.893 WORM)
+-- ======================================================================================
+CREATE OR REPLACE FUNCTION trg_prevent_audit_tampering()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'Operação não permitida: Registros de auditoria são imutáveis (Regulatório BACEN / WORM).';
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_auditoria_acessos_immutable ON auditoria_acessos;
+CREATE TRIGGER trg_auditoria_acessos_immutable
+BEFORE UPDATE OR DELETE ON auditoria_acessos
+FOR EACH ROW EXECUTE FUNCTION trg_prevent_audit_tampering();
+
+DROP TRIGGER IF EXISTS trg_historico_reservas_immutable ON historico_reservas;
+CREATE TRIGGER trg_historico_reservas_immutable
+BEFORE UPDATE OR DELETE ON historico_reservas
+FOR EACH ROW EXECUTE FUNCTION trg_prevent_audit_tampering();
+
 

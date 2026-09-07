@@ -109,6 +109,7 @@ export class TokenService {
         SELECT u.id, u.nome, u.email, u.matricula, u.perfil,
                COALESCE(u.permissao_rh, false) AS permissao_rh,
                COALESCE(u.permissao_ti, false) AS permissao_ti,
+               COALESCE(u.token_version, 1) AS token_version,
                u.ativo, u.departamento_id, d.nome AS departamento_nome
         FROM usuarios u
         LEFT JOIN departamentos d ON u.departamento_id = d.id
@@ -140,10 +141,15 @@ export class TokenService {
       const novoAccessToken = jwt.sign(
         {
           userId: user.id,
+          nome: user.nome,
           email: user.email,
+          matricula: user.matricula,
           perfil: user.perfil,
           permissaoRh: user.permissao_rh,
-          permissaoTi: user.permissao_ti
+          permissaoTi: user.permissao_ti,
+          departamentoId: user.departamento_id,
+          departamentoNome: user.departamento_nome,
+          tokenVersion: user.token_version || 1
         },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRATION as any }
@@ -210,6 +216,28 @@ export class TokenService {
       `, [usuarioId]);
     } catch (e) {
       console.error('[TokenService.revogarPorUsuario Error]:', e);
+    }
+  }
+
+  /**
+   * Incrementa o token_version do usuário no banco e revoga todas as suas sessões ativas.
+   * Usado em: Desativação de Usuário (TI/RH/SCIM), Mudança de Perfil, Reset de Senha e Logout Global.
+   */
+  public static async incrementarTokenVersion(usuarioId: number): Promise<number> {
+    try {
+      const res = await pool.query(`
+        UPDATE usuarios
+        SET token_version = COALESCE(token_version, 1) + 1
+        WHERE id = $1
+        RETURNING token_version
+      `, [usuarioId]);
+
+      await this.revogarPorUsuario(usuarioId);
+
+      return res.rows[0]?.token_version || 1;
+    } catch (err) {
+      console.error('[TokenService.incrementarTokenVersion Error]:', err);
+      return 1;
     }
   }
 }

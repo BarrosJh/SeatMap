@@ -1,8 +1,8 @@
 import { SsoService } from '../../src/services/ssoService';
 import { validateSecurityConfig } from '../../src/config/securityValidation';
 
-describe('Validação de Segurança SSO & Fail-Fast (SEC-01 & SEC-02)', () => {
-  describe('SsoService.verifyIdToken (SEC-01)', () => {
+describe('Validação de Segurança SSO & Configuração', () => {
+  describe('SsoService.verifyIdToken', () => {
     it('deve rejeitar tokens vazios ou nulos com erro explícito', async () => {
       // @ts-ignore
       await expect(SsoService.verifyIdToken('google', null)).rejects.toThrow('idToken não fornecido');
@@ -18,7 +18,7 @@ describe('Validação de Segurança SSO & Fail-Fast (SEC-01 & SEC-02)', () => {
     });
   });
 
-  describe('validateSecurityConfig Fail-Fast Guard (SEC-02)', () => {
+  describe('validateSecurityConfig Guard', () => {
     const originalEnv = process.env;
 
     beforeEach(() => {
@@ -43,6 +43,20 @@ describe('Validação de Segurança SSO & Fail-Fast (SEC-01 & SEC-02)', () => {
     it('deve chamar process.exit(1) em produção se JWT_SECRET for fraco ou contiver chaves padrão', () => {
       process.env.NODE_ENV = 'production';
       process.env.JWT_SECRET = 'super_secret_jwt_key_seatmap_2026_change_in_prod';
+      
+      const mockExit = jest.spyOn(process, 'exit').mockImplementation((code?: string | number | null | undefined) => {
+        throw new Error(`process.exit called with ${code}`);
+      });
+
+      expect(() => validateSecurityConfig()).toThrow('process.exit called with 1');
+      mockExit.mockRestore();
+    });
+
+    it('deve chamar process.exit(1) em produção se JWT_MFA_TEMP_SECRET for fraco ou ausente', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.JWT_SECRET = 'uma_chave_jwt_muito_forte_com_mais_de_32_caracteres_12345';
+      process.env.JWT_ADMIN_SECRET = 'outra_chave_admin_muito_forte_com_mais_de_32_caracteres_67890';
+      process.env.JWT_MFA_TEMP_SECRET = 'super_secret_temp_mfa_token_key_2026';
       
       const mockExit = jest.spyOn(process, 'exit').mockImplementation((code?: string | number | null | undefined) => {
         throw new Error(`process.exit called with ${code}`);

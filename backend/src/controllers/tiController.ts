@@ -56,6 +56,10 @@ export class TiController {
       const ssoOktaClientId = await ConfigService.get('SSO_OKTA_CLIENT_ID', '');
       const oktaSecretRaw = await ConfigService.get('SSO_OKTA_CLIENT_SECRET', '');
 
+      // Configurações de Auto-Lock por Inatividade (Segurança Bancária)
+      const autoLockAtivo = (await ConfigService.get('AUTO_LOCK_ATIVO', 'true')) === 'true';
+      const autoLockMinutos = await ConfigService.getNumber('AUTO_LOCK_MINUTOS', 15);
+
       res.status(200).json({
         smtp: {
           host: smtpHost,
@@ -72,6 +76,10 @@ export class TiController {
           totpEnabled: mfaTotpEnabled,
           expiracaoMinutos: mfaExpiracao,
           maxTentativas: mfaMaxTentativas
+        },
+        autoLock: {
+          ativo: autoLockAtivo,
+          minutos: autoLockMinutos
         },
         sso: {
           enabled: ssoEnabled,
@@ -127,6 +135,8 @@ export class TiController {
         mfaTotpEnabled,
         mfaExpiracaoMinutos,
         mfaMaxTentativas,
+        autoLockAtivo,
+        autoLockMinutos,
         ssoEnabled,
         ssoAllowedDomains,
         ssoAutoProvision,
@@ -166,6 +176,10 @@ export class TiController {
       if (mfaTotpEnabled !== undefined) await ConfigService.set('MFA_TOTP_ENABLED', String(mfaTotpEnabled), 'MFA por TOTP App');
       if (mfaExpiracaoMinutos !== undefined) await ConfigService.set('MFA_EXPIRACAO_MINUTOS', String(mfaExpiracaoMinutos), 'Expiração MFA');
       if (mfaMaxTentativas !== undefined) await ConfigService.set('MFA_MAX_TENTATIVAS', String(mfaMaxTentativas), 'Tentativas MFA');
+
+      // Auto-Lock por Inatividade
+      if (autoLockAtivo !== undefined) await ConfigService.set('AUTO_LOCK_ATIVO', String(autoLockAtivo), 'Bloqueio de Sessão por Inatividade');
+      if (autoLockMinutos !== undefined) await ConfigService.set('AUTO_LOCK_MINUTOS', String(autoLockMinutos), 'Tempo limite de inatividade em minutos');
 
       // SSO Governance
       if (ssoEnabled !== undefined) await ConfigService.set('SSO_ENABLED', String(ssoEnabled), 'SSO Ativo');

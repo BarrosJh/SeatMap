@@ -142,7 +142,7 @@ export class SsoService {
   }
 
   /**
-   * Valida criptograficamente o idToken emitido pelo provedor de identidade via JWKS nativo (SEC-01)
+   * Valida o idToken emitido pelo provedor de identidade via JWKS
    */
   public static async verifyIdToken(provider: string, idToken: string): Promise<SsoVerifiedUser> {
     if (!idToken || typeof idToken !== 'string') {

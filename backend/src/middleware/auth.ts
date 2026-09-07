@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import pool from '../config/db';
 import { ConfigService } from '../services/configService';
 
 export interface AuthUser {
@@ -13,6 +14,7 @@ export interface AuthUser {
   is_admin?: boolean;
   departamentoId: number | null;
   departamentoNome?: string;
+  tokenVersion?: number;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -31,12 +33,35 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     return res.status(401).json({ error: 'Token de autenticação não fornecido' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) {
+  jwt.verify(token, JWT_SECRET, async (err, decoded: any) => {
+    if (err || !decoded || !decoded.userId) {
       return res.status(403).json({ error: 'Token inválido ou expirado' });
     }
-    req.user = decoded as AuthUser;
-    next();
+
+    try {
+      // Validação de Revogação Instantânea de Sessão e Status Ativo no Banco
+      const userCheck = await pool.query(
+        'SELECT ativo, COALESCE(token_version, 1) AS token_version FROM usuarios WHERE id = $1',
+        [decoded.userId]
+      );
+
+      if (userCheck.rowCount === 0 || !userCheck.rows[0].ativo) {
+        return res.status(401).json({ error: 'Conta de usuário desativada ou inexistente. Acesso revogado.' });
+      }
+
+      const dbTokenVersion = userCheck.rows[0].token_version;
+      const tokenPayloadVersion = decoded.tokenVersion || 1;
+
+      if (tokenPayloadVersion < dbTokenVersion) {
+        return res.status(401).json({ error: 'Sessão revogada ou credenciais alteradas. Faça login novamente.' });
+      }
+
+      req.user = decoded as AuthUser;
+      next();
+    } catch (dbErr) {
+      console.error('[authenticateToken] Erro ao validar status do usuário no banco:', dbErr);
+      return res.status(503).json({ error: 'Serviço temporariamente indisponível para validação de credenciais.' });
+    }
   });
 };
 
@@ -102,8 +127,7 @@ export const authenticateAdminMfa = async (req: AuthenticatedRequest, res: Respo
     });
   } catch (error) {
     console.error('[authenticateAdminMfa] Erro ao verificar política de MFA:', error);
-    req.isAdminMfaValidated = true;
-    next();
+    return res.status(500).json({ error: 'Erro de segurança ao validar autenticação em duas etapas.' });
   }
 };
 

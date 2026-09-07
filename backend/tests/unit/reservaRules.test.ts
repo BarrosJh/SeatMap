@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 
-describe('Regras de Negócio do Motor de Reservas (Business Policy Suite)', () => {
+describe('Regras de Negócio do Motor de Reservas', () => {
   const SP_ZONE = 'America/Sao_Paulo';
 
   describe('Cálculo e Validação de Janelas de Horário', () => {
@@ -31,7 +31,7 @@ describe('Regras de Negócio do Motor de Reservas (Business Policy Suite)', () =
       expect(podeReservarDuas).toBe(false);
     });
 
-    it('deve considerar a agenda da próxima semana aberta durante sábado e domingo (BUG-01)', async () => {
+    it('deve considerar a agenda da próxima semana aberta durante sábado e domingo', async () => {
       const { isProximaSemanaLiberada } = await import('../../src/utils/workWeekUtils');
       
       // Sábado às 14:00

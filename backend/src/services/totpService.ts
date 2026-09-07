@@ -121,9 +121,12 @@ export class TotpService {
 
     const currentCounter = Math.floor(Date.now() / 1000 / this.TIME_STEP_SECONDS);
 
+    const cleanBuf = Buffer.from(cleanToken, 'utf-8');
+
     for (let error = -windowSteps; error <= windowSteps; error++) {
       const expectedToken = this.generateTokenForCounter(secret, currentCounter + error);
-      if (expectedToken === cleanToken) {
+      const expectedBuf = Buffer.from(expectedToken, 'utf-8');
+      if (expectedBuf.length === cleanBuf.length && crypto.timingSafeEqual(expectedBuf, cleanBuf)) {
         return true;
       }
     }

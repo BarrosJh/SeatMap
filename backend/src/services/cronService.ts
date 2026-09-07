@@ -27,7 +27,7 @@ export class CronService {
     try {
       await client.query('BEGIN');
 
-      // ARCH-02: Lock distribuído no PostgreSQL para evitar execução duplicada em cluster multi-container
+      // Lock no PostgreSQL para evitar execução concorrente em ambientes multi-instância
       const lockRes = await client.query(`
         SELECT pg_try_advisory_xact_lock(hashtext('seatmap_cron_noshow_lock')) AS obtido;
       `);

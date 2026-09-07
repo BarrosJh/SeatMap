@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import url from 'url';
 import jwt from 'jsonwebtoken';
+import pool from '../config/db';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -44,25 +45,66 @@ export class WsManager {
 
     this.wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
       const parsedUrl = url.parse(req.url || '', true);
-      const token = parsedUrl.query.token as string;
+      let token: string | undefined;
+
+      // 1. Extração via Sec-WebSocket-Protocol (Recomendado RFC 6455 / OWASP)
+      const protocolHeader = req.headers['sec-websocket-protocol'];
+      if (typeof protocolHeader === 'string') {
+        const parts = protocolHeader.split(',').map(p => p.trim());
+        if (parts.length >= 2 && parts[0].toLowerCase() === 'bearer') {
+          token = parts[1];
+        } else {
+          token = parts.find(p => p.startsWith('eyJ') || p.split('.').length === 3) || parts[0];
+        }
+      }
+
+      // 2. Extração via cabeçalho Authorization padrão
+      if (!token && req.headers['authorization']) {
+        const auth = req.headers['authorization'];
+        if (auth.startsWith('Bearer ')) {
+          token = auth.substring(7).trim();
+        }
+      }
+
+      // 3. Fallback de compatibilidade via query parameter
+      if (!token && parsedUrl.query.token) {
+        token = parsedUrl.query.token as string;
+      }
+
       const initialEscritorioId = parsedUrl.query.escritorioId ? parseInt(parsedUrl.query.escritorioId as string, 10) : undefined;
 
-      // Validação obrigatória de token no handshake (OBS-01)
+      // Validação do token JWT no handshake da conexão
       if (!token) {
         console.warn('[WS] Conexão rejeitada: token de autenticação não fornecido.');
         ws.close(4001, 'Token de autenticação obrigatório.');
         return;
       }
 
+      let decoded: any;
       try {
         const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        decoded = jwt.verify(token, JWT_SECRET) as any;
         ws.userId = decoded.userId;
         ws.perfil = decoded.perfil;
       } catch (err) {
         console.warn('[WS] Conexão rejeitada: token JWT inválido ou expirado.');
         ws.close(4001, 'Token JWT inválido ou expirado.');
         return;
+      }
+
+      // Validação assíncrona de token_version e status ativo no banco
+      if (decoded?.userId) {
+        pool.query(
+          'SELECT ativo, COALESCE(token_version, 1) AS token_version FROM usuarios WHERE id = $1',
+          [decoded.userId]
+        ).then(userCheck => {
+          if (userCheck.rowCount === 0 || !userCheck.rows[0].ativo || (decoded.tokenVersion && decoded.tokenVersion < userCheck.rows[0].token_version)) {
+            console.warn(`[WS] Conexão encerrada: usuário ${decoded.userId} inativo ou sessão revogada.`);
+            ws.close(4003, 'Sessão revogada ou usuário inativo.');
+          }
+        }).catch(() => {
+          // Ignora falha de conexão de banco em testes isolados
+        });
       }
 
       ws.isAlive = true;

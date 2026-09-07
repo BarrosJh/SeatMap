@@ -35,7 +35,7 @@ export class EmailService {
           port,
           secure,
           auth: { user, pass },
-          tls: { rejectUnauthorized: false }
+          tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' }
         });
       } else {
         // Fallback para desenvolvimento / simulação com JSON transport e logs formatados
@@ -105,8 +105,7 @@ export class EmailService {
       to: para,
       subject: `[SeatMap] Código de Verificação MFA: ${codigo}`,
       html,
-      tipoLog: 'MFA_RH',
-      codigoDebug: codigo
+      tipoLog: 'MFA_RH'
     });
   }
 
@@ -163,8 +162,7 @@ export class EmailService {
       to: para,
       subject: `[SeatMap] Código para Redefinição de Senha: ${codigo}`,
       html,
-      tipoLog: 'RESET_SENHA',
-      codigoDebug: codigo
+      tipoLog: 'RESET_SENHA'
     });
   }
 
@@ -248,8 +246,7 @@ export class EmailService {
       to: para,
       subject: `[SeatMap] Comprovante de Reserva - Mesa ${dados.cadeiraIdentificador} (${dados.dataReserva})`,
       html,
-      tipoLog: 'COMPROVANTE_RESERVA',
-      codigoDebug: dados.codigoComprovante
+      tipoLog: 'COMPROVANTE_RESERVA'
     });
   }
 
@@ -349,7 +346,6 @@ export class EmailService {
     subject: string;
     html: string;
     tipoLog: string;
-    codigoDebug?: string;
   }): Promise<boolean> {
     try {
       const transporter = await this.getTransporter();
@@ -367,9 +363,6 @@ export class EmailService {
       console.log('[EmailService] E-mail enviado com sucesso!');
       console.log('[EmailService] Tipo:', opts.tipoLog, '| Destinatário:', opts.to);
       console.log('[EmailService] Assunto:', opts.subject);
-      if (opts.codigoDebug) {
-        console.log('[EmailService] Código/Token: >>>', opts.codigoDebug, '<<<');
-      }
       if (info.messageId) {
         console.log('[EmailService] MessageId:', info.messageId);
       }

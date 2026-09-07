@@ -44,7 +44,9 @@ export class ReservaController {
     const { cadeiraId, dataReserva } = req.body;
     const idempotencyKey = req.headers['x-idempotency-key'] as string | undefined;
 
-    if (!cadeiraId || !dataReserva) {
+    const numericCadeiraId = parseInt(String(cadeiraId), 10);
+
+    if (!cadeiraId || isNaN(numericCadeiraId) || numericCadeiraId <= 0 || !dataReserva) {
       return res.status(400).json({ error: 'Cadeira e data de reserva são obrigatórios.' });
     }
 
@@ -91,8 +93,7 @@ export class ReservaController {
     try {
       await client.query('BEGIN');
 
-      // 1. CONTROLE DE CONCORRÊNCIA PESSIMISTA REAL:
-      // Trava a linha física da cadeira na tabela 'cadeiras' para serializar qualquer concorrência
+      // Bloqueia a linha da cadeira para evitar reservas concorrentes
       const cadeiraRes = await client.query(`
         SELECT c.id, c.identificador, c.ativa, c.status_operacional, c.motivo_manutencao, c.previsao_retorno, b.id AS baia_id, b.nome AS baia_nome, b.escritorio_id
         FROM cadeiras c
@@ -107,7 +108,7 @@ export class ReservaController {
       }
       const cadeira = cadeiraRes.rows[0];
 
-      // 1.1 Bloqueio de Assento em Manutenção Operacional (Facilities / TI)
+      // Bloqueio de assento em manutenção operacional
       if (cadeira.status_operacional === 'EM_MANUTENCAO') {
         await client.query('ROLLBACK');
         const prevMsg = cadeira.previsao_retorno 
@@ -179,18 +180,18 @@ export class ReservaController {
         }
       }
 
-      // 5. Geração de Hash Criptográfico / Comprovante de Integridade no Backend
+      // Geração de comprovante único da reserva
       const timestampIso = new Date().toISOString();
       const rawPayload = `${user.userId}-${cadeiraId}-${dataAlvoIso}-${timestampIso}-${idempotencyKey || ''}`;
       const codigoComprovante = 'RES-' + crypto.createHash('sha256').update(rawPayload).digest('hex').substring(0, 16).toUpperCase();
 
-      // 6. Configurar Check-in Automático para GESTAO conforme parametrização
+      // Check-in automático para perfil de gestão se configurado
       const checkinAutoGestao = (await ConfigService.get('CHECKIN_AUTOMATICO_GESTAO', 'true')) === 'true';
       const isGestao = user.perfil === 'GESTAO';
       const checkinRealizado = isGestao && checkinAutoGestao;
       const checkinEm = checkinRealizado ? new Date() : null;
 
-      // 7. Executar inserção ou troca atômica
+      // Executa inserção ou troca atômica
       let novaReserva: any;
       if (isTroca && reservaAntiga) {
         const updateRes = await client.query(`
@@ -209,7 +210,7 @@ export class ReservaController {
         novaReserva = insertRes.rows[0];
       }
 
-      // 7.1 Registrar na Linha do Tempo Forense Imutável (historico_reservas)
+      // Registra evento no histórico de auditoria
       await ReservaHistoryService.registrarEvento({
         reservaId: novaReserva.id,
         cadeiraId: cadeira.id,

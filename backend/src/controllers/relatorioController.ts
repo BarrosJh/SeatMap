@@ -339,6 +339,7 @@ export class RelatorioController {
         JOIN escritorios e ON b.escritorio_id = e.id
         WHERE ${whereClause}
         ORDER BY r.data_reserva DESC, e.nome ASC, c.identificador ASC
+        LIMIT 10000
       `;
       const result = await pool.query(query, params);
 
@@ -546,6 +547,7 @@ export class RelatorioController {
         JOIN escritorios e ON b.escritorio_id = e.id
         WHERE ${whereClause}
         ORDER BY r.data_reserva DESC, e.nome ASC, c.identificador ASC
+        LIMIT 2000
       `;
       const result = await pool.query(query, params);
 
@@ -565,6 +567,15 @@ export class RelatorioController {
         size: 'A4',
         margin: 30,
         bufferPages: true
+      });
+
+      doc.on('error', (err) => {
+        console.error('[RelatorioController.exportarPdf PDFKit Error]:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Erro ao renderizar relatório em PDF.' });
+        } else {
+          res.end();
+        }
       });
 
       const filename = `relatorio_reservas_${dataInicio}_a_${dataFim}.pdf`;
@@ -712,7 +723,10 @@ export class RelatorioController {
       doc.end();
     } catch (error) {
       console.error('[RelatorioController.exportarPdf] Erro:', error);
-      return res.status(500).json({ error: 'Erro ao gerar relatório em PDF.' });
+      if (!res.headersSent) {
+        return res.status(500).json({ error: 'Erro ao gerar relatório em PDF.' });
+      }
+      res.end();
     }
   }
 }
