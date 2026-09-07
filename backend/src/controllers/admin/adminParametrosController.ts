@@ -1,10 +1,13 @@
-﻿import { Response } from 'express';
+import { Response } from 'express';
 import { DateTime } from 'luxon';
 import pool from '../../config/db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { ConfigService } from '../../services/configService';
 import { CronService } from '../../services/cronService';
 import { wsManager } from '../../websocket/wsServer';
+import { logger } from '../../utils/logger';
+
+import { sanitizeCsvCell } from '../../utils/sanitizer';
 
 export class AdminParametrosController {
   public static async getParametros(req: AuthenticatedRequest, res: Response) {
@@ -12,7 +15,7 @@ export class AdminParametrosController {
       const parametros = await ConfigService.getAll();
       return res.status(200).json(parametros);
     } catch (error) {
-      console.error('[AdminParametrosController.getParametros] Erro:', error);
+      logger.error('[AdminParametrosController.getParametros] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao buscar parâmetros do sistema.' });
     }
   }
@@ -49,7 +52,7 @@ export class AdminParametrosController {
         parametros: atualizadas
       });
     } catch (error) {
-      console.error('[AdminParametrosController.updateParametros] Erro:', error);
+      logger.error('[AdminParametrosController.updateParametros] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao atualizar configurações.' });
     }
   }
@@ -64,7 +67,7 @@ export class AdminParametrosController {
         detalhes: resultado.reservas
       });
     } catch (error) {
-      console.error('[AdminParametrosController.executarLimpezaNoShow] Erro:', error);
+      logger.error('[AdminParametrosController.executarLimpezaNoShow] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao executar limpeza de No-Show.' });
     }
   }
@@ -106,16 +109,16 @@ export class AdminParametrosController {
           : DateTime.fromJSDate(row.data_reserva).toFormat('dd/MM/yyyy');
 
         const line = [
-          `"${row.matricula || ''}"`,
-          `"${row.colaborador || ''}"`,
-          `"${row.departamento || ''}"`,
-          `"${row.escritorio || ''}"`,
-          `"${row.baia || ''}"`,
-          `"${row.assento || ''}"`,
-          `"${dataReservaFormatada}"`,
-          `"${row.status}"`,
-          `"${row.checkin_realizado ? 'SIM' : 'NÃO'}"`,
-          `"${checkinFormatado}"`
+          sanitizeCsvCell(row.matricula || ''),
+          sanitizeCsvCell(row.colaborador || ''),
+          sanitizeCsvCell(row.departamento || ''),
+          sanitizeCsvCell(row.escritorio || ''),
+          sanitizeCsvCell(row.baia || ''),
+          sanitizeCsvCell(row.assento || ''),
+          sanitizeCsvCell(dataReservaFormatada),
+          sanitizeCsvCell(row.status),
+          sanitizeCsvCell(row.checkin_realizado ? 'SIM' : 'NÃO'),
+          sanitizeCsvCell(checkinFormatado)
         ];
         csvLines.push(line.join(';'));
       }
@@ -126,7 +129,7 @@ export class AdminParametrosController {
       res.setHeader('Content-Disposition', `attachment; filename=relatorio_reservas_${dataAlvo}.csv`);
       return res.status(200).send(csvContent);
     } catch (error) {
-      console.error('[AdminParametrosController.exportarRelatorioCsv] Erro:', error);
+      logger.error('[AdminParametrosController.exportarRelatorioCsv] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao gerar relatório CSV.' });
     }
   }

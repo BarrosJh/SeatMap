@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db';
 import { ConfigService } from '../services/configService';
+import { env } from '../config/env';
 
 export interface AuthUser {
   userId: number;
@@ -22,8 +23,8 @@ export interface AuthenticatedRequest extends Request {
   isAdminMfaValidated?: boolean;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-const JWT_ADMIN_SECRET = process.env.JWT_ADMIN_SECRET || 'super_secret_admin_mfa_jwt_key_seatmap_2026';
+const JWT_SECRET = env.JWT_SECRET;
+const JWT_ADMIN_SECRET = env.JWT_ADMIN_SECRET;
 
 export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];

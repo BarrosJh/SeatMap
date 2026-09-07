@@ -5,6 +5,7 @@ import { EmailService } from '../services/emailService';
 import { AuditService } from '../services/auditService';
 import { wsManager } from '../websocket/wsServer';
 import { performance } from 'perf_hooks';
+import { logger } from '../utils/logger';
 
 export class TiController {
   /**
@@ -64,18 +65,17 @@ export class TiController {
         smtp: {
           host: smtpHost,
           port: parseInt(smtpPort, 10),
-          secure: smtpSecure === 'true' || smtpPort === '465',
+          secure: smtpSecure === 'true',
           user: smtpUser,
-          passConfigurada: rawPass.length > 0,
-          passMasked: rawPass.length > 0 ? '••••••••••••' : '',
-          from: emailFrom
+          passConfigured: rawPass.length > 0,
+          emailFrom
         },
         mfa: {
+          expiracaoMinutos: mfaExpiracao,
+          maxTentativas: mfaMaxTentativas,
           policy: mfaPolicy,
           emailEnabled: mfaEmailEnabled,
-          totpEnabled: mfaTotpEnabled,
-          expiracaoMinutos: mfaExpiracao,
-          maxTentativas: mfaMaxTentativas
+          totpEnabled: mfaTotpEnabled
         },
         autoLock: {
           ativo: autoLockAtivo,
@@ -90,19 +90,19 @@ export class TiController {
           google: {
             enabled: ssoGoogleEnabled,
             clientId: ssoGoogleClientId,
-            secretConfigured: googleSecretRaw.length > 0,
             hd: ssoGoogleHd,
-            redirectUri: ssoGoogleRedirectUri
+            redirectUri: ssoGoogleRedirectUri,
+            secretConfigured: googleSecretRaw.length > 0
           },
           azure: {
             enabled: ssoAzureEnabled,
             tenantType: ssoAzureTenantType,
             tenantId: ssoAzureTenantId,
             clientId: ssoAzureClientId,
-            secretConfigured: azureSecretRaw.length > 0,
             scopes: ssoAzureScopes,
             securityGroup: ssoAzureSecurityGroup,
-            redirectUri: ssoAzureRedirectUri
+            redirectUri: ssoAzureRedirectUri,
+            secretConfigured: azureSecretRaw.length > 0
           },
           okta: {
             enabled: ssoOktaEnabled,
@@ -113,7 +113,7 @@ export class TiController {
         }
       });
     } catch (error) {
-      console.error('[TiController.getConfiguracoesTi Error]:', error);
+      logger.error('[TiController.getConfiguracoesTi Error]:', { correlationId: (req as any).correlationId, error });
       res.status(500).json({ error: 'Erro ao buscar configurações de TI.' });
     }
   }
@@ -224,7 +224,7 @@ export class TiController {
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error('[TiController.updateConfiguracoesTi Error]:', error);
+      logger.error('[TiController.updateConfiguracoesTi Error]:', { correlationId: (req as any).correlationId, error });
       res.status(500).json({ error: 'Erro ao atualizar configurações de TI.' });
     }
   }
@@ -271,7 +271,7 @@ export class TiController {
         });
       }
     } catch (error: any) {
-      console.error('[TiController.testarConexaoEmail Error]:', error);
+      logger.error('[TiController.testarConexaoEmail Error]:', { correlationId: (req as any).correlationId, error });
       res.status(500).json({
         success: false,
         error: error.message || 'Erro inesperado ao testar conexão SMTP.'
@@ -324,7 +324,7 @@ export class TiController {
         }
       });
     } catch (error) {
-      console.error('[TiController.getStatusSistema Error]:', error);
+      logger.error('[TiController.getStatusSistema Error]:', { correlationId: (req as any).correlationId, error });
       res.status(500).json({
         status: 'DEGRADED',
         error: 'Erro ao coletar diagnóstico do sistema.'
@@ -353,7 +353,7 @@ export class TiController {
 
       res.status(200).json(resultado);
     } catch (error) {
-      console.error('[TiController.getAuditoriaAcessos Error]:', error);
+      logger.error('[TiController.getAuditoriaAcessos Error]:', { correlationId: (req as any).correlationId, error });
       res.status(500).json({ error: 'Erro ao buscar trilha de auditoria de acessos.' });
     }
   }
@@ -385,7 +385,7 @@ export class TiController {
         auditoria: result.rows
       });
     } catch (error) {
-      console.error('[TiController.getAuditoriaMfa Error]:', error);
+      logger.error('[TiController.getAuditoriaMfa Error]:', { correlationId: (req as any).correlationId, error });
       res.status(500).json({ error: 'Erro ao buscar auditoria de MFA.' });
     }
   }

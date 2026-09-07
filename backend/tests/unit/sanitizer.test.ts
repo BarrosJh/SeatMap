@@ -1,6 +1,25 @@
-import { sanitizeText, sanitizeForLog, maskSensitiveData } from '../../src/utils/sanitizer';
+import { sanitizeText, sanitizeForLog, maskSensitiveData, sanitizeCsvCell } from '../../src/utils/sanitizer';
 
 describe('Sanitizer & Log Masking Security Utility', () => {
+  describe('sanitizeCsvCell (CWE-1236 Formula Injection)', () => {
+    it('deve neutralizar células que iniciam com =, +, -, @, \\t, \\r prefixando com apóstrofo', () => {
+      expect(sanitizeCsvCell('=1+1')).toBe('"\'=1+1"');
+      expect(sanitizeCsvCell('+cmd|/c calc')).toBe('"\' +cmd|/c calc"'.replace('\' ', '\''));
+      expect(sanitizeCsvCell('-2+5')).toBe('"\' -2+5"'.replace('\' ', '\''));
+      expect(sanitizeCsvCell('@SUM(A1:A10)')).toBe('"\'@SUM(A1:A10)"');
+      expect(sanitizeCsvCell('\tmalicious')).toBe('"\'\tmalicious"');
+    });
+
+    it('deve escapar aspas duplas internas duplicando-as', () => {
+      expect(sanitizeCsvCell('João "Dev" Silva')).toBe('"João ""Dev"" Silva"');
+    });
+
+    it('deve tratar valores nulos e vazios com segurança', () => {
+      expect(sanitizeCsvCell(null)).toBe('""');
+      expect(sanitizeCsvCell(undefined)).toBe('""');
+      expect(sanitizeCsvCell('Normal Text')).toBe('"Normal Text"');
+    });
+  });
   describe('sanitizeText (Anti-XSS)', () => {
     it('deve escapar tags HTML perigosas', () => {
       const dirty = '<script>alert("xss")</script>';

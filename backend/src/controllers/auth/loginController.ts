@@ -10,10 +10,12 @@ import { EmailService } from '../../services/emailService';
 import { AuditService } from '../../services/auditService';
 import { SsoService } from '../../services/ssoService';
 import { TokenService } from '../../services/tokenService';
+import { logger } from '../../utils/logger';
+import { env } from '../../config/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1d';
-const JWT_MFA_TEMP_SECRET = process.env.JWT_MFA_TEMP_SECRET || 'super_secret_temp_mfa_token_key_2026';
+const JWT_SECRET = env.JWT_SECRET;
+const JWT_EXPIRATION = env.JWT_EXPIRATION;
+const JWT_MFA_TEMP_SECRET = env.JWT_MFA_TEMP_SECRET;
 
 export class LoginController {
   public static async login(req: Request, res: Response) {
@@ -226,7 +228,7 @@ export class LoginController {
 
           // Enviar código por e-mail em background
           EmailService.enviarCodigoMfa(user.email, user.nome, codigoPin, mfaExpiracaoMinutos).catch(err => {
-            console.error('[LoginController.login] Erro ao enviar e-mail com código MFA:', err);
+            logger.error('[LoginController.login] Erro ao enviar e-mail com código MFA:', { correlationId: req.correlationId, error: err });
           });
 
           const tempToken = jwt.sign({
@@ -308,7 +310,7 @@ export class LoginController {
         }
       });
     } catch (error) {
-      console.error('[LoginController.login] Erro:', error);
+      logger.error('[LoginController.login] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro interno ao realizar login.' });
     }
   }
@@ -335,7 +337,7 @@ export class LoginController {
         user: result.user
       });
     } catch (error) {
-      console.error('[LoginController.refreshToken] Erro:', error);
+      logger.error('[LoginController.refreshToken] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro interno ao renovar sessão.' });
     }
   }
@@ -386,7 +388,7 @@ export class LoginController {
 
       return res.status(200).json({ message: 'Todas as suas sessões ativas foram desconectadas com sucesso.' });
     } catch (error) {
-      console.error('[LoginController.logoutGlobal] Erro:', error);
+      logger.error('[LoginController.logoutGlobal] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao processar logout global.' });
     }
   }
@@ -411,7 +413,7 @@ export class LoginController {
         }
       });
     } catch (error) {
-      console.error('[LoginController.getConfigSeguranca] Erro:', error);
+      logger.error('[LoginController.getConfigSeguranca] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao obter configurações públicas de segurança.' });
     }
   }

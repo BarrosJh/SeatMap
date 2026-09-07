@@ -7,9 +7,11 @@ import { ConfigService } from '../../services/configService';
 import { AuditService } from '../../services/auditService';
 import { SsoService } from '../../services/ssoService';
 import { TokenService } from '../../services/tokenService';
+import { logger } from '../../utils/logger';
+import { env } from '../../config/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1d';
+const JWT_SECRET = env.JWT_SECRET;
+const JWT_EXPIRATION = env.JWT_EXPIRATION;
 
 export class SsoController {
   public static async getSsoConfig(req: Request, res: Response) {
@@ -17,7 +19,7 @@ export class SsoController {
       const config = await SsoService.getActiveProviders();
       return res.status(200).json(config);
     } catch (error) {
-      console.error('[SsoController.getSsoConfig] Erro:', error);
+      logger.error('[SsoController.getSsoConfig] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao buscar configurações de SSO.' });
     }
   }
@@ -224,7 +226,7 @@ export class SsoController {
         }
       });
     } catch (error) {
-      console.error('[SsoController.loginSso] Erro:', error);
+      logger.error('[SsoController.loginSso] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao processar autenticação Single Sign-On.' });
     }
   }

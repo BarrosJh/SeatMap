@@ -1,10 +1,11 @@
-﻿import { Response } from 'express';
+import { Response } from 'express';
 import { DateTime } from 'luxon';
 import pool from '../../config/db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { EmailService } from '../../services/emailService';
 import { ReservaHistoryService } from '../../services/reservaHistoryService';
 import { wsManager } from '../../websocket/wsServer';
+import { logger } from '../../utils/logger';
 
 export class FacilitiesController {
   public static async colocarCadeiraEmManutencao(req: AuthenticatedRequest, res: Response) {
@@ -119,7 +120,7 @@ export class FacilitiesController {
           escritorioNome: cadeira.escritorio_nome,
           motivo: motivo.trim(),
           previsaoRetorno: previsaoRetorno ? DateTime.fromISO(previsaoRetorno).setZone('America/Sao_Paulo').toFormat('dd/MM/yyyy HH:mm') : undefined
-        }).catch(err => console.error('[FacilitiesController] Erro ao despachar email de manutencao:', err));
+        }).catch(err => logger.error('[FacilitiesController] Erro ao despachar email de manutencao:', { correlationId: req.correlationId, error: err }));
       }
 
       wsManager.broadcastToAll({
@@ -142,8 +143,12 @@ export class FacilitiesController {
         }
       });
     } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('[FacilitiesController.colocarCadeiraEmManutencao] Erro:', error);
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        logger.error('[FacilitiesController] Falha ao executar ROLLBACK:', { correlationId: req.correlationId, error: rollbackErr });
+      }
+      logger.error('[FacilitiesController.colocarCadeiraEmManutencao] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao bloquear assento para manutenção.' });
     } finally {
       client.release();
@@ -188,7 +193,7 @@ export class FacilitiesController {
         statusOperacional: 'DISPONIVEL'
       });
     } catch (error) {
-      console.error('[FacilitiesController.liberarCadeiraManutencao] Erro:', error);
+      logger.error('[FacilitiesController.liberarCadeiraManutencao] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao liberar cadeira de manutenção.' });
     }
   }
@@ -210,7 +215,7 @@ export class FacilitiesController {
         historico
       });
     } catch (error) {
-      console.error('[FacilitiesController.getHistoricoCadeira] Erro:', error);
+      logger.error('[FacilitiesController.getHistoricoCadeira] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao consultar linha do tempo do assento.' });
     }
   }
@@ -286,7 +291,7 @@ export class FacilitiesController {
         manutencoes: listRes.rows
       });
     } catch (error) {
-      console.error('[FacilitiesController.getCadeirasManutencao] Erro:', error);
+      logger.error('[FacilitiesController.getCadeirasManutencao] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao buscar assentos em manutenção.' });
     }
   }
@@ -323,7 +328,7 @@ export class FacilitiesController {
 
       return res.status(200).json(result.rows);
     } catch (error) {
-      console.error('[FacilitiesController.getTodasCadeiras] Erro:', error);
+      logger.error('[FacilitiesController.getTodasCadeiras] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao listar todas as cadeiras.' });
     }
   }

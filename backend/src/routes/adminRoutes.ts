@@ -33,7 +33,6 @@ router.post('/usuarios', requireAdminOrTi, AdminUsuariosController.criarUsuario)
 router.put('/usuarios/:id', requireAdminOrTi, AdminUsuariosController.updateUsuario);
 router.patch('/usuarios/:id/status', requireAdminOrTi, AdminUsuariosController.toggleStatusUsuario);
 router.put('/usuarios/:id/status', requireAdminOrTi, AdminUsuariosController.toggleStatusUsuario);
-router.post('/usuarios/:id/status', requireAdminOrTi, AdminUsuariosController.toggleStatusUsuario);
 router.post('/usuarios/:id/reset-senha', requireAdminOrTi, AdminUsuariosController.resetSenhaUsuario);
 router.post('/usuarios/importar-lote', requireAdminOrTi, AdminUsuariosController.importarLoteUsuarios);
 

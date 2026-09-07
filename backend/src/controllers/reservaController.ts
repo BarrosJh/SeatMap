@@ -8,6 +8,7 @@ import { EmailService } from '../services/emailService';
 import { ReservaHistoryService } from '../services/reservaHistoryService';
 import { wsManager } from '../websocket/wsServer';
 import { getWorkWeekDiff, isProximaSemanaLiberada } from '../utils/workWeekUtils';
+import { logger } from '../utils/logger';
 
 
 // Interface do Evento de Mensageria (ex: RabbitMQ / Kafka / BullMQ / Outbox)
@@ -31,9 +32,9 @@ function dispatchAsyncEvent(eventPayload: ReservaCriadaEvent): void {
   setImmediate(async () => {
     try {
       // Ponto de extensão para RabbitMQ / Kafka / SQS / BullMQ / Webhook
-      console.log(`[EventBroker] Evento emitido com sucesso: [${eventPayload.evento}] Comprovante: ${eventPayload.codigoComprovante}`);
+      logger.info(`[EventBroker] Evento emitido com sucesso: [${eventPayload.evento}] Comprovante: ${eventPayload.codigoComprovante}`);
     } catch (err) {
-      console.error(`[EventBroker Error] Falha ao processar evento de reserva ${eventPayload.codigoComprovante}:`, err);
+      logger.error(`[EventBroker Error] Falha ao processar evento de reserva ${eventPayload.codigoComprovante}:`, { error: err });
     }
   });
 }
@@ -119,7 +120,7 @@ export class ReservaController {
         });
       }
 
-      // 2. Verificar se a cadeira já está reservada por outro colaborador para a data
+      // Verificar se a cadeira já está reservada por outro colaborador para a data
       const cadeiraOcupadaRes = await client.query(`
         SELECT id, usuario_id FROM reservas
         WHERE cadeira_id = $1 AND data_reserva = $2 AND status = 'ATIVA'
@@ -297,7 +298,7 @@ export class ReservaController {
         }
       }
 
-      console.error('[ReservaController.criarReserva] Erro:', error);
+      logger.error('[ReservaController.criarReserva] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro interno ao processar a reserva.' });
     } finally {
       client.release();
@@ -310,18 +311,6 @@ export class ReservaController {
 
     if (isNaN(reservaId)) {
       return res.status(400).json({ error: 'ID de reserva inválido.' });
-    }
-
-    const agora = DateTime.now().setZone('America/Sao_Paulo');
-    const horarioInicio = await ConfigService.get('HORARIO_INICIO_CHECKIN', '06:00');
-    const horarioLimite = await ConfigService.get('HORARIO_LIMITE_CHECKIN', '11:00');
-    const [horaInicioH, horaInicioM] = horarioInicio.split(':').map(Number);
-    const [horaLimiteH, horaLimiteM] = horarioLimite.split(':').map(Number);
-    const inicioCheckinHoje = agora.set({ hour: horaInicioH, minute: horaInicioM, second: 0, millisecond: 0 });
-    const limiteCheckinHoje = agora.set({ hour: horaLimiteH, minute: horaLimiteM, second: 0, millisecond: 0 });
-
-    if (agora < inicioCheckinHoje) {
-      return res.status(400).json({ error: `O check-in diário só está liberado a partir das ${horarioInicio}.` });
     }
 
     try {
@@ -342,12 +331,14 @@ export class ReservaController {
           e.nome AS escritorio_nome,
           e.cidade AS escritorio_cidade,
           u.nome AS usuario_nome,
-          u.matricula AS usuario_matricula
+          u.matricula AS usuario_matricula,
+          d.nome AS departamento_nome
         FROM reservas r
         JOIN cadeiras c ON r.cadeira_id = c.id
         JOIN baias b ON c.baia_id = b.id
         JOIN escritorios e ON b.escritorio_id = e.id
         JOIN usuarios u ON r.usuario_id = u.id
+        LEFT JOIN departamentos d ON u.departamento_id = d.id
         WHERE r.id = $1
       `, [reservaId]);
 
@@ -365,7 +356,7 @@ export class ReservaController {
         });
       }
 
-      const hasRhAccess = user.permissaoRh === true || user.is_admin === true || user.perfil === 'ADMIN_RH';
+      const hasRhAccess = user.permissaoRh === true || user.is_admin === true || user.perfil === 'ADMIN_RH' || user.perfil === 'GESTAO';
 
       if (reserva.usuario_id !== user.userId && !hasRhAccess) {
         return res.status(403).json({ error: 'Você não tem permissão para realizar check-in nesta reserva.' });
@@ -376,6 +367,9 @@ export class ReservaController {
       }
 
       const checkinHoraAtual = new Date().toISOString();
+      const dataReservaIso = typeof reserva.data_reserva === 'string'
+        ? reserva.data_reserva
+        : DateTime.fromJSDate(reserva.data_reserva).toISODate()!;
 
       if (reserva.checkin_realizado) {
         return res.status(200).json({
@@ -384,7 +378,7 @@ export class ReservaController {
           checkinEm: reserva.checkin_em || checkinHoraAtual,
           reserva: {
             id: reserva.id,
-            dataReserva: typeof reserva.data_reserva === 'string' ? reserva.data_reserva : DateTime.fromJSDate(reserva.data_reserva).toISODate()!,
+            dataReserva: dataReservaIso,
             cadeiraId: reserva.cadeira_id,
             cadeiraIdentificador: reserva.cadeira_identificador,
             baiaNome: reserva.baia_nome,
@@ -398,33 +392,44 @@ export class ReservaController {
         });
       }
 
-      const dataReservaIso = typeof reserva.data_reserva === 'string'
-        ? reserva.data_reserva
-        : DateTime.fromJSDate(reserva.data_reserva).toISODate();
+      const hoje = DateTime.now().setZone('America/Sao_Paulo').startOf('day');
+      const dataReservaLuxon = typeof reserva.data_reserva === 'string'
+        ? DateTime.fromISO(reserva.data_reserva, { zone: 'America/Sao_Paulo' }).startOf('day')
+        : DateTime.fromJSDate(reserva.data_reserva, { zone: 'America/Sao_Paulo' }).startOf('day');
 
-      // Verificar se a reserva é de hoje
-      if (dataReservaIso !== agora.toISODate()) {
-        return res.status(400).json({ error: 'O check-in só pode ser realizado no próprio dia da reserva.' });
-      }
-
-      // Bloquear se passou do horário limite (11h00)
-      if (agora > limiteCheckinHoje && !hasRhAccess) {
+      if (!hoje.equals(dataReservaLuxon)) {
         return res.status(400).json({
-          error: `O horário limite para check-in (${horarioLimite}) já foi encerrado.`
+          error: 'O check-in só pode ser realizado no dia da reserva.'
         });
       }
 
-      await pool.query(`
-        UPDATE reservas
-        SET checkin_realizado = true, checkin_em = NOW()
-        WHERE id = $1
-      `, [reservaId]);
+      // Validar janela de horário
+      const agora = DateTime.now().setZone('America/Sao_Paulo');
+      const horarioInicio = await ConfigService.get('HORARIO_INICIO_CHECKIN', '06:00');
+      const horarioLimite = await ConfigService.get('HORARIO_LIMITE_CHECKIN', '11:00');
+      const [horaInicioH, horaInicioM] = horarioInicio.split(':').map(Number);
+      const [horaLimiteH, horaLimiteM] = horarioLimite.split(':').map(Number);
+      const inicioCheckinHoje = agora.set({ hour: horaInicioH, minute: horaInicioM, second: 0, millisecond: 0 });
+      const limiteCheckinHoje = agora.set({ hour: horaLimiteH, minute: horaLimiteM, second: 0, millisecond: 0 });
 
-      // Registrar evento de Check-in na Linha do Tempo
+      if (agora < inicioCheckinHoje) {
+        return res.status(400).json({ error: `O check-in diário só está liberado a partir das ${horarioInicio}.` });
+      }
+
+      if (agora > limiteCheckinHoje) {
+        return res.status(400).json({ error: `O horário limite para check-in encerrou às ${horarioLimite}.` });
+      }
+
+      await pool.query(`
+        UPDATE reservas 
+        SET checkin_realizado = true, checkin_em = $1 
+        WHERE id = $2
+      `, [checkinHoraAtual, reservaId]);
+
       await ReservaHistoryService.registrarEvento({
         reservaId: reserva.id,
         cadeiraId: reserva.cadeira_id,
-        usuarioId: reserva.usuario_id,
+        usuarioId: user.userId,
         dataReserva: dataReservaIso,
         tipoEvento: 'CHECKIN',
         executadoPorUsuarioId: user.userId,
@@ -432,6 +437,19 @@ export class ReservaController {
         detalhes: {
           checkinEm: checkinHoraAtual,
           comprovante: reserva.codigo_comprovante
+        }
+      });
+
+      // Notificar via WebSocket
+      wsManager.broadcastSeatUpdate({
+        evento: 'assento_atualizado',
+        escritorioId: reserva.escritorio_id,
+        cadeiraId: reserva.cadeira_id,
+        data: dataReservaIso,
+        status: 'ocupada',
+        ocupante: {
+          nome: reserva.usuario_nome,
+          departamento: reserva.departamento_nome || 'Sem Departamento'
         }
       });
 
@@ -454,7 +472,7 @@ export class ReservaController {
         }
       });
     } catch (error) {
-      console.error('[ReservaController.fazerCheckin] Erro:', error);
+      logger.error('[ReservaController.fazerCheckin] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao realizar check-in.' });
     }
   }
@@ -468,90 +486,91 @@ export class ReservaController {
     }
 
     try {
-      const reservaRes = await pool.query(`
+      const result = await pool.query(`
         SELECT 
           r.id, 
           r.usuario_id, 
+          r.cadeira_id, 
           r.data_reserva, 
           r.status, 
-          r.cadeira_id, 
           r.codigo_comprovante,
           b.escritorio_id,
-          c.identificador AS cadeira_identificador,
-          e.nome AS escritorio_nome,
-          e.cidade AS escritorio_cidade
+          c.identificador AS cadeira_identificador
         FROM reservas r
         JOIN cadeiras c ON r.cadeira_id = c.id
         JOIN baias b ON c.baia_id = b.id
-        JOIN escritorios e ON b.escritorio_id = e.id
         WHERE r.id = $1
       `, [reservaId]);
 
-      if (reservaRes.rowCount === 0) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Reserva não encontrada.' });
       }
 
-      const reserva = reservaRes.rows[0];
-      const hasRhAccess = user.permissaoRh === true || user.is_admin === true || user.perfil === 'ADMIN_RH';
+      const reserva = result.rows[0];
 
-      if (reserva.usuario_id !== user.userId && !hasRhAccess) {
-        return res.status(403).json({ error: 'Você não tem permissão para cancelar esta reserva.' });
+      if (reserva.usuario_id !== user.userId) {
+        return res.status(403).json({ error: 'Você só pode cancelar suas próprias reservas.' });
       }
 
       if (reserva.status !== 'ATIVA') {
-        return res.status(400).json({ error: 'Apenas reservas ativas podem ser canceladas.' });
+        return res.status(400).json({ error: `Não é possível cancelar uma reserva com status ${reserva.status}.` });
+      }
+
+      const dataReservaLuxon = typeof reserva.data_reserva === 'string'
+        ? DateTime.fromISO(reserva.data_reserva, { zone: 'America/Sao_Paulo' }).startOf('day')
+        : DateTime.fromJSDate(reserva.data_reserva, { zone: 'America/Sao_Paulo' }).startOf('day');
+
+      const hoje = DateTime.now().setZone('America/Sao_Paulo').startOf('day');
+
+      if (dataReservaLuxon < hoje) {
+        return res.status(400).json({ error: 'Não é possível cancelar reservas de datas passadas.' });
       }
 
       await pool.query(`
-        UPDATE reservas
-        SET status = 'CANCELADA'
+        UPDATE reservas 
+        SET status = 'CANCELADA' 
         WHERE id = $1
       `, [reservaId]);
 
-      const dataIso = typeof reserva.data_reserva === 'string'
+      const dataFormatada = typeof reserva.data_reserva === 'string'
         ? reserva.data_reserva
         : DateTime.fromJSDate(reserva.data_reserva).toISODate()!;
 
-      // Registrar evento de cancelamento na Linha do Tempo
       await ReservaHistoryService.registrarEvento({
         reservaId: reserva.id,
         cadeiraId: reserva.cadeira_id,
-        usuarioId: reserva.usuario_id,
-        dataReserva: dataIso,
-        tipoEvento: user.userId === reserva.usuario_id ? 'CANCELADA_USUARIO' : 'CANCELADA_GESTAO',
+        usuarioId: user.userId,
+        dataReserva: dataFormatada,
+        tipoEvento: 'CANCELADA_USUARIO',
         executadoPorUsuarioId: user.userId,
-        motivo: user.userId === reserva.usuario_id ? 'Cancelamento voluntário pelo colaborador' : 'Cancelamento administrativo por RH/Gestão',
         detalhes: {
-          codigoComprovante: reserva.codigo_comprovante,
-          cadeiraIdentificador: reserva.cadeira_identificador,
-          escritorioNome: reserva.escritorio_nome
+          comprovante: reserva.codigo_comprovante,
+          cadeiraIdentificador: reserva.cadeira_identificador
         }
       });
 
-      // Liberar o assento via WebSocket
+      // Notificar via WebSocket
       wsManager.broadcastSeatUpdate({
         evento: 'assento_atualizado',
         escritorioId: reserva.escritorio_id,
         cadeiraId: reserva.cadeira_id,
-        data: dataIso,
+        data: dataFormatada,
         status: 'livre',
         ocupante: null
       });
 
-      return res.status(200).json({ 
-        message: 'Reserva cancelada com sucesso.',
-        data: {
+      return res.status(200).json({
+        message: 'Reserva cancelada com sucesso!',
+        reserva: {
           id: reserva.id,
-          codigoComprovante: reserva.codigo_comprovante,
-          cadeiraIdentificador: reserva.cadeira_identificador,
-          escritorioNome: reserva.escritorio_nome,
-          escritorioCidade: reserva.escritorio_cidade,
-          dataReserva: dataIso,
+          cadeiraId: reserva.cadeira_id,
+          dataReserva: dataFormatada,
+          status: 'CANCELADA',
           canceladoEm: new Date().toISOString()
         }
       });
     } catch (error) {
-      console.error('[ReservaController.cancelarReserva] Erro:', error);
+      logger.error('[ReservaController.cancelarReserva] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao cancelar reserva.' });
     }
   }
@@ -565,7 +584,7 @@ export class ReservaController {
       const historico = await ReservaHistoryService.getHistoricoUsuario(user.userId, limit, offset);
       return res.status(200).json(historico);
     } catch (error) {
-      console.error('[ReservaController.historicoMinhasReservas] Erro:', error);
+      logger.error('[ReservaController.historicoMinhasReservas] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao consultar histórico de movimentações do usuário.' });
     }
   }
@@ -573,6 +592,8 @@ export class ReservaController {
 
   public static async minhasReservas(req: AuthenticatedRequest, res: Response) {
     const user = req.user!;
+    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const offset = parseInt(req.query.offset as string, 10) || 0;
 
     try {
       const result = await pool.query(`
@@ -597,11 +618,12 @@ export class ReservaController {
         JOIN escritorios e ON b.escritorio_id = e.id
         WHERE r.usuario_id = $1
         ORDER BY r.data_reserva DESC, r.id DESC
-      `, [user.userId]);
+        LIMIT $2 OFFSET $3
+      `, [user.userId, limit, offset]);
 
       return res.status(200).json(result.rows);
     } catch (error) {
-      console.error('[ReservaController.minhasReservas] Erro:', error);
+      logger.error('[ReservaController.minhasReservas] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao listar reservas do usuário.' });
     }
   }
@@ -658,7 +680,7 @@ export class ReservaController {
         codigoComprovante: reserva.codigo_comprovante,
         emitidoEm: reserva.criado_em_formatado
       }).catch(err => {
-        console.error('[ReservaController.enviarComprovanteEmail] Erro ao despachar e-mail:', err);
+        logger.error('[ReservaController.enviarComprovanteEmail] Erro ao despachar e-mail:', { correlationId: req.correlationId, error: err });
       });
 
       return res.status(200).json({
@@ -666,7 +688,7 @@ export class ReservaController {
         email: reserva.usuario_email
       });
     } catch (error) {
-      console.error('[ReservaController.enviarComprovanteEmail] Erro:', error);
+      logger.error('[ReservaController.enviarComprovanteEmail] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao enviar comprovante por e-mail.' });
     }
   }

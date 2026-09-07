@@ -3,9 +3,10 @@ import { DateTime } from 'luxon';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db';
 import { AuditService } from './auditService';
+import { env } from '../config/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1d';
+const JWT_SECRET = env.JWT_SECRET;
+const JWT_EXPIRATION = env.JWT_EXPIRATION;
 const REFRESH_TOKEN_DAYS = 30;
 
 export interface TokenPairResult {

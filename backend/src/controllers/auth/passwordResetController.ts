@@ -7,6 +7,7 @@ import { EmailService } from '../../services/emailService';
 import { AuditService } from '../../services/auditService';
 import { validatePasswordPolicy } from '../../utils/passwordValidator';
 import { TokenService } from '../../services/tokenService';
+import { logger } from '../../utils/logger';
 
 export class PasswordResetController {
   public static async solicitarRecuperacaoSenha(req: Request, res: Response) {
@@ -48,7 +49,7 @@ export class PasswordResetController {
       `, [user.id, codigo, expiraEm]);
 
       EmailService.enviarCodigoRecuperacaoSenha(user.email, user.nome, codigo, expiraMin).catch(err => {
-        console.error('[PasswordResetController.solicitarRecuperacaoSenha] Erro ao enviar e-mail:', err);
+        logger.error('[PasswordResetController.solicitarRecuperacaoSenha] Erro ao enviar e-mail:', { correlationId: (req as any).correlationId, error: err });
       });
 
       AuditService.log({
@@ -74,7 +75,7 @@ export class PasswordResetController {
         codigoSimulado: process.env.NODE_ENV !== 'production' ? codigo : undefined
       });
     } catch (error) {
-      console.error('[PasswordResetController.solicitarRecuperacaoSenha] Erro:', error);
+      logger.error('[PasswordResetController.solicitarRecuperacaoSenha] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao solicitar recuperação de senha.' });
     }
   }
@@ -163,7 +164,7 @@ export class PasswordResetController {
         message: 'Senha alterada com sucesso! Você já pode realizar login com sua nova senha.'
       });
     } catch (error) {
-      console.error('[PasswordResetController.redefinirSenha] Erro:', error);
+      logger.error('[PasswordResetController.redefinirSenha] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao redefinir senha do usuário.' });
     }
   }

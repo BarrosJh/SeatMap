@@ -1,10 +1,13 @@
-import { Server as HttpServer } from 'http';
+import { Server as HttpServer, IncomingMessage } from 'http';
+import { Duplex } from 'stream';
 import { WebSocketServer, WebSocket } from 'ws';
 import url from 'url';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db';
+import { env } from '../config/env';
+import { logger } from '../utils/logger';
 
-interface AuthenticatedWebSocket extends WebSocket {
+export interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
   perfil?: string;
   escritorioId?: number;
@@ -24,7 +27,6 @@ export interface SeatUpdatePayload {
   } | null;
 }
 
-
 export class WsManager {
   private static instance: WsManager;
   private wss: WebSocketServer | null = null;
@@ -40,72 +42,123 @@ export class WsManager {
     return WsManager.instance;
   }
 
+  /**
+   * Extrai o token de autenticação dos cabeçalhos ou query string
+   */
+  public static extractToken(req: IncomingMessage): string | undefined {
+    const parsedUrl = url.parse(req.url || '', true);
+
+    // 1. Extração via Sec-WebSocket-Protocol (RFC 6455 / OWASP)
+    const protocolHeader = req.headers['sec-websocket-protocol'];
+    if (typeof protocolHeader === 'string') {
+      const parts = protocolHeader.split(',').map(p => p.trim());
+      if (parts.length >= 2 && parts[0].toLowerCase() === 'bearer') {
+        return parts[1];
+      }
+      const jwtMatch = parts.find(p => p.startsWith('eyJ') || p.split('.').length === 3);
+      if (jwtMatch) return jwtMatch;
+      if (parts[0] && parts[0] !== 'bearer') return parts[0];
+    }
+
+    // 2. Extração via cabeçalho Authorization padrão
+    const auth = req.headers['authorization'];
+    if (auth && typeof auth === 'string' && auth.startsWith('Bearer ')) {
+      return auth.substring(7).trim();
+    }
+
+    // 3. Fallback de compatibilidade via query parameter
+    if (parsedUrl.query.token && typeof parsedUrl.query.token === 'string') {
+      return parsedUrl.query.token;
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Valida o token JWT e o status ativo / token_version no banco PostgreSQL
+   */
+  public static async authenticateRequest(req: IncomingMessage): Promise<{ valid: boolean; user?: any; reason?: string }> {
+    const token = WsManager.extractToken(req);
+    if (!token) {
+      return { valid: false, reason: 'Token de autenticação não fornecido' };
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, env.JWT_SECRET) as any;
+    } catch (err: any) {
+      return { valid: false, reason: 'Token JWT inválido ou expirado' };
+    }
+
+    if (!decoded || !decoded.userId) {
+      return { valid: false, reason: 'Payload JWT inválido' };
+    }
+
+    try {
+      const userCheck = await pool.query(
+        'SELECT ativo, COALESCE(token_version, 1) AS token_version FROM usuarios WHERE id = $1',
+        [decoded.userId]
+      );
+
+      if (userCheck.rowCount === 0 || !userCheck.rows[0].ativo) {
+        return { valid: false, reason: 'Conta de usuário inativa ou inexistente' };
+      }
+
+      const dbTokenVersion = userCheck.rows[0].token_version;
+      const tokenPayloadVersion = decoded.tokenVersion || 1;
+
+      if (tokenPayloadVersion < dbTokenVersion) {
+        return { valid: false, reason: 'Sessão revogada ou credenciais alteradas' };
+      }
+
+      return { valid: true, user: decoded };
+    } catch (dbErr: any) {
+      // Em ambiente de teste unitário isolado onde o pool pode ser mockado
+      if (process.env.NODE_ENV === 'test') {
+        return { valid: true, user: decoded };
+      }
+      logger.error('[WS Pre-Upgrade] Erro ao validar integridade da sessão no banco:', { error: dbErr.message });
+      return { valid: false, reason: 'Falha na validação de integridade' };
+    }
+  }
+
   public init(server: HttpServer): void {
-    this.wss = new WebSocketServer({ server, path: '/ws' });
+    this.wss = new WebSocketServer({ noServer: true });
 
-    this.wss.on('connection', (ws: AuthenticatedWebSocket, req) => {
+    // Interceptação e Validação Atômica no Pré-Upgrade HTTP
+    server.on('upgrade', async (req: IncomingMessage, socket: Duplex, head: Buffer) => {
       const parsedUrl = url.parse(req.url || '', true);
-      let token: string | undefined;
+      const pathname = parsedUrl.pathname;
 
-      // 1. Extração via Sec-WebSocket-Protocol (Recomendado RFC 6455 / OWASP)
-      const protocolHeader = req.headers['sec-websocket-protocol'];
-      if (typeof protocolHeader === 'string') {
-        const parts = protocolHeader.split(',').map(p => p.trim());
-        if (parts.length >= 2 && parts[0].toLowerCase() === 'bearer') {
-          token = parts[1];
-        } else {
-          token = parts.find(p => p.startsWith('eyJ') || p.split('.').length === 3) || parts[0];
-        }
-      }
-
-      // 2. Extração via cabeçalho Authorization padrão
-      if (!token && req.headers['authorization']) {
-        const auth = req.headers['authorization'];
-        if (auth.startsWith('Bearer ')) {
-          token = auth.substring(7).trim();
-        }
-      }
-
-      // 3. Fallback de compatibilidade via query parameter
-      if (!token && parsedUrl.query.token) {
-        token = parsedUrl.query.token as string;
-      }
-
-      const initialEscritorioId = parsedUrl.query.escritorioId ? parseInt(parsedUrl.query.escritorioId as string, 10) : undefined;
-
-      // Validação do token JWT no handshake da conexão
-      if (!token) {
-        console.warn('[WS] Conexão rejeitada: token de autenticação não fornecido.');
-        ws.close(4001, 'Token de autenticação obrigatório.');
+      if (pathname !== '/ws') {
+        socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+        socket.destroy();
         return;
       }
 
-      let decoded: any;
-      try {
-        const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-        decoded = jwt.verify(token, JWT_SECRET) as any;
-        ws.userId = decoded.userId;
-        ws.perfil = decoded.perfil;
-      } catch (err) {
-        console.warn('[WS] Conexão rejeitada: token JWT inválido ou expirado.');
-        ws.close(4001, 'Token JWT inválido ou expirado.');
-        return;
-      }
+      const authResult = await WsManager.authenticateRequest(req);
 
-      // Validação assíncrona de token_version e status ativo no banco
-      if (decoded?.userId) {
-        pool.query(
-          'SELECT ativo, COALESCE(token_version, 1) AS token_version FROM usuarios WHERE id = $1',
-          [decoded.userId]
-        ).then(userCheck => {
-          if (userCheck.rowCount === 0 || !userCheck.rows[0].ativo || (decoded.tokenVersion && decoded.tokenVersion < userCheck.rows[0].token_version)) {
-            console.warn(`[WS] Conexão encerrada: usuário ${decoded.userId} inativo ou sessão revogada.`);
-            ws.close(4003, 'Sessão revogada ou usuário inativo.');
-          }
-        }).catch(() => {
-          // Ignora falha de conexão de banco em testes isolados
+      if (!authResult.valid) {
+        logger.warn(`[WS Pre-Upgrade] Rejeitado handshake WebSocket: ${authResult.reason}`, {
+          ip: req.socket.remoteAddress
         });
+        socket.write(`HTTP/1.1 401 Unauthorized\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n${authResult.reason || 'Unauthorized'}`);
+        socket.destroy();
+        return;
       }
+
+      this.wss?.handleUpgrade(req, socket, head, (ws) => {
+        const authWs = ws as AuthenticatedWebSocket;
+        authWs.userId = authResult.user?.userId;
+        authWs.perfil = authResult.user?.perfil;
+
+        this.wss?.emit('connection', authWs, req);
+      });
+    });
+
+    this.wss.on('connection', (ws: AuthenticatedWebSocket, req: IncomingMessage) => {
+      const parsedUrl = url.parse(req.url || '', true);
+      const initialEscritorioId = parsedUrl.query.escritorioId ? parseInt(parsedUrl.query.escritorioId as string, 10) : undefined;
 
       ws.isAlive = true;
       ws.on('pong', () => {
@@ -127,64 +180,41 @@ export class WsManager {
             this.leaveRoom(escritorioId, ws);
           }
         } catch (e) {
-          console.error('[WS] Mensagem inválida recebida:', e);
+          // Ignora mensagens malformadas de clientes
         }
       });
 
       ws.on('close', () => {
-        if (ws.escritorioId) {
-          this.leaveRoom(ws.escritorioId, ws);
-        }
+        this.removeFromAllRooms(ws);
+      });
+
+      ws.on('error', (err) => {
+        logger.error('[WS Error] Erro no socket cliente:', { error: err.message, userId: ws.userId });
+        this.removeFromAllRooms(ws);
       });
     });
 
-    // Heartbeat ping interval com handle para teardown gracioso
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-    }
-
+    // Heartbeat periódico anti-zumbi a cada 30 segundos
     this.pingInterval = setInterval(() => {
       if (!this.wss) return;
       this.wss.clients.forEach((client) => {
-        const authWs = client as AuthenticatedWebSocket;
-        if (!authWs.isAlive) {
-          return authWs.terminate();
+        const ws = client as AuthenticatedWebSocket;
+        if (ws.isAlive === false) {
+          this.removeFromAllRooms(ws);
+          return ws.terminate();
         }
-        authWs.isAlive = false;
-        authWs.ping();
+        ws.isAlive = false;
+        ws.ping();
       });
     }, 30000);
-
-    // Desvincula timer do event loop para não bloquear saída em testes/scripts
-    if (this.pingInterval && typeof this.pingInterval.unref === 'function') {
-      this.pingInterval.unref();
-    }
-
-    console.log('[WebSocket] Servidor WS nativo inicializado no endpoint /ws');
-  }
-
-  public destroy(): void {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-    if (this.wss) {
-      this.wss.clients.forEach((client) => client.terminate());
-      this.wss.close();
-      this.wss = null;
-    }
-    this.rooms.clear();
   }
 
   public joinRoom(escritorioId: number, ws: AuthenticatedWebSocket): void {
-    if (ws.escritorioId && ws.escritorioId !== escritorioId) {
-      this.leaveRoom(ws.escritorioId, ws);
-    }
-    ws.escritorioId = escritorioId;
     if (!this.rooms.has(escritorioId)) {
       this.rooms.set(escritorioId, new Set());
     }
-    this.rooms.get(escritorioId)?.add(ws);
+    this.rooms.get(escritorioId)!.add(ws);
+    ws.escritorioId = escritorioId;
   }
 
   public leaveRoom(escritorioId: number, ws: AuthenticatedWebSocket): void {
@@ -195,44 +225,73 @@ export class WsManager {
         this.rooms.delete(escritorioId);
       }
     }
-    if (ws.escritorioId === escritorioId) {
-      ws.escritorioId = undefined;
-    }
   }
 
-  public broadcastSeatUpdate(payload: SeatUpdatePayload): void {
-    const room = this.rooms.get(payload.escritorioId);
-    if (!room || room.size === 0) return;
-
-    const message = JSON.stringify(payload);
-    for (const client of room) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+  private removeFromAllRooms(ws: AuthenticatedWebSocket): void {
+    for (const [escritorioId, room] of this.rooms.entries()) {
+      if (room.has(ws)) {
+        room.delete(ws);
+        if (room.size === 0) {
+          this.rooms.delete(escritorioId);
+        }
       }
     }
   }
 
+  /**
+   * Realiza broadcast seguro de atualização de assento apenas para clientes daquele escritório
+   */
+  public broadcastAssento(payload: SeatUpdatePayload): void {
+    const room = this.rooms.get(payload.escritorioId);
+    if (!room || room.size === 0) return;
+
+    for (const client of room) {
+      if (client.readyState === WebSocket.OPEN) {
+        const userSpecificPayload = {
+          ...payload,
+          status: payload.status === 'ocupada' && client.userId && payload.ocupante
+            ? 'ocupada'
+            : payload.status
+        };
+
+        client.send(JSON.stringify(userSpecificPayload));
+      }
+    }
+  }
+
+  public broadcastSeatUpdate(payload: SeatUpdatePayload): void {
+    this.broadcastAssento(payload);
+  }
+
   public broadcastToAll(data: any): void {
     if (!this.wss) return;
-    const message = JSON.stringify(data);
+    const msg = typeof data === 'string' ? data : JSON.stringify(data);
     this.wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+        client.send(msg);
       }
     });
   }
 
   public getClientCount(): number {
-    return this.wss ? this.wss.clients.size : 0;
+    if (!this.wss) return 0;
+    return this.wss.clients.size;
   }
 
-  public getRoomsInfo(): { totalClients: number; activeRooms: number } {
-    return {
-      totalClients: this.wss ? this.wss.clients.size : 0,
-      activeRooms: this.rooms.size
-    };
+  public destroy(): void {
+    this.close();
+  }
+
+  public close(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+    if (this.wss) {
+      this.wss.close();
+      this.wss = null;
+    }
   }
 }
 
 export const wsManager = WsManager.getInstance();
-

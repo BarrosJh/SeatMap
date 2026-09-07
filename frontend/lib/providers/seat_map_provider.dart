@@ -421,7 +421,7 @@ class SeatMapProvider extends ChangeNotifier {
     return int.tryParse(trimmed);
   }
 
-  Future<ApiResponse<String>> validarEEfetuarCheckinPorQr(String token, String qrCode) async {
+  Future<ApiResponse<Map<String, dynamic>>> validarEEfetuarCheckinPorQr(String token, String qrCode) async {
     if (_reservaHoje == null) {
       return ApiResponse(
         success: false,

@@ -4,9 +4,10 @@ import pool from '../../src/config/db';
 import { authenticateToken, authenticateAdminMfa, AuthenticatedRequest } from '../../src/middleware/auth';
 import { TokenService } from '../../src/services/tokenService';
 import { ConfigService } from '../../src/services/configService';
+import { env } from '../../src/config/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-const JWT_ADMIN_SECRET = process.env.JWT_ADMIN_SECRET || 'super_secret_admin_mfa_jwt_key_seatmap_2026';
+const JWT_SECRET = env.JWT_SECRET;
+const JWT_ADMIN_SECRET = env.JWT_ADMIN_SECRET;
 
 describe('Instant Session Revocation & Token Versioning (BACEN Compliance)', () => {
   afterAll(async () => {

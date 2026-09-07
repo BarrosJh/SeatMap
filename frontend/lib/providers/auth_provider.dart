@@ -17,6 +17,11 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // Auto-Lock por Inatividade (Segurança Bancária)
+  bool _autoLockAtivo = true;
+  int _autoLockMinutos = 15;
+  bool _isSessionLocked = false;
+
   UserModel? get user => _user;
   String? get token => _token;
   String? get refreshToken => _refreshToken;
@@ -30,7 +35,40 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _token != null && _user != null;
   bool get isAdminStepUpAuthenticated => _user?.isAdmin == true;
 
+  bool get autoLockAtivo => _autoLockAtivo;
+  int get autoLockMinutos => _autoLockMinutos;
+  bool get isSessionLocked => _isSessionLocked;
+
+  void lockSession() {
+    if (isAuthenticated && !_isSessionLocked && _autoLockAtivo) {
+      _isSessionLocked = true;
+      notifyListeners();
+    }
+  }
+
+  void unlockSession() {
+    _isSessionLocked = false;
+    notifyListeners();
+  }
+
+  Future<void> carregarConfigSeguranca() async {
+    try {
+      final res = await _apiService.getConfigSeguranca();
+      if (res.success && res.data != null) {
+        final autoLock = res.data!['autoLock'];
+        if (autoLock != null) {
+          _autoLockAtivo = autoLock['ativo'] == true;
+          _autoLockMinutos = (autoLock['minutos'] as int?) ?? 15;
+          notifyListeners();
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> initAuth() async {
+    // Carrega políticas públicas de segurança da sessão
+    await carregarConfigSeguranca();
+
     // Executa migração transparente de SharedPreferences legados, se houver
     await _secureStorage.migrateFromSharedPreferences();
 

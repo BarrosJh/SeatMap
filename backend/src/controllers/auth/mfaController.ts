@@ -11,12 +11,14 @@ import { AuditService } from '../../services/auditService';
 import { TotpService } from '../../services/totpService';
 import { CryptoService } from '../../services/cryptoService';
 import { TokenService } from '../../services/tokenService';
+import { logger } from '../../utils/logger';
+import { env } from '../../config/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
-const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1d';
-const JWT_ADMIN_SECRET = process.env.JWT_ADMIN_SECRET || 'super_secret_admin_mfa_jwt_key_seatmap_2026';
-const JWT_ADMIN_EXPIRATION = process.env.JWT_ADMIN_EXPIRATION || '2h';
-const JWT_MFA_TEMP_SECRET = process.env.JWT_MFA_TEMP_SECRET || 'super_secret_temp_mfa_token_key_2026';
+const JWT_SECRET = env.JWT_SECRET;
+const JWT_EXPIRATION = env.JWT_EXPIRATION;
+const JWT_ADMIN_SECRET = env.JWT_ADMIN_SECRET;
+const JWT_ADMIN_EXPIRATION = env.JWT_ADMIN_EXPIRATION;
+const JWT_MFA_TEMP_SECRET = env.JWT_MFA_TEMP_SECRET;
 
 export class MfaController {
   public static async setupTotp(req: AuthenticatedRequest, res: Response) {
@@ -43,7 +45,7 @@ export class MfaController {
         backupCodes
       });
     } catch (error) {
-      console.error('[MfaController.setupTotp] Erro:', error);
+      logger.error('[MfaController.setupTotp] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao configurar autenticação TOTP.' });
     }
   }
@@ -93,7 +95,7 @@ export class MfaController {
 
       return res.status(200).json({ message: 'Autenticação em 2 etapas (TOTP) ativada com sucesso!' });
     } catch (error) {
-      console.error('[MfaController.ativarTotp] Erro:', error);
+      logger.error('[MfaController.ativarTotp] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao ativar TOTP.' });
     }
   }
@@ -105,13 +107,22 @@ export class MfaController {
     const userAgent = AuditService.getUserAgent(req);
 
     if (!user) return res.status(401).json({ error: 'Não autenticado.' });
-    if (!senha) return res.status(400).json({ error: 'Senha obrigatória para desativar o 2FA.' });
+    if (!senha) return res.status(400).json({ error: 'Senha atual é obrigatória para desativar o TOTP.' });
 
     try {
       const userRes = await pool.query('SELECT senha_hash FROM usuarios WHERE id = $1', [user.userId]);
-      const match = await bcrypt.compare(senha, userRes.rows[0]?.senha_hash || '');
+      const userDb = userRes.rows[0];
 
+      const match = await bcrypt.compare(senha, userDb.senha_hash);
       if (!match) {
+        AuditService.log({
+          usuarioId: user.userId,
+          tipoEvento: 'TOTP_FALHA',
+          sucesso: false,
+          ip,
+          userAgent,
+          detalhes: { contexto: 'Tentativa de desativação com senha incorreta' }
+        });
         return res.status(401).json({ error: 'Senha incorreta.' });
       }
 
@@ -127,7 +138,7 @@ export class MfaController {
 
       return res.status(200).json({ message: 'Autenticação em 2 etapas (TOTP) desativada.' });
     } catch (error) {
-      console.error('[MfaController.desativarTotp] Erro:', error);
+      logger.error('[MfaController.desativarTotp] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao desativar TOTP.' });
     }
   }
@@ -254,7 +265,7 @@ export class MfaController {
         }
       });
     } catch (error) {
-      console.error('[MfaController.validarLoginTotp] Erro:', error);
+      logger.error('[MfaController.validarLoginTotp] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao validar código TOTP.' });
     }
   }
@@ -376,7 +387,7 @@ export class MfaController {
         }
       });
     } catch (error) {
-      console.error('[MfaController.validarLoginEmailMfa] Erro:', error);
+      logger.error('[MfaController.validarLoginEmailMfa] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({ error: 'Erro ao validar código MFA por e-mail.' });
     }
   }
@@ -402,7 +413,7 @@ export class MfaController {
       `, [user.userId, codigo, expiraEm]);
 
       EmailService.enviarCodigoMfa(user.email, user.nome, codigo, expiraMin).catch(err => {
-        console.error('[MfaController.solicitarMfa] Erro ao enviar e-mail:', err);
+        logger.error('[MfaController.solicitarMfa] Erro ao enviar e-mail:', { correlationId: req.correlationId, error: err });
       });
 
       AuditService.log({
@@ -420,7 +431,7 @@ export class MfaController {
         codigoSimulado: process.env.NODE_ENV !== 'production' ? codigo : undefined
       });
     } catch (error) {
-      console.error('[MfaController.solicitarMfa] Erro:', error);
+      logger.error('[MfaController.solicitarMfa] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro interno ao gerar código MFA.' });
     }
   }
@@ -491,7 +502,7 @@ export class MfaController {
         expiresIn: JWT_ADMIN_EXPIRATION
       });
     } catch (error) {
-      console.error('[MfaController.validarMfa] Erro:', error);
+      logger.error('[MfaController.validarMfa] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro interno ao validar MFA.' });
     }
   }

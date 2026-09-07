@@ -4,6 +4,7 @@ import pool from '../../config/db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { validatePasswordPolicy } from '../../utils/passwordValidator';
 import { TokenService } from '../../services/tokenService';
+import { logger } from '../../utils/logger';
 
 export class AdminUsuariosController {
   public static async getUsuarios(req: AuthenticatedRequest, res: Response) {
@@ -80,7 +81,7 @@ export class AdminUsuariosController {
         usuarios: result.rows
       });
     } catch (error) {
-      console.error('[AdminUsuariosController.getUsuarios] Erro:', error);
+      logger.error('[AdminUsuariosController.getUsuarios] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao listar usuários.' });
     }
   }
@@ -162,7 +163,7 @@ export class AdminUsuariosController {
         usuario: novoUsuario
       });
     } catch (error) {
-      console.error('[AdminUsuariosController.criarUsuario] Erro:', error);
+      logger.error('[AdminUsuariosController.criarUsuario] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao criar usuário.' });
     }
   }
@@ -259,7 +260,7 @@ export class AdminUsuariosController {
         usuario: updateRes.rows[0]
       });
     } catch (error) {
-      console.error('[AdminUsuariosController.updateUsuario] Erro:', error);
+      logger.error('[AdminUsuariosController.updateUsuario] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao atualizar usuário.' });
     }
   }
@@ -303,7 +304,7 @@ export class AdminUsuariosController {
         usuario: result.rows[0]
       });
     } catch (error) {
-      console.error('[AdminUsuariosController.toggleStatusUsuario] Erro:', error);
+      logger.error('[AdminUsuariosController.toggleStatusUsuario] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao alterar status do usuário.' });
     }
   }
@@ -347,7 +348,7 @@ export class AdminUsuariosController {
         message: 'Senha do usuário redefinida com sucesso.'
       });
     } catch (error) {
-      console.error('[AdminUsuariosController.resetSenhaUsuario] Erro:', error);
+      logger.error('[AdminUsuariosController.resetSenhaUsuario] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao redefinir senha do usuário.' });
     }
   }
@@ -463,8 +464,12 @@ export class AdminUsuariosController {
         erros
       });
     } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('[AdminUsuariosController.importarLoteUsuarios] Erro:', error);
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        logger.error('[AdminUsuariosController] Falha ao executar ROLLBACK:', { correlationId: req.correlationId, error: rollbackErr });
+      }
+      logger.error('[AdminUsuariosController.importarLoteUsuarios] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao processar importação em lote.' });
     } finally {
       client.release();

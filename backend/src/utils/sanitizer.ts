@@ -72,3 +72,26 @@ export function maskSensitiveData(data: any): any {
   return masked;
 }
 
+/**
+ * Sanitizes CSV field values to prevent CSV / Formula Injection (CWE-1236).
+ * Values starting with =, +, -, @, \t, \r are escaped with a leading single quote (').
+ * Double quotes are escaped by doubling them ("").
+ */
+export function sanitizeCsvCell(value: any): string {
+  if (value === null || value === undefined) {
+    return '""';
+  }
+
+  let str = String(value);
+
+  // Se inicia com caracteres que acionam fórmulas no Excel / Calc
+  const formulaChars = ['=', '+', '-', '@', '\t', '\r'];
+  if (formulaChars.some(char => str.startsWith(char))) {
+    str = `'${str}`;
+  }
+
+  // Escapa aspas duplas internas
+  const escaped = str.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+

@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { DateTime } from 'luxon';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
+import { logger } from '../utils/logger';
 
 export class RelatorioController {
   /**
@@ -182,7 +183,7 @@ export class RelatorioController {
         periodo: { dataInicio, dataFim }
       });
     } catch (error) {
-      console.error('[RelatorioController.getAnalytics] Erro:', error);
+      logger.error('[RelatorioController.getAnalytics] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao consolidar analytics do relatório.' });
     }
   }
@@ -300,7 +301,7 @@ export class RelatorioController {
         registros: rows
       });
     } catch (error) {
-      console.error('[RelatorioController.getDadosRelatorio] Erro:', error);
+      logger.error('[RelatorioController.getDadosRelatorio] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao buscar dados do relatório.' });
     }
   }
@@ -512,7 +513,7 @@ export class RelatorioController {
       await workbook.xlsx.write(res);
       return res.end();
     } catch (error) {
-      console.error('[RelatorioController.exportarXlsx] Erro:', error);
+      logger.error('[RelatorioController.exportarXlsx] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao gerar planilha Excel.' });
     }
   }
@@ -570,7 +571,7 @@ export class RelatorioController {
       });
 
       doc.on('error', (err) => {
-        console.error('[RelatorioController.exportarPdf PDFKit Error]:', err);
+        logger.error('[RelatorioController.exportarPdf PDFKit Error]:', { correlationId: req.correlationId, error: err });
         if (!res.headersSent) {
           res.status(500).json({ error: 'Erro ao renderizar relatório em PDF.' });
         } else {
@@ -722,7 +723,7 @@ export class RelatorioController {
 
       doc.end();
     } catch (error) {
-      console.error('[RelatorioController.exportarPdf] Erro:', error);
+      logger.error('[RelatorioController.exportarPdf] Erro:', { correlationId: req.correlationId, error });
       if (!res.headersSent) {
         return res.status(500).json({ error: 'Erro ao gerar relatório em PDF.' });
       }

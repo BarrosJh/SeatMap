@@ -20,6 +20,14 @@ export class CronService {
     console.log('[Cron] Rotina diária de No-Show agendada para às 11h00 (America/Sao_Paulo)');
   }
 
+  public static stop(): void {
+    if (this.task) {
+      this.task.stop();
+      this.task = null;
+      console.log('[Cron] Rotina diária de No-Show interrompida.');
+    }
+  }
+
   public static async cancelExpiredNoShows(forcedDate?: string): Promise<{ totalExpiradas: number; reservas: any[] }> {
     const dataAlvo = forcedDate || DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
     const client = await pool.connect();
@@ -33,7 +41,9 @@ export class CronService {
       `);
 
       if (!lockRes.rows[0]?.obtido) {
-        await client.query('ROLLBACK');
+        try {
+          await client.query('ROLLBACK');
+        } catch (_) {}
         console.log('[Cron No-Show] Outra instância/processo já está executando a rotina de No-Show. Execução concorrente ignorada.');
         return { totalExpiradas: 0, reservas: [] };
       }
@@ -100,7 +110,11 @@ export class CronService {
       console.log(`[Cron No-Show] ${selectRes.rowCount} reservas foram canceladas por No-Show e assentos liberados no WebSocket.`);
       return { totalExpiradas: selectRes.rowCount || 0, reservas: selectRes.rows };
     } catch (error) {
-      await client.query('ROLLBACK');
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackErr) {
+        console.error('[Cron No-Show] Falha ao executar ROLLBACK:', rollbackErr);
+      }
       console.error('[Cron No-Show] Erro ao executar cancelamento de no-show:', error);
       throw error;
     } finally {

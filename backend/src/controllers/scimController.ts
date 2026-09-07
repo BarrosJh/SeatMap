@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db';
 import { TokenService } from '../services/tokenService';
+import { logger } from '../utils/logger';
 
 const SCIM_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCIM_LIST_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
@@ -140,7 +141,7 @@ export class ScimController {
         Resources: resources
       });
     } catch (error) {
-      console.error('[ScimController.getUsers] Erro:', error);
+      logger.error('[ScimController.getUsers] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({
         schemas: [SCIM_ERROR_SCHEMA],
         status: '500',
@@ -182,7 +183,7 @@ export class ScimController {
 
       return res.status(200).json(formatScimUser(result.rows[0]));
     } catch (error) {
-      console.error('[ScimController.getUserById] Erro:', error);
+      logger.error('[ScimController.getUserById] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({
         schemas: [SCIM_ERROR_SCHEMA],
         status: '500',
@@ -233,7 +234,7 @@ export class ScimController {
       const created = insertRes.rows[0];
       return res.status(201).json(formatScimUser(created));
     } catch (error) {
-      console.error('[ScimController.createUser] Erro:', error);
+      logger.error('[ScimController.createUser] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({
         schemas: [SCIM_ERROR_SCHEMA],
         status: '500',
@@ -297,7 +298,7 @@ export class ScimController {
 
       return res.status(200).json(formatScimUser(updateRes.rows[0]));
     } catch (error) {
-      console.error('[ScimController.updateUser] Erro:', error);
+      logger.error('[ScimController.updateUser] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({
         schemas: [SCIM_ERROR_SCHEMA],
         status: '500',
@@ -376,7 +377,7 @@ export class ScimController {
 
       return res.status(200).json(formatScimUser(updateRes.rows[0]));
     } catch (error) {
-      console.error('[ScimController.patchUser] Erro:', error);
+      logger.error('[ScimController.patchUser] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({
         schemas: [SCIM_ERROR_SCHEMA],
         status: '500',
@@ -422,7 +423,7 @@ export class ScimController {
 
       return res.status(204).send();
     } catch (error) {
-      console.error('[ScimController.deleteUser] Erro:', error);
+      logger.error('[ScimController.deleteUser] Erro:', { correlationId: (req as any).correlationId, error });
       return res.status(500).json({
         schemas: [SCIM_ERROR_SCHEMA],
         status: '500',

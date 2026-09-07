@@ -1,6 +1,7 @@
-﻿import { Response } from 'express';
+import { Response } from 'express';
 import pool from '../../config/db';
 import { AuthenticatedRequest } from '../../middleware/auth';
+import { logger } from '../../utils/logger';
 
 export class AdminDepartamentosController {
   public static async getDepartamentos(req: AuthenticatedRequest, res: Response) {
@@ -18,7 +19,7 @@ export class AdminDepartamentosController {
 
       return res.status(200).json(result.rows);
     } catch (error) {
-      console.error('[AdminDepartamentosController.getDepartamentos] Erro:', error);
+      logger.error('[AdminDepartamentosController.getDepartamentos] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao listar departamentos.' });
     }
   }
@@ -46,7 +47,7 @@ export class AdminDepartamentosController {
         departamento: result.rows[0]
       });
     } catch (error) {
-      console.error('[AdminDepartamentosController.criarDepartamento] Erro:', error);
+      logger.error('[AdminDepartamentosController.criarDepartamento] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao criar departamento.' });
     }
   }

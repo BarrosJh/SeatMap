@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { env } from '../config/env';
 
 export class CryptoService {
   private static readonly ALGORITHM = 'aes-256-gcm';
@@ -6,10 +7,10 @@ export class CryptoService {
   private static readonly PREFIX = 'enc:v1:';
 
   /**
-   * Obtém a chave mestra de 32 bytes (256 bits) usando SHA-256 sobre a chave de ambiente
+   * Obtém a chave mestra de 32 bytes (256 bits) usando SHA-256 sobre a chave de ambiente estrita
    */
   private static getKey(): Buffer {
-    const rawSecret = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET || 'seatmap_encryption_master_key_2026_default_secure';
+    const rawSecret = env.ENCRYPTION_KEY;
     return crypto.createHash('sha256').update(rawSecret).digest();
   }
 

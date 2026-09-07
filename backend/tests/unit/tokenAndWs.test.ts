@@ -1,9 +1,11 @@
 import { TokenService } from '../../src/services/tokenService';
+import { WsManager } from '../../src/websocket/wsServer';
 import pool from '../../src/config/db';
 import jwt from 'jsonwebtoken';
+import { env } from '../../src/config/env';
 
 describe('TokenService & Autenticação WebSocket', () => {
-  const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_seatmap_2026_change_in_prod';
+  const JWT_SECRET = env.JWT_SECRET;
 
   describe('TokenService (Rotação de Refresh Tokens e Prevenção de Replay)', () => {
     it('deve rejeitar tentativa de rotação com token nulo ou vazio', async () => {
@@ -45,8 +47,71 @@ describe('TokenService & Autenticação WebSocket', () => {
     });
   });
 
+  describe('WsManager (Validação Atômica no Pré-Upgrade)', () => {
+    it('deve extrair token via Sec-WebSocket-Protocol, Authorization e query param', () => {
+      const reqWithProtocol: any = {
+        headers: { 'sec-websocket-protocol': 'bearer, eyJhbGciOi...' }
+      };
+      expect(WsManager.extractToken(reqWithProtocol)).toBe('eyJhbGciOi...');
+
+      const reqWithAuthHeader: any = {
+        headers: { authorization: 'Bearer eyJhbGciOiHeader...' }
+      };
+      expect(WsManager.extractToken(reqWithAuthHeader)).toBe('eyJhbGciOiHeader...');
+
+      const reqWithQuery: any = {
+        headers: {},
+        url: '/ws?token=queryToken123'
+      };
+      expect(WsManager.extractToken(reqWithQuery)).toBe('queryToken123');
+    });
+
+    it('authenticateRequest deve rejeitar requisição sem token', async () => {
+      const req: any = { headers: {} };
+      const result = await WsManager.authenticateRequest(req);
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain('não fornecido');
+    });
+
+    it('authenticateRequest deve validar token legítimo e usuário ativo', async () => {
+      const token = jwt.sign({ userId: 15, email: 'ativo@empresa.com', tokenVersion: 1 }, JWT_SECRET);
+      const req: any = {
+        headers: { authorization: `Bearer ${token}` }
+      };
+
+      const querySpy = jest.spyOn(pool, 'query').mockImplementation(async () => ({
+        rowCount: 1,
+        rows: [{ ativo: true, token_version: 1 }]
+      } as any));
+
+      const result = await WsManager.authenticateRequest(req);
+      expect(result.valid).toBe(true);
+      expect(result.user.userId).toBe(15);
+
+      querySpy.mockRestore();
+    });
+
+    it('authenticateRequest deve rejeitar conexão com tokenVersion defasada (sessão revogada)', async () => {
+      const token = jwt.sign({ userId: 15, email: 'ativo@empresa.com', tokenVersion: 1 }, JWT_SECRET);
+      const req: any = {
+        headers: { authorization: `Bearer ${token}` }
+      };
+
+      // Banco já está na versão 2 (revogado)
+      const querySpy = jest.spyOn(pool, 'query').mockImplementation(async () => ({
+        rowCount: 1,
+        rows: [{ ativo: true, token_version: 2 }]
+      } as any));
+
+      const result = await WsManager.authenticateRequest(req);
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain('revogada');
+
+      querySpy.mockRestore();
+    });
+  });
+
   afterAll(async () => {
     await pool.end();
   });
 });
-

@@ -4,6 +4,7 @@ import pool from '../config/db';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { getMondayOfCurrentWorkWeek, isProximaSemanaLiberada } from '../utils/workWeekUtils';
 import { ConfigService } from '../services/configService';
+import { logger } from '../utils/logger';
 
 export class EscritorioController {
   public static async listar(req: AuthenticatedRequest, res: Response) {
@@ -11,7 +12,7 @@ export class EscritorioController {
       const result = await pool.query('SELECT id, nome, cidade, ativo FROM escritorios WHERE ativo = true ORDER BY id ASC');
       return res.status(200).json(result.rows);
     } catch (error) {
-      console.error('[EscritorioController.listar] Erro:', error);
+      logger.error('[EscritorioController.listar] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao listar escritórios.' });
     }
   }
@@ -166,7 +167,7 @@ export class EscritorioController {
         baias: baiasArray
       });
     } catch (error) {
-      console.error('[EscritorioController.getMapa] Erro:', error);
+      logger.error('[EscritorioController.getMapa] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao carregar mapa de assentos.' });
     }
   }
@@ -286,7 +287,7 @@ export class EscritorioController {
 
       return res.status(200).json(resultado);
     } catch (error) {
-      console.error('[EscritorioController.getOcupacaoSemanal] Erro:', error);
+      logger.error('[EscritorioController.getOcupacaoSemanal] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao calcular ocupação semanal dos escritórios.' });
     }
   }
@@ -296,7 +297,7 @@ export class EscritorioController {
       const aviso = await ConfigService.get('AVISO_GLOBAL_SISTEMA', '');
       return res.status(200).json({ aviso });
     } catch (error) {
-      console.error('[EscritorioController.getAvisoGlobal] Erro:', error);
+      logger.error('[EscritorioController.getAvisoGlobal] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao obter aviso global do sistema.' });
     }
   }

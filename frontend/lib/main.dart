@@ -7,6 +7,7 @@ import 'providers/auth_provider.dart';
 import 'providers/seat_map_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation.dart';
+import 'widgets/inactivity_watcher.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,9 @@ class SeatMapApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      builder: (context, child) {
+        return InactivityWatcher(child: child ?? const SizedBox());
+      },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppConstants.primaryColor,

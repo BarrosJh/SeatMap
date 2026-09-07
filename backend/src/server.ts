@@ -11,6 +11,7 @@ import { validateSecurityConfig } from './config/securityValidation';
 import { correlationIdMiddleware } from './middleware/correlationId';
 import { requestLoggerMiddleware } from './middleware/requestLogger';
 import { logger } from './utils/logger';
+import pool from './config/db';
 
 dotenv.config();
 validateSecurityConfig();
@@ -101,6 +102,76 @@ if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, () => {
     logger.info(`[SeatMap API] Servidor Express ativo em http://localhost:${PORT}`, { port: PORT });
     logger.info(`[SeatMap API] WebSocket ativo em ws://localhost:${PORT}/ws`);
+  });
+}
+
+// ==========================================
+// Graceful Shutdown & Process Lifecycle
+// ==========================================
+let isShuttingDown = false;
+
+export const gracefulShutdown = async (signal: string): Promise<void> => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  logger.info(`[SeatMap API] Recebido sinal ${signal}. Iniciando encerramento gracioso...`);
+
+  // Timeout de segurança para forçar encerramento caso conexões fiquem pendentes
+  const forceExitTimeout = setTimeout(() => {
+    logger.error('[SeatMap API] Encerramento forçado após timeout de 10s.');
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+  }, 10000);
+  if (typeof forceExitTimeout.unref === 'function') {
+    forceExitTimeout.unref();
+  }
+
+  try {
+    // 1. Interromper rotinas agendadas em background
+    CronService.stop();
+
+    // 2. Encerrar conexões WebSocket ativas
+    wsManager.destroy();
+
+    // 3. Fechar servidor HTTP Express
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+    logger.info('[SeatMap API] Servidor HTTP Express encerrado com sucesso.');
+
+    // 4. Drenar e fechar o pool de conexões do PostgreSQL
+    await pool.end();
+    logger.info('[SeatMap API] Pool PostgreSQL drenado e finalizado.');
+
+    clearTimeout(forceExitTimeout);
+    logger.info('[SeatMap API] Encerramento gracioso finalizado com sucesso.');
+
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(0);
+    }
+  } catch (error) {
+    logger.error('[SeatMap API] Erro durante o encerramento gracioso:', { error });
+    if (process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+  }
+};
+
+if (process.env.NODE_ENV !== 'test') {
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+  process.on('unhandledRejection', (reason: any) => {
+    logger.error('[SeatMap API - Unhandled Rejection]', { reason: reason instanceof Error ? reason.stack : reason });
+  });
+
+  process.on('uncaughtException', (error: Error) => {
+    logger.error('[SeatMap API - Uncaught Exception]', { error: error.stack });
+    gracefulShutdown('uncaughtException');
   });
 }
 

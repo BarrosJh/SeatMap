@@ -1,9 +1,10 @@
-﻿import { Response } from 'express';
+import { Response } from 'express';
 import { DateTime } from 'luxon';
 import pool from '../../config/db';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { ReservaHistoryService } from '../../services/reservaHistoryService';
 import { wsManager } from '../../websocket/wsServer';
+import { logger } from '../../utils/logger';
 
 export class AdminReservasController {
   public static async getReservas(req: AuthenticatedRequest, res: Response) {
@@ -105,7 +106,7 @@ export class AdminReservasController {
         reservas: result.rows
       });
     } catch (error) {
-      console.error('[AdminReservasController.getReservas] Erro:', error);
+      logger.error('[AdminReservasController.getReservas] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao consultar reservas.' });
     }
   }
@@ -183,7 +184,7 @@ export class AdminReservasController {
         reservaId: id
       });
     } catch (error) {
-      console.error('[AdminReservasController.cancelarReservaAdmin] Erro:', error);
+      logger.error('[AdminReservasController.cancelarReservaAdmin] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao cancelar reserva.' });
     }
   }

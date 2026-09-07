@@ -28,10 +28,13 @@ class WebSocketService {
 
     try {
       final uri = Uri.parse(
-        '${AppConstants.wsUrl}?token=$token${escritorioId != null ? '&escritorioId=$escritorioId' : ''}',
+        '${AppConstants.wsUrl}${escritorioId != null ? '?escritorioId=$escritorioId' : ''}',
       );
 
-      _channel = WebSocketChannel.connect(uri);
+      _channel = WebSocketChannel.connect(
+        uri,
+        protocols: ['Bearer', token],
+      );
       _isConnected = true;
 
       _subscription = _channel!.stream.listen(
