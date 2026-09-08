@@ -169,7 +169,7 @@ class DeskModel {
   int get hashCode => id.hashCode ^ status.hashCode;
 }
 
-/// Exact desks extracted from the complete berrini_raw.svg (Total: 102 desks)
+/// Exact desk coordinates for the Berrini floor plan (102 desks).
 /// All default to DeskStatus.available with no mock presets.
 const List<DeskModel> berriniSvgDesks = [
     DeskModel(

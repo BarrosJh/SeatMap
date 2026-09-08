@@ -39,5 +39,6 @@ frontend/.pub-cache/
 frontend/ios/Flutter/Generated.xcconfig
 frontend/ios/Flutter/flutter_export_environment.sh
 frontend/android/local.properties
-# Scratch / Temp
-scratch/
+# Generated load-test output / temporary files
+tests/load/*.json
+tests/load/*.log

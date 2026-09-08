@@ -1,1 +1,0 @@
-<svg width=\\\\\\\"883\\\\\\\"');\n    if (idx !== -1) {\n      console.log('Found svg in step index:', obj.step_index);\n      const rawText = obj.content || obj.text || (obj.tool_calls ? JSON.stringify(obj.tool_calls) : '');\n      const sIdx = rawText.indexOf('<svg width=\\\"883\\\"');\n      const eIdx = rawText.indexOf('</svg>

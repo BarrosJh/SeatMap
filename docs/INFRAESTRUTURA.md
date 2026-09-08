@@ -22,7 +22,7 @@ O `docker-compose.yml` é destinado ao desenvolvimento local. Em staging e produ
 Com o backend e o banco disponíveis, execute o cenário de duas tentativas para o mesmo assento:
 
 ```powershell
-k6 run concurrency_test.js
+k6 run tests/load/concurrency_test.js
 ```
 
 Variáveis obrigatórias: `BASE_URL`, `AUTH_TOKEN`, `SEAT_ID` e `RESERVATION_DATE`.
