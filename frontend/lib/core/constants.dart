@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
+  // Global Navigator Key para controle centralizado de rotas e logout seguro
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   // URLs configuráveis dinamicamente via --dart-define ou fallback padrão
   static const String _definedBaseUrl = String.fromEnvironment('API_URL');
   static const String _definedWsUrl = String.fromEnvironment('WS_URL');

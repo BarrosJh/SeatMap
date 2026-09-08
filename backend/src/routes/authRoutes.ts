@@ -5,9 +5,8 @@ import { SsoController } from '../controllers/auth/ssoController';
 import { PasswordResetController } from '../controllers/auth/passwordResetController';
 import { authenticateToken } from '../middleware/auth';
 import { authLimiter } from '../middleware/rateLimiter';
-
-import { validateBody } from '../middleware/validate';
-import { loginSchema } from '../validation/schemas';
+import { validateRequest } from '../middleware/validateRequest';
+import { loginSchema, esqueciSenhaSchema, redefinirSenhaSchema, refreshTokenSchema } from '../schemas';
 
 const router = Router();
 
@@ -16,7 +15,7 @@ router.use(authLimiter);
 
 // 1. Login Padrão, Configurações de Segurança & SSO
 router.get('/config-seguranca', LoginController.getConfigSeguranca);
-router.post('/login', validateBody(loginSchema), LoginController.login);
+router.post('/login', validateRequest({ body: loginSchema }), LoginController.login);
 router.get('/sso/config', SsoController.getSsoConfig);
 router.post('/sso/login', SsoController.loginSso);
 

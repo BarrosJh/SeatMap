@@ -6,6 +6,8 @@ class TabPoliticas extends StatelessWidget {
   final TextEditingController horarioColabController;
   final TextEditingController horarioInicioCheckinController;
   final TextEditingController horarioCheckinController;
+  final TextEditingController horarioInicioReservaTardiaController;
+  final TextEditingController toleranciaCheckinTardiaController;
   final TextEditingController avisoGlobalController;
   final String diaGestao;
   final String diaColab;
@@ -25,6 +27,8 @@ class TabPoliticas extends StatelessWidget {
     required this.horarioColabController,
     required this.horarioInicioCheckinController,
     required this.horarioCheckinController,
+    required this.horarioInicioReservaTardiaController,
+    required this.toleranciaCheckinTardiaController,
     required this.avisoGlobalController,
     required this.diaGestao,
     required this.diaColab,
@@ -200,10 +204,32 @@ class TabPoliticas extends StatelessWidget {
                       final inputHorarioLimite = TextFormField(
                         controller: horarioCheckinController,
                         decoration: const InputDecoration(
-                          labelText: 'Horário Limite / Corte (No-Show)',
+                          labelText: 'Horário de Corte Padrão (No-Show)',
                           hintText: '11:00',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.alarm_off_rounded, size: 20),
+                        ),
+                      );
+
+                      final inputHorarioInicioTardia = TextFormField(
+                        controller: horarioInicioReservaTardiaController,
+                        decoration: const InputDecoration(
+                          labelText: 'Início Reserva Tardia',
+                          hintText: '10:00',
+                          helperText: 'A partir deste horário aplica tolerância',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.schedule_rounded, size: 20),
+                        ),
+                      );
+
+                      final inputToleranciaTardia = TextFormField(
+                        controller: toleranciaCheckinTardiaController,
+                        decoration: const InputDecoration(
+                          labelText: 'Tolerância Reserva Tardia (Min)',
+                          hintText: '120',
+                          helperText: 'Ex: 120 min = 2h de prazo após criar',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.timer_outlined, size: 20),
                         ),
                       );
 
@@ -225,12 +251,24 @@ class TabPoliticas extends StatelessWidget {
                             inputHorarioInicio,
                             const SizedBox(height: 12),
                             inputHorarioLimite,
+                            const SizedBox(height: 12),
+                            inputHorarioInicioTardia,
+                            const SizedBox(height: 12),
+                            inputToleranciaTardia,
                           ] else ...[
                             Row(
                               children: [
                                 Expanded(child: inputHorarioInicio),
                                 const SizedBox(width: 12),
                                 Expanded(child: inputHorarioLimite),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(child: inputHorarioInicioTardia),
+                                const SizedBox(width: 12),
+                                Expanded(child: inputToleranciaTardia),
                               ],
                             ),
                           ],

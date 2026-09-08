@@ -111,6 +111,31 @@ export class ReservaController {
     }
   }
 
+  public static async liberarMesa(req: AuthenticatedRequest, res: Response) {
+    const user = req.user!;
+    const reservaId = parseIdParam(req.params.id);
+
+    if (!reservaId) {
+      return res.status(400).json({ error: 'ID de reserva inválido.' });
+    }
+
+    try {
+      const result = await ReservaService.liberarMesa(reservaId, user.userId, req.correlationId);
+
+      if (!result.success) {
+        return res.status(result.code || 400).json({ error: result.error });
+      }
+
+      return res.status(result.code || 200).json({
+        message: result.message,
+        reserva: result.reserva
+      });
+    } catch (error) {
+      logger.error('[ReservaController.liberarMesa] Erro:', { correlationId: req.correlationId, error });
+      return res.status(500).json({ error: 'Erro ao liberar mesa.' });
+    }
+  }
+
   public static async historicoMinhasReservas(req: AuthenticatedRequest, res: Response) {
     const user = req.user!;
     const limit = parseInt(req.query.limit as string, 10) || 50;

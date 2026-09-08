@@ -33,6 +33,7 @@ class SeatMapApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: AppConstants.navigatorKey,
       title: 'SeatMap Internal',
       debugShowCheckedModeBanner: false,
       locale: const Locale('pt', 'BR'),

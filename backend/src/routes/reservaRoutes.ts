@@ -23,6 +23,9 @@ router.post('/:id/checkin', authenticateToken, ReservaController.fazerCheckin);
 // POST /api/reservas/:id/enviar-comprovante-email (Disparo do voucher por e-mail)
 router.post('/:id/enviar-comprovante-email', authenticateToken, ReservaController.enviarComprovanteEmail);
 
+// POST /api/reservas/:id/liberar (Liberação/Checkout voluntário da mesa pós check-in)
+router.post('/:id/liberar', authenticateToken, ReservaController.liberarMesa);
+
 // DELETE /api/reservas/:id (Cancelamento da reserva com devolução ao WebSocket)
 router.delete('/:id', authenticateToken, ReservaController.cancelarReserva);
 

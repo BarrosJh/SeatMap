@@ -7,13 +7,13 @@ import { FacilitiesController } from '../controllers/admin/facilitiesController'
 import { RelatorioController } from '../controllers/relatorioController';
 import { authenticateToken, requireAdmin, requireAdminOrTi, authenticateAdminMfa } from '../middleware/auth';
 import { adminLimiter } from '../middleware/rateLimiter';
-import { validateBody } from '../middleware/validate';
+import { validateRequest } from '../middleware/validateRequest';
 import {
   criarUsuarioSchema,
   editarUsuarioSchema,
   colocarManutencaoSchema,
   updateParametrosSchema
-} from '../validation/schemas';
+} from '../schemas';
 
 const router = Router();
 
@@ -24,7 +24,7 @@ router.use(authenticateAdminMfa);
 
 // 1. Parâmetros e Políticas (RH Admin)
 router.get('/parametros', requireAdmin, AdminParametrosController.getParametros);
-router.put('/parametros', requireAdmin, validateBody(updateParametrosSchema), AdminParametrosController.updateParametros);
+router.put('/parametros', requireAdmin, validateRequest({ body: updateParametrosSchema }), AdminParametrosController.updateParametros);
 router.post('/limpeza-noshow', requireAdmin, AdminParametrosController.executarLimpezaNoShow);
 router.get('/relatorio/exportar', requireAdmin, AdminParametrosController.exportarRelatorioCsv);
 
@@ -36,8 +36,8 @@ router.get('/relatorios/exportar/pdf', requireAdmin, RelatorioController.exporta
 
 // 3. Gestão de Usuários (RH & TI)
 router.get('/usuarios', requireAdminOrTi, AdminUsuariosController.getUsuarios);
-router.post('/usuarios', requireAdminOrTi, validateBody(criarUsuarioSchema), AdminUsuariosController.criarUsuario);
-router.put('/usuarios/:id', requireAdminOrTi, validateBody(editarUsuarioSchema), AdminUsuariosController.updateUsuario);
+router.post('/usuarios', requireAdminOrTi, validateRequest({ body: criarUsuarioSchema }), AdminUsuariosController.criarUsuario);
+router.put('/usuarios/:id', requireAdminOrTi, validateRequest({ body: editarUsuarioSchema }), AdminUsuariosController.updateUsuario);
 router.patch('/usuarios/:id/status', requireAdminOrTi, AdminUsuariosController.toggleStatusUsuario);
 router.put('/usuarios/:id/status', requireAdminOrTi, AdminUsuariosController.toggleStatusUsuario);
 router.post('/usuarios/:id/reset-senha', requireAdminOrTi, AdminUsuariosController.resetSenhaUsuario);
@@ -54,9 +54,10 @@ router.post('/reservas/:id/cancelar', requireAdmin, AdminReservasController.canc
 // 6. Gestão Operacional de Assentos & Manutenção (Facilities / TI / RH)
 router.get('/cadeiras/manutencao', requireAdminOrTi, FacilitiesController.getCadeirasManutencao);
 router.get('/cadeiras/todas', requireAdminOrTi, FacilitiesController.getTodasCadeiras);
-router.post('/cadeiras/:id/manutencao', requireAdminOrTi, validateBody(colocarManutencaoSchema), FacilitiesController.colocarCadeiraEmManutencao);
+router.post('/cadeiras/:id/manutencao', requireAdminOrTi, validateRequest({ body: colocarManutencaoSchema }), FacilitiesController.colocarCadeiraEmManutencao);
 router.post('/cadeiras/:id/liberar', requireAdminOrTi, FacilitiesController.liberarCadeiraManutencao);
 router.get('/cadeiras/:id/historico', requireAdminOrTi, FacilitiesController.getHistoricoCadeira);
+
 
 export default router;
 

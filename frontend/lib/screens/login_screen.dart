@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../core/constants.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
-import 'main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -162,7 +161,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             erroSso = null;
                           });
 
-                          final mainNav = Navigator.of(context);
                           final dialogNav = Navigator.of(ctx);
 
                           final ok = await authProvider.loginSso(
@@ -173,9 +171,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           if (ok && mounted) {
                             dialogNav.pop();
-                            mainNav.pushReplacement(
-                              MaterialPageRoute(builder: (_) => const MainNavigation()),
-                            );
                           } else if (mounted) {
                             setModalState(() {
                               loading = false;
@@ -205,9 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-      );
+      // Autenticado com sucesso. MaterialApp.home Consumer cuidará da transição.
     } else if (authProvider.requiresMfaStep && mounted) {
       _abrirModalMfa(authProvider);
     } else if (mounted) {
@@ -344,7 +337,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             erroMsg = null;
                           });
 
-                          final navigator = Navigator.of(context);
                           final dialogNav = Navigator.of(ctx);
 
                           final ok = isEmail
@@ -353,9 +345,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           if (ok && mounted) {
                             dialogNav.pop();
-                            navigator.pushReplacement(
-                              MaterialPageRoute(builder: (_) => const MainNavigation()),
-                            );
                           } else if (mounted) {
                             setModalState(() {
                               loading = false;

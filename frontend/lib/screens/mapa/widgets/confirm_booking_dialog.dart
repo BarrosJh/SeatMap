@@ -176,5 +176,66 @@ class ConfirmBookingDialog {
       ),
     );
   }
+
+  static void showLiberar({
+    required BuildContext context,
+    required ReservaModel reserva,
+    required String token,
+  }) {
+    final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.meeting_room_outlined, color: Color(0xFF0284C7)),
+            SizedBox(width: 8),
+            Text('Liberar Mesa'),
+          ],
+        ),
+        content: Text(
+          'Deseja liberar a mesa ${reserva.cadeiraIdentificador} (${reserva.baiaNome} - ${reserva.escritorioNome})?\n\nSua presença continuará confirmada no sistema para hoje e a estação de trabalho ficará disponível para outros colegas.',
+          style: const TextStyle(fontSize: 14, color: Color(0xFF334155), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Voltar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0284C7),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final res = await seatProvider.liberarMinhaReserva(token, reserva.id);
+              if (context.mounted) {
+                if (res.success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Mesa ${reserva.cadeiraIdentificador} liberada com sucesso!'),
+                      backgroundColor: const Color(0xFF0284C7),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(res.error ?? 'Falha ao liberar mesa.'),
+                      backgroundColor: const Color(0xFFDC2626),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Sim, Liberar Mesa'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 

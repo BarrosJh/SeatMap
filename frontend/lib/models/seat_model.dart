@@ -245,12 +245,14 @@ class ReservaModel {
   final String escritorioNome;
   final String escritorioCidade;
   final String? codigoComprovante;
+  final String? checkoutEm;
 
   ReservaModel({
     required this.id,
     required this.dataReserva,
     required this.checkinRealizado,
     this.checkinEm,
+    this.checkoutEm,
     required this.status,
     this.criadoEm,
     required this.cadeiraId,
@@ -326,7 +328,7 @@ class ReservaModel {
   bool get isCancelada => status == 'CANCELADA';
   bool get isExpirada => status == 'EXPIRADA_NOSHOW' || isNoShowPassado;
   bool get isNoShowPassado => status == 'ATIVA' && !checkinRealizado && isPassada;
-  bool get isConcluida => (checkinRealizado && isPassada) || status == 'CONCLUIDA';
+  bool get isConcluida => status == 'CONCLUIDA' || (checkinRealizado && isPassada);
 
   factory ReservaModel.fromJson(Map<String, dynamic> json) {
     final rawData = json['data_reserva'] ?? json['dataReserva'] ?? '';
@@ -339,6 +341,7 @@ class ReservaModel {
       dataReserva: cleanData,
       checkinRealizado: json['checkin_realizado'] ?? json['checkinRealizado'] ?? false,
       checkinEm: json['checkin_em'] ?? json['checkinEm'],
+      checkoutEm: json['checkout_em'] ?? json['checkoutEm'],
       status: json['status'] ?? 'ATIVA',
       criadoEm: json['criado_em'] ?? json['criadoEm'],
       cadeiraId: json['cadeira_id'] ?? json['cadeiraId'] ?? 0,

@@ -83,6 +83,14 @@ class _InactivityWatcherState extends State<InactivityWatcher> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
+        if (!auth.isAuthenticated || auth.isSessionLocked || !auth.autoLockAtivo) {
+          _timer?.cancel();
+        } else if (_timer == null || !_timer!.isActive) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _resetTimer();
+          });
+        }
+
         return Listener(
           behavior: HitTestBehavior.translucent,
           onPointerDown: _onUserActivity,
@@ -234,10 +242,10 @@ class _InactivityWatcherState extends State<InactivityWatcher> {
                   ),
                   const SizedBox(height: 12),
                   TextButton.icon(
-                    onPressed: () {
+                    onPressed: () async {
                       _unlockPasswordController.clear();
                       auth.unlockSession();
-                      auth.logout();
+                      await auth.logout();
                     },
                     icon: const Icon(Icons.logout_rounded, size: 16, color: Color(0xFF94A3B8)),
                     label: const Text(

@@ -311,6 +311,8 @@ async function runSeed() {
       ('DIA_ABERTURA_COLABORADOR', '5', 'Dia da semana para abertura COLABORADOR (1=Segunda a 7=Domingo)'),
       ('HORARIO_INICIO_CHECKIN', '06:00', 'Horário a partir do qual a confirmação diária de presença é liberada'),
       ('HORARIO_LIMITE_CHECKIN', '11:00', 'Horário de corte para confirmação diária de presença no app'),
+      ('HORARIO_INICIO_RESERVA_TARDIA', '10:00', 'Horário a partir do qual reservas criadas para o mesmo dia recebem tolerância estendida'),
+      ('TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS', '120', 'Janela de tolerância em minutos para check-in de reservas criadas no mesmo dia'),
       ('PERMITIR_TROCA_MESMO_DIA', 'true', 'Permite que o colaborador troque de assento para a mesma data já reservada'),
       ('CHECKIN_AUTOMATICO_GESTAO', 'true', 'Realiza o check-in automático ao reservar para usuários com perfil GESTAO'),
       ('AVISO_GLOBAL_SISTEMA', '', 'Mensagem institucional de aviso em tempo real exibida no topo do app'),

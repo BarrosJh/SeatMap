@@ -5,7 +5,6 @@ import '../models/seat_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/seat_map_provider.dart';
 import 'home_dashboard_screen.dart';
-import 'login_screen.dart';
 import 'mapa_screen.dart';
 import 'checkin_screen.dart';
 import 'minhas_reservas_screen.dart';
@@ -102,13 +101,7 @@ class _MainNavigationState extends State<MainNavigation> {
             onPressed: () async {
               Navigator.pop(ctx);
               final auth = Provider.of<AuthProvider>(context, listen: false);
-              final navigator = Navigator.of(context);
               await auth.logout();
-              if (mounted) {
-                navigator.pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
             },
             child: const Text('Sair', style: TextStyle(color: Colors.white)),
           ),
@@ -144,12 +137,16 @@ class _MainNavigationState extends State<MainNavigation> {
         onNavegarParaMinhasReservas: () => setState(() => _currentIndex = 3),
         onNavegarParaMapa: (nomeEscritorio, data) => _navegarParaMapaComData(nomeEscritorio, data),
       ),
-      const MapaScreen(),
+      MapaScreen(
+        onNavegarParaCheckin: () => setState(() => _currentIndex = 2),
+      ),
       CheckinScreen(
         isActive: activeIndex == 2,
         onNavegarParaMapa: () => setState(() => _currentIndex = 1),
       ),
-      const MinhasReservasScreen(),
+      MinhasReservasScreen(
+        onNavegarParaCheckin: () => setState(() => _currentIndex = 2),
+      ),
       if (isAdmin) const AdminPanelScreen(),
       if (isTi) const TiPanelScreen(),
     ];

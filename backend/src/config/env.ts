@@ -20,12 +20,18 @@ export interface EnvironmentConfig {
   ALLOWED_ORIGINS: string[];
 }
 
-function getRequiredEnv(key: string): string {
+function getRequiredEnv(key: string, devFallback?: string): string {
   const val = process.env[key];
   if (!val || val.trim() === '') {
     if (process.env.NODE_ENV === 'test') {
       // Valor seguro para ambiente de testes unitários isolados
       return `test_mock_secure_key_for_unit_tests_${key.toLowerCase()}_32chars`;
+    }
+    if (process.env.NODE_ENV !== 'production') {
+      // Valor padrão de desenvolvimento local
+      const fallback = devFallback || `dev_local_secret_key_for_${key.toLowerCase()}_32chars_len`;
+      console.warn(`⚠️ [CONFIGURAÇÃO DEV]: A variável '${key}' não foi definida no .env. Usando chave padrão de desenvolvimento.`);
+      return fallback;
     }
     console.error(`❌ [CONFIGURAÇÃO CRÍTICA]: A variável de ambiente obrigatória '${key}' não foi definida.`);
     process.exit(1);

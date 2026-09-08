@@ -8,7 +8,8 @@ export type TipoEventoReserva =
   | 'CANCELADA_USUARIO' 
   | 'CANCELADA_GESTAO' 
   | 'CANCELADA_MANUTENCAO' 
-  | 'EXPIRADA_NOSHOW';
+  | 'EXPIRADA_NOSHOW'
+  | 'MESA_LIBERADA';
 
 export interface RegistrarEventoReservaParams {
   reservaId?: number | null;

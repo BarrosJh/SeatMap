@@ -29,14 +29,20 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Verify TypeScript Compilation
+      - name: Verify TypeScript Type Checking
+        run: npm run typecheck
+
+      - name: Compile Backend Production Build
         run: npm run build
 
-      - name: Run Automated Jest Unit Tests
+      - name: Run Automated Jest Unit & Integration Tests
         run: npm test
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ci_test_secret_key_seatmap_2026
 
   frontend-ci:
-    name: Frontend CI (Flutter Analyze & Tests)
+    name: Frontend CI (Flutter Analyze, Tests & Web Build)
     runs-on: ubuntu-latest
 
     defaults:
@@ -67,4 +73,7 @@ jobs:
 
       - name: Run Automated Flutter Unit Tests
         run: flutter test
+
+      - name: Compile Flutter Web Release Build
+        run: flutter build web --release --no-tree-shake-icons
 

@@ -95,6 +95,9 @@ class ApiService {
   Future<ApiResponse<Map<String, dynamic>>> cancelarReserva(String token, int reservaId) =>
       _reservaApi.cancelarReserva(token, reservaId);
 
+  Future<ApiResponse<Map<String, dynamic>>> liberarMesa(String token, int reservaId) =>
+      _reservaApi.liberarMesa(token, reservaId);
+
   Future<ApiResponse<String>> enviarComprovanteEmail(String token, int reservaId) =>
       _reservaApi.enviarComprovanteEmail(token, reservaId);
 

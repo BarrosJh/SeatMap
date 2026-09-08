@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../core/constants.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../services/api/api_client_base.dart';
 import '../services/secure_storage_service.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -68,6 +70,20 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> initAuth() async {
+    // Configura callbacks do Interceptor HTTP para sincronização transparente de estado
+    ApiClientBase.onTokenRefreshed = (newToken, newRefreshToken) {
+      _token = newToken;
+      if (newRefreshToken != null) {
+        _refreshToken = newRefreshToken;
+      }
+      notifyListeners();
+    };
+
+    ApiClientBase.onSessionExpired = (reason) {
+      debugPrint('[AuthProvider] Sessão expirada pelo interceptor: $reason');
+      logout();
+    };
+
     // Carrega políticas públicas de segurança da sessão
     await carregarConfigSeguranca();
 
@@ -87,6 +103,7 @@ class AuthProvider extends ChangeNotifier {
     _adminToken = await _secureStorage.getAdminToken();
     notifyListeners();
   }
+
 
   Future<bool> login(String login, String senha) async {
     _isLoading = true;
@@ -297,8 +314,11 @@ class AuthProvider extends ChangeNotifier {
     _refreshToken = null;
     _user = null;
     _adminToken = null;
+    _isSessionLocked = false;
     await _secureStorage.clearAll();
     notifyListeners();
+
+    AppConstants.navigatorKey.currentState?.popUntil((route) => route.isFirst);
 
     if (currentToken != null || currentRefresh != null) {
       _apiService.logout(currentToken, refreshToken: currentRefresh);

@@ -5,21 +5,35 @@ import { ReservaHistoryService } from './reservaHistoryService';
 import { wsManager } from '../websocket/wsServer';
 import { logger } from '../utils/logger';
 import { normalizeIsoDate } from '../utils/workWeekUtils';
+import { ConfigService } from './configService';
+import { ReservaToleranceUtils } from './reservas/reservaToleranceUtils';
 
 export class CronService {
   private static task: ScheduledTask | null = null;
   private static activeExecution: Promise<any> | null = null;
 
   public static init(): void {
-    // Agendador executado diariamente às 11:00:00 no fuso de São Paulo
-    this.task = cron.schedule('0 11 * * *', async () => {
-      logger.info(`[Cron No-Show] [${DateTime.now().setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd HH:mm:ss')}] Iniciando rotina de limpeza de No-Show...`);
-      await this.cancelExpiredNoShows();
+    // 1. Executa verificação inicial no boot para limpar no-shows pendentes
+    this.checkAndCancelNoShows().catch((err) => {
+      logger.error('[Cron] Falha na verificação de No-Show no boot:', { error: err });
+    });
+
+    // 2. Agendador periódico a cada 1 minuto para checar o horário de corte configurado dinamicamente
+    this.task = cron.schedule('* * * * *', async () => {
+      await this.checkAndCancelNoShows();
     }, {
       timezone: 'America/Sao_Paulo'
     });
 
-    logger.info('[Cron] Rotina diária de No-Show agendada para às 11h00 (America/Sao_Paulo)');
+    logger.info('[Cron] Rotina de monitoramento de No-Show iniciada (verificação por minuto no fuso America/Sao_Paulo)');
+  }
+
+  public static async checkAndCancelNoShows(): Promise<void> {
+    try {
+      await this.cancelExpiredNoShows();
+    } catch (err) {
+      logger.error('[Cron] Erro ao verificar horário de No-Show:', { error: err });
+    }
   }
 
   public static stop(): void {
@@ -74,6 +88,11 @@ export class CronService {
 
   private static async executeCancelExpiredNoShows(forcedDate?: string): Promise<{ totalExpiradas: number; reservas: any[] }> {
     const dataAlvo = forcedDate || DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
+    const agora = DateTime.now().setZone('America/Sao_Paulo');
+    const horarioCortePadrao = await ConfigService.get('HORARIO_CORTE_NOSHOW', '11:00');
+    const horarioInicioTardia = await ConfigService.get('HORARIO_INICIO_RESERVA_TARDIA', '10:00');
+    const toleranciaMinutos = await ConfigService.getNumber('TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS', 120);
+
     const client = await pool.connect();
 
     try {
@@ -94,13 +113,13 @@ export class CronService {
         return { totalExpiradas: 0, reservas: [] };
       }
 
-      // Buscar reservas ativas sem checkin na data especificada com dados de escritório e cadeira
+      // Buscar reservas ativas sem checkin com data igual ou anterior à data alvo
       const selectRes = await client.query(`
-        SELECT r.id, r.cadeira_id, r.usuario_id, r.data_reserva, b.escritorio_id, c.identificador
+        SELECT r.id, r.cadeira_id, r.usuario_id, r.data_reserva, r.criado_em, b.escritorio_id, c.identificador
         FROM reservas r
         JOIN cadeiras c ON r.cadeira_id = c.id
         JOIN baias b ON c.baia_id = b.id
-        WHERE r.data_reserva = $1
+        WHERE r.data_reserva <= $1
           AND r.status = 'ATIVA'
           AND r.checkin_realizado = false
         FOR UPDATE;
@@ -108,11 +127,39 @@ export class CronService {
 
       if (selectRes.rowCount === 0) {
         await client.query('COMMIT');
-        logger.info(`[Cron No-Show] Nenhuma reserva pendente de check-in encontrada para a data ${dataAlvo}.`);
         return { totalExpiradas: 0, reservas: [] };
       }
 
-      const ids = selectRes.rows.map((r: any) => r.id);
+      // Filtrar apenas reservas cujo limite individual de tolerância já foi atingido
+      const reservasExpiradas: any[] = [];
+
+      for (const row of selectRes.rows) {
+        const calculo = ReservaToleranceUtils.calcularLimiteCheckin(
+          row.data_reserva,
+          row.criado_em,
+          {
+            horarioCortePadrao,
+            horarioInicioTardia,
+            toleranciaMinutos
+          },
+          agora
+        );
+
+        if (calculo.isExpirada) {
+          reservasExpiradas.push({
+            ...row,
+            limiteFormatado: calculo.limiteFormatado,
+            isReservaTardia: calculo.isReservaTardia
+          });
+        }
+      }
+
+      if (reservasExpiradas.length === 0) {
+        await client.query('COMMIT');
+        return { totalExpiradas: 0, reservas: [] };
+      }
+
+      const ids = reservasExpiradas.map((r: any) => r.id);
 
       // Atualizar status para EXPIRADA_NOSHOW
       await client.query(`
@@ -122,7 +169,7 @@ export class CronService {
       `, [ids]);
 
       // Registrar evento de No-Show na Linha do Tempo forense
-      for (const row of selectRes.rows) {
+      for (const row of reservasExpiradas) {
         await ReservaHistoryService.registrarEvento({
           reservaId: row.id,
           cadeiraId: row.cadeira_id,
@@ -130,10 +177,14 @@ export class CronService {
           dataReserva: row.data_reserva,
           tipoEvento: 'EXPIRADA_NOSHOW',
           executadoPorUsuarioId: null,
-          motivo: 'Cancelamento automático por ausência de check-in diário até o horário limite (No-Show)',
+          motivo: row.isReservaTardia
+            ? `Cancelamento automático por ausência de check-in diário até o limite de tolerância estendida (${row.limiteFormatado})`
+            : `Cancelamento automático por ausência de check-in diário até o horário limite (${row.limiteFormatado})`,
           detalhes: {
             identificadorCadeira: row.identificador,
-            escritorioId: row.escritorio_id
+            escritorioId: row.escritorio_id,
+            limiteCheckin: row.limiteFormatado,
+            isReservaTardia: row.isReservaTardia
           }
         }, client);
       }
@@ -141,7 +192,7 @@ export class CronService {
       await client.query('COMMIT');
 
       // Emitir broadcast WebSocket liberando as cadeiras instantaneamente
-      for (const row of selectRes.rows) {
+      for (const row of reservasExpiradas) {
         wsManager.broadcastSeatUpdate({
           evento: 'assento_atualizado',
           escritorioId: row.escritorio_id,
@@ -152,8 +203,8 @@ export class CronService {
         });
       }
 
-      logger.info(`[Cron No-Show] ${selectRes.rowCount} reservas foram canceladas por No-Show e assentos liberados no WebSocket.`);
-      return { totalExpiradas: selectRes.rowCount || 0, reservas: selectRes.rows };
+      logger.info(`[Cron No-Show] ${reservasExpiradas.length} reservas foram canceladas por No-Show e assentos liberados no WebSocket.`);
+      return { totalExpiradas: reservasExpiradas.length, reservas: reservasExpiradas };
     } catch (error) {
       try {
         await client.query('ROLLBACK');

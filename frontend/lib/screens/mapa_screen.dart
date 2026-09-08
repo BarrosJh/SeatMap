@@ -16,7 +16,9 @@ import 'mapa/widgets/seat_maintenance_dialog.dart';
 
 
 class MapaScreen extends StatefulWidget {
-  const MapaScreen({super.key});
+  final VoidCallback? onNavegarParaCheckin;
+
+  const MapaScreen({super.key, this.onNavegarParaCheckin});
 
   @override
   State<MapaScreen> createState() => _MapaScreenState();
@@ -371,21 +373,10 @@ class _MapaScreenState extends State<MapaScreen> {
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      icon: const Icon(Icons.check_rounded, size: 16),
-                      label: const Text('Confirmar Check-in', style: TextStyle(fontWeight: FontWeight.bold)),
-                      onPressed: () async {
-                        if (auth.token != null) {
-                          final messenger = ScaffoldMessenger.of(context);
-                          final ok = await seatProvider.confirmarPresencaHoje(auth.token!);
-                          if (context.mounted) {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(ok ? 'Presença confirmada com sucesso!' : 'Falha ao confirmar presença.'),
-                                backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-                              ),
-                            );
-                          }
-                        }
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                      label: const Text('Ler QR Code / Check-in', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        widget.onNavegarParaCheckin?.call();
                       },
                     ),
                   ],
@@ -550,15 +541,23 @@ class _MapaScreenState extends State<MapaScreen> {
         ).firstOrNull;
 
         if (reserva != null) {
-          ConfirmBookingDialog.showCancel(
-            context: context,
-            reserva: reserva,
-            token: token,
-          );
+          if (reserva.checkinRealizado) {
+            ConfirmBookingDialog.showLiberar(
+              context: context,
+              reserva: reserva,
+              token: token,
+            );
+          } else {
+            ConfirmBookingDialog.showCancel(
+              context: context,
+              reserva: reserva,
+              token: token,
+            );
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Nenhuma reserva ativa encontrada para cancelamento.'),
+              content: Text('Nenhuma reserva ativa encontrada para este assento.'),
               backgroundColor: Colors.red,
             ),
           );

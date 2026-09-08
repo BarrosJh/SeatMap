@@ -59,18 +59,26 @@ CREATE TABLE IF NOT EXISTS reservas (
     data_reserva DATE NOT NULL,
     checkin_realizado BOOLEAN DEFAULT false,
     checkin_em TIMESTAMP,
-    status VARCHAR(50) DEFAULT 'ATIVA' CHECK (status IN ('ATIVA', 'CANCELADA', 'EXPIRADA_NOSHOW')),
+    checkout_em TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'ATIVA' CHECK (status IN ('ATIVA', 'CANCELADA', 'EXPIRADA_NOSHOW', 'CONCLUIDA')),
     codigo_comprovante VARCHAR(64) UNIQUE,
     criado_em TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE reservas ADD COLUMN IF NOT EXISTS checkout_em TIMESTAMP;
+ALTER TABLE reservas DROP CONSTRAINT IF EXISTS reservas_status_check;
+ALTER TABLE reservas ADD CONSTRAINT reservas_status_check CHECK (status IN ('ATIVA', 'CANCELADA', 'EXPIRADA_NOSHOW', 'CONCLUIDA'));
 
 -- Índices adicionais e parciais para alta concorrência e integridade de reservas ativas
 CREATE UNIQUE INDEX IF NOT EXISTS unq_cadeira_data_ativa ON reservas (cadeira_id, data_reserva) WHERE status = 'ATIVA';
 CREATE UNIQUE INDEX IF NOT EXISTS unq_usuario_data_ativa ON reservas (usuario_id, data_reserva) WHERE status = 'ATIVA';
 CREATE INDEX IF NOT EXISTS idx_reservas_data_status ON reservas(data_reserva, status);
 CREATE INDEX IF NOT EXISTS idx_reservas_usuario_data ON reservas(usuario_id, data_reserva);
+CREATE INDEX IF NOT EXISTS idx_reservas_relatorio ON reservas(data_reserva, status, usuario_id, checkin_realizado);
+CREATE INDEX IF NOT EXISTS idx_usuarios_dept_ativo ON usuarios(departamento_id, ativo);
 CREATE INDEX IF NOT EXISTS idx_cadeiras_baia ON cadeiras(baia_id);
 CREATE INDEX IF NOT EXISTS idx_baias_escritorio ON baias(escritorio_id);
+
 
 -- Tabela: configuracoes_sistema
 CREATE TABLE IF NOT EXISTS configuracoes_sistema (
@@ -169,12 +177,15 @@ CREATE TABLE IF NOT EXISTS historico_reservas (
     cadeira_id INT NOT NULL REFERENCES cadeiras(id) ON DELETE CASCADE,
     usuario_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     data_reserva DATE NOT NULL,
-    tipo_evento VARCHAR(50) NOT NULL CHECK (tipo_evento IN ('CRIADA', 'TROCADA', 'CHECKIN', 'CANCELADA_USUARIO', 'CANCELADA_GESTAO', 'CANCELADA_MANUTENCAO', 'EXPIRADA_NOSHOW')),
+    tipo_evento VARCHAR(50) NOT NULL CHECK (tipo_evento IN ('CRIADA', 'TROCADA', 'CHECKIN', 'CANCELADA_USUARIO', 'CANCELADA_GESTAO', 'CANCELADA_MANUTENCAO', 'EXPIRADA_NOSHOW', 'MESA_LIBERADA')),
     executado_por_usuario_id INT REFERENCES usuarios(id) ON DELETE SET NULL,
     motivo TEXT,
     detalhes JSONB,
     criado_em TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE historico_reservas DROP CONSTRAINT IF EXISTS historico_reservas_tipo_evento_check;
+ALTER TABLE historico_reservas ADD CONSTRAINT historico_reservas_tipo_evento_check CHECK (tipo_evento IN ('CRIADA', 'TROCADA', 'CHECKIN', 'CANCELADA_USUARIO', 'CANCELADA_GESTAO', 'CANCELADA_MANUTENCAO', 'EXPIRADA_NOSHOW', 'MESA_LIBERADA'));
 
 CREATE INDEX IF NOT EXISTS idx_historico_cadeira_data ON historico_reservas(cadeira_id, data_reserva);
 CREATE INDEX IF NOT EXISTS idx_historico_usuario ON historico_reservas(usuario_id);

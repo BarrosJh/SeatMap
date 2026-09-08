@@ -147,6 +147,36 @@ class ReservaApi extends ApiClientBase {
     }
   }
 
+  Future<ApiResponse<Map<String, dynamic>>> liberarMesa(String token, int reservaId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/reservas/$reservaId/liberar'),
+        headers: headers(token),
+      );
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        final data = body['reserva'] != null
+            ? Map<String, dynamic>.from(body['reserva'])
+            : (body is Map<String, dynamic> ? body : null);
+        return ApiResponse(
+          success: true,
+          data: data,
+          message: body['message'] ?? 'Mesa liberada com sucesso.',
+          statusCode: response.statusCode,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Erro ao liberar mesa.',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
   Future<ApiResponse<String>> enviarComprovanteEmail(String token, int reservaId) async {
     try {
       final response = await http.post(

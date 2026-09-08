@@ -505,6 +505,24 @@ class SeatMapProvider extends ChangeNotifier {
     return res;
   }
 
+  Future<ApiResponse<Map<String, dynamic>>> liberarMinhaReserva(String token, int reservaId) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final res = await _apiService.liberarMesa(token, reservaId);
+    _isLoading = false;
+
+    if (res.success) {
+      await carregarMinhasReservas(token);
+      await carregarMapa(token);
+      notifyListeners();
+    } else {
+      _errorMessage = res.error;
+      notifyListeners();
+    }
+    return res;
+  }
+
   @override
   void dispose() {
     _wsSubscription?.cancel();

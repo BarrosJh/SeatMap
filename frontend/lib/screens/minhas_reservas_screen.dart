@@ -7,7 +7,9 @@ import '../providers/seat_map_provider.dart';
 import '../widgets/comprovante_dialog.dart';
 
 class MinhasReservasScreen extends StatefulWidget {
-  const MinhasReservasScreen({super.key});
+  final VoidCallback? onNavegarParaCheckin;
+
+  const MinhasReservasScreen({super.key, this.onNavegarParaCheckin});
 
   @override
   State<MinhasReservasScreen> createState() => _MinhasReservasScreenState();
@@ -24,6 +26,65 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
         seatProvider.carregarMinhasReservas(auth.token!);
       }
     });
+  }
+
+  void _showLiberarMesaDialog(ReservaModel reserva, String token) {
+    final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.meeting_room_outlined, color: Color(0xFF0284C7)),
+              SizedBox(width: 8),
+              Text('Liberar Mesa'),
+            ],
+          ),
+          content: Text(
+            'Deseja liberar a mesa ${reserva.cadeiraIdentificador} (${reserva.baiaNome} - ${reserva.escritorioNome})?\n\nSua presença continuará confirmada no sistema para hoje e a estação de trabalho ficará disponível para outros colegas.',
+            style: const TextStyle(fontSize: 14, color: Color(0xFF334155), height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Voltar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0284C7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final res = await seatProvider.liberarMinhaReserva(token, reserva.id);
+                if (mounted) {
+                  if (res.success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Mesa ${reserva.cadeiraIdentificador} liberada com sucesso!'),
+                        backgroundColor: const Color(0xFF0284C7),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(res.error ?? 'Falha ao liberar mesa.'),
+                        backgroundColor: const Color(0xFFDC2626),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('Sim, Liberar Mesa'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showCancelDialog(ReservaModel reserva, String token) {
@@ -749,55 +810,43 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           icon: const Icon(Icons.qr_code_scanner_rounded, size: 14),
-                          label: const Text('Fazer Check-in', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          onPressed: () async {
+                          label: const Text('Fazer Check-in (QR Code)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            widget.onNavegarParaCheckin?.call();
+                          },
+                        ),
+                      if (!r.checkinRealizado)
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFDC2626),
+                            side: const BorderSide(color: Color(0xFFFCA5A5)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.cancel_outlined, size: 14),
+                          label: const Text('Cancelar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () {
                             if (token != null) {
-                              final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
-                              final auth = Provider.of<AuthProvider>(context, listen: false);
-                              final ok = await seatProvider.confirmarPresencaHoje(token);
-                              if (context.mounted) {
-                                if (ok) {
-                                  ComprovanteDialog.show(
-                                    context,
-                                    reservaId: r.id,
-                                    tipo: TipoComprovante.checkin,
-                                    comprovante: r.codigoComprovante ?? 'RES-CHECKIN',
-                                    dataReserva: r.dataReserva,
-                                    escritorioNome: r.escritorioNome,
-                                    escritorioCidade: r.escritorioCidade,
-                                    cadeiraIdentificador: r.cadeiraIdentificador,
-                                    baiaNome: r.baiaNome,
-                                    usuarioNome: auth.user?.nome,
-                                    usuarioMatricula: auth.user?.matricula,
-                                    dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(seatProvider.errorMessage ?? 'Falha ao confirmar presença.'),
-                                      backgroundColor: const Color(0xFFDC2626),
-                                    ),
-                                  );
-                                }
-                              }
+                              _showCancelDialog(r, token);
+                            }
+                          },
+                        )
+                      else if (r.isHoje)
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          icon: const Icon(Icons.meeting_room_outlined, size: 14),
+                          label: const Text('Liberar Mesa', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            if (token != null) {
+                              _showLiberarMesaDialog(r, token);
                             }
                           },
                         ),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFDC2626),
-                          side: const BorderSide(color: Color(0xFFFCA5A5)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        icon: const Icon(Icons.cancel_outlined, size: 14),
-                        label: const Text('Cancelar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        onPressed: () {
-                          if (token != null) {
-                            _showCancelDialog(r, token);
-                          }
-                        },
-                      ),
                     ] else ...[
                       // Para reservas canceladas ou concluídas: botão de abrir voucher
                       TextButton.icon(

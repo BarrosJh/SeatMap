@@ -65,6 +65,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
   final _horarioColabController = TextEditingController();
   final _horarioInicioCheckinController = TextEditingController();
   final _horarioCheckinController = TextEditingController();
+  final _horarioInicioReservaTardiaController = TextEditingController();
+  final _toleranciaCheckinTardiaController = TextEditingController();
   final _avisoGlobalController = TextEditingController();
   String _diaGestao = '5';
   String _diaColab = '5';
@@ -91,6 +93,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
     _horarioColabController.dispose();
     _horarioInicioCheckinController.dispose();
     _horarioCheckinController.dispose();
+    _horarioInicioReservaTardiaController.dispose();
+    _toleranciaCheckinTardiaController.dispose();
     _avisoGlobalController.dispose();
     super.dispose();
   }
@@ -206,6 +210,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
         if (chave == 'HORARIO_ABERTURA_COLABORADOR') _horarioColabController.text = valor;
         if (chave == 'HORARIO_INICIO_CHECKIN') _horarioInicioCheckinController.text = valor;
         if (chave == 'HORARIO_LIMITE_CHECKIN') _horarioCheckinController.text = valor;
+        if (chave == 'HORARIO_INICIO_RESERVA_TARDIA') _horarioInicioReservaTardiaController.text = valor;
+        if (chave == 'TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS') _toleranciaCheckinTardiaController.text = valor;
         if (chave == 'DIA_ABERTURA_GESTAO') _diaGestao = valor;
         if (chave == 'DIA_ABERTURA_COLABORADOR') _diaColab = valor;
         if (chave == 'PERMITIR_TROCA_MESMO_DIA') _permitirTroca = (valor == 'true');
@@ -404,6 +410,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
       {'chave': 'DIA_ABERTURA_COLABORADOR', 'valor': _diaColab},
       {'chave': 'HORARIO_INICIO_CHECKIN', 'valor': _horarioInicioCheckinController.text.trim()},
       {'chave': 'HORARIO_LIMITE_CHECKIN', 'valor': _horarioCheckinController.text.trim()},
+      {'chave': 'HORARIO_INICIO_RESERVA_TARDIA', 'valor': _horarioInicioReservaTardiaController.text.trim()},
+      {'chave': 'TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS', 'valor': _toleranciaCheckinTardiaController.text.trim()},
       {'chave': 'PERMITIR_TROCA_MESMO_DIA', 'valor': _permitirTroca.toString()},
       {'chave': 'CHECKIN_AUTOMATICO_GESTAO', 'valor': _checkinAutoGestao.toString()},
       {'chave': 'AVISO_GLOBAL_SISTEMA', 'valor': _avisoGlobalController.text.trim()},
@@ -600,6 +608,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
                   horarioColabController: _horarioColabController,
                   horarioInicioCheckinController: _horarioInicioCheckinController,
                   horarioCheckinController: _horarioCheckinController,
+                  horarioInicioReservaTardiaController: _horarioInicioReservaTardiaController,
+                  toleranciaCheckinTardiaController: _toleranciaCheckinTardiaController,
                   avisoGlobalController: _avisoGlobalController,
                   diaGestao: _diaGestao,
                   diaColab: _diaColab,

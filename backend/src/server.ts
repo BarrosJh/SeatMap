@@ -11,6 +11,7 @@ import { globalLimiter } from './middleware/rateLimiter';
 import { validateSecurityConfig } from './config/securityValidation';
 import { correlationIdMiddleware } from './middleware/correlationId';
 import { requestLoggerMiddleware } from './middleware/requestLogger';
+import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
 import pool from './config/db';
 
@@ -66,30 +67,9 @@ app.use('/api', globalLimiter);
 // Rotas da API
 app.use('/api', routes);
 
-// Middleware Global de Tratamento de Erros (AppSec / SIEM)
-app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const rawCorr = req.correlationId || req.headers['x-correlation-id'] || 'unknown';
-  const correlationId = Array.isArray(rawCorr) ? rawCorr[0] : String(rawCorr);
-  const reqLogger = req.logger || logger;
+// Middleware Global de Tratamento de Erros (AppSec / SIEM / AppError / Zod)
+app.use(errorHandler);
 
-  reqLogger.error(`[Unhandled Server Error] ${err.message || err}`, {
-    correlationId,
-    path: req.originalUrl || req.path,
-    method: req.method,
-    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined
-  });
-
-  const statusCode = typeof err.statusCode === 'number' ? err.statusCode : (typeof err.status === 'number' ? err.status : 500);
-
-  if (!res.headersSent) {
-    res.status(statusCode).json({
-      error: statusCode >= 500 && process.env.NODE_ENV === 'production'
-        ? 'Erro interno do servidor. Entre em contato com o suporte.'
-        : (err.message || 'Erro inesperado no processamento da requisição.'),
-      correlationId
-    });
-  }
-});
 
 // Inicializar WebSocket nativo
 wsManager.init(server);
