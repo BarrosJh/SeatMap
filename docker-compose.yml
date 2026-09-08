@@ -10,7 +10,7 @@ services:
       TZ: America/Sao_Paulo
       PGTZ: America/Sao_Paulo
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_BIND_ADDRESS:-127.0.0.1}:${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/src/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
@@ -39,10 +39,18 @@ services:
       DB_NAME: ${DB_NAME:-seatmap_db}
       DB_USER: ${DB_USER:-seatmap_user}
       DB_PASSWORD: ${DB_PASSWORD:-seatmap_password}
-      JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key_seatmap_2026_change_in_prod}
+      JWT_SECRET: ${JWT_SECRET:-dev_local_secret_key_for_jwt_secret_32chars_len}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-1d}
-      JWT_ADMIN_SECRET: ${JWT_ADMIN_SECRET:-super_secret_admin_mfa_jwt_key_seatmap_2026}
+      JWT_ADMIN_SECRET: ${JWT_ADMIN_SECRET:-dev_local_secret_key_for_admin_secret_32chars_len}
       JWT_ADMIN_EXPIRATION: ${JWT_ADMIN_EXPIRATION:-2h}
+      JWT_MFA_TEMP_SECRET: ${JWT_MFA_TEMP_SECRET:-dev_local_secret_key_for_mfa_32chars_len}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev_local_secret_key_for_encryption_32chars_len}
+      INTERNAL_HEALTH_TOKEN: ${INTERNAL_HEALTH_TOKEN:-}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
+      LOAD_TEST_MODE: ${LOAD_TEST_MODE:-false}
+      LOAD_TEST_RATE_LIMIT_MAX: ${LOAD_TEST_RATE_LIMIT_MAX:-10000}
+      AUTH_IP_RATE_LIMIT_MAX: ${AUTH_IP_RATE_LIMIT_MAX:-50}
+      GLOBAL_RATE_LIMIT_MAX: ${GLOBAL_RATE_LIMIT_MAX:-900}
       MFA_CODE_EXPIRATION_MINUTES: ${MFA_CODE_EXPIRATION_MINUTES:-5}
       DEFAULT_WEEKLY_LIMIT: ${DEFAULT_WEEKLY_LIMIT:-2}
       DEFAULT_CHECKIN_CUTOFF_TIME: ${DEFAULT_CHECKIN_CUTOFF_TIME:-11:00}
@@ -59,4 +67,10 @@ volumes:
 networks:
   seatmap_network:
     driver: bridge
+
+# Observação:
+# Este docker-compose é adequado para desenvolvimento local.
+# Em produção ou staging, as variáveis sensíveis devem ser injetadas pelo ambiente do deploy
+# e não depender de valores padrão do repositório. O PostgreSQL fica exposto somente em
+# localhost por padrão; remova o mapeamento de porta em ambientes que não exigem acesso local.
 

@@ -6,10 +6,12 @@ import { AuditService } from '../../src/services/auditService';
 import { CronService } from '../../src/services/cronService';
 import { AdminUsuariosController } from '../../src/controllers/admin/adminUsuariosController';
 import { AdminParametrosController } from '../../src/controllers/admin/adminParametrosController';
+import { ParametrosService } from '../../src/services/admin/parametrosService';
 import { escapeSqlWildcards } from '../../src/utils/sanitizer';
 import { parseIdParam, normalizeIsoDate } from '../../src/utils/workWeekUtils';
 import { validateBody } from '../../src/middleware/validate';
 import { loginSchema, colocarManutencaoSchema } from '../../src/validation/schemas';
+import { requirePermission, getUserPermissions } from '../../src/middleware/auth';
 import pool from '../../src/config/db';
 import { DateTime } from 'luxon';
 
@@ -273,6 +275,103 @@ describe('Onda 4: Remediação dos 14 Apontamentos Enterprise (SEC, REL, TEC)', 
       middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
+    });
+  });
+
+  describe('9. Bloco 1: autorização por permissão explícita', () => {
+    it('deve conceder permissões de administração RH ao perfil ADMIN_RH', () => {
+      const permissions = getUserPermissions({
+        userId: 1,
+        nome: 'RH',
+        email: 'rh@empresa.com',
+        matricula: 'RH001',
+        perfil: 'ADMIN_RH',
+        departamentoId: 1
+      } as any);
+
+      expect(permissions).toEqual(expect.arrayContaining(['config:read', 'config:write']));
+    });
+
+    it('deve bloquear acesso de colaborador a permissão de configuração', () => {
+      const req: any = {
+        user: {
+          userId: 2,
+          nome: 'Colaborador',
+          email: 'c@empresa.com',
+          matricula: 'C001',
+          perfil: 'COLABORADOR',
+          departamentoId: 1,
+          permissaoRh: false,
+          permissaoTi: false
+        }
+      };
+      const res: any = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+      };
+      const next = jest.fn();
+
+      const middleware = requirePermission('config:write');
+      middleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('10. Bloco 3: auditoria de ações críticas', () => {
+    it('deve registrar a criação de usuário em auditoria', async () => {
+      const logSpy = jest.spyOn(AuditService, 'log').mockImplementation(() => undefined);
+      const querySpy = jest.spyOn(pool, 'query').mockImplementation(async (q: any) => {
+        const text = String(q);
+
+        if (text.includes('SELECT id FROM usuarios WHERE email = $1 OR matricula = $2')) {
+          return { rowCount: 0, rows: [] } as any;
+        }
+
+        if (text.includes('INSERT INTO usuarios')) {
+          return {
+            rowCount: 1,
+            rows: [{ id: 42, nome: 'Novo Usuário', email: 'novo@empresa.com', matricula: 'NVO01', departamento_id: null, perfil: 'COLABORADOR', permissao_rh: false, permissao_ti: false, exigir_mfa: false, ativo: true }]
+          } as any;
+        }
+
+        return { rowCount: 1, rows: [] } as any;
+      });
+
+      const result = await UsuarioService.criarUsuario({
+        nome: 'Novo Usuário',
+        email: 'novo@empresa.com',
+        matricula: 'NVO01',
+        senha: 'SenhaForte@2026',
+        perfil: 'COLABORADOR'
+      }, true);
+
+      expect(result.success).toBe(true);
+      expect(logSpy).toHaveBeenCalledWith(expect.objectContaining({
+        tipoEvento: 'USUARIO_CRIADO',
+        sucesso: true
+      }));
+
+      logSpy.mockRestore();
+      querySpy.mockRestore();
+    });
+
+    it('deve registrar alteração de configuração crítica em auditoria', async () => {
+      const logSpy = jest.spyOn(AuditService, 'log').mockImplementation(() => undefined);
+      const querySpy = jest.spyOn(pool, 'query').mockImplementation(async () => ({ rowCount: 1, rows: [] } as any));
+
+      const result = await ParametrosService.updateParametros({ SMTP_PORT: '587' });
+
+      expect(result.success).toBe(true);
+      expect(logSpy).toHaveBeenCalledWith(expect.objectContaining({
+        tipoEvento: 'CONFIGURACAO_ALTERADA',
+        sucesso: true,
+        detalhes: expect.objectContaining({ chave: 'SMTP_PORT' })
+      }));
+
+      logSpy.mockRestore();
+      querySpy.mockRestore();
     });
   });
 

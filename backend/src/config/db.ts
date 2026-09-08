@@ -3,12 +3,24 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const isProductionLike = ['production', 'staging'].includes((process.env.NODE_ENV || 'development').toLowerCase());
+
+const dbHost = process.env.DB_HOST || 'localhost';
+const dbPort = parseInt(process.env.DB_PORT || '5432', 10);
+const dbName = process.env.DB_NAME || 'seatmap_db';
+const dbUser = process.env.DB_USER || 'seatmap_user';
+const dbPassword = process.env.DB_PASSWORD || process.env.DB_PASS;
+
+if (isProductionLike && (!dbPassword || dbPassword.trim() === '')) {
+  throw new Error('DB_PASSWORD/DB_PASS deve ser configurado em ambiente de produção ou staging. Nenhum valor inseguro pode ser usado como fallback.');
+}
+
 const poolConfig: PoolConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME || 'seatmap_db',
-  user: process.env.DB_USER || 'seatmap_user',
-  password: process.env.DB_PASSWORD || 'seatmap_password',
+  host: dbHost,
+  port: dbPort,
+  database: dbName,
+  user: dbUser,
+  password: dbPassword || (isProductionLike ? '' : 'seatmap_password'),
   max: parseInt(process.env.DB_POOL_MAX || '30', 10),
   idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
   connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '10000', 10),

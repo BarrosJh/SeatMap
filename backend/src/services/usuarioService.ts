@@ -4,6 +4,7 @@ import pool from '../config/db';
 import { validatePasswordPolicy } from '../utils/passwordValidator';
 import { TokenService } from './tokenService';
 import { escapeSqlWildcards } from '../utils/sanitizer';
+import { AuditService } from './auditService';
 
 export interface ListarUsuariosOptions {
   busca?: string;
@@ -194,6 +195,19 @@ export class UsuarioService {
       true
     ]);
 
+    AuditService.log({
+      usuarioId: insertRes.rows[0]?.id ?? null,
+      loginInformado: insertRes.rows[0]?.email || email.trim().toLowerCase(),
+      tipoEvento: 'USUARIO_CRIADO',
+      sucesso: true,
+      detalhes: {
+        perfil,
+        departamentoId: departamentoId || null,
+        exigiuMfa: needsMfa,
+        operadorTi: operatorIsTi
+      }
+    });
+
     return {
       success: true,
       code: 201,
@@ -284,6 +298,20 @@ export class UsuarioService {
       id
     ]);
 
+    AuditService.log({
+      usuarioId: id,
+      loginInformado: cleanEmail || cleanMatricula || undefined,
+      tipoEvento: 'USUARIO_ATUALIZADO',
+      sucesso: true,
+      detalhes: {
+        campos: Object.keys(input),
+        perfilAnterior: userExists.rows[0]?.perfil,
+        perfilNovo: perfil || userExists.rows[0]?.perfil,
+        departamentoId: departamentoId !== undefined ? (departamentoId ?? null) : undefined,
+        operadorTi: operatorIsTi
+      }
+    });
+
     return {
       success: true,
       code: 200,
@@ -318,6 +346,15 @@ export class UsuarioService {
     }
 
     await TokenService.incrementarTokenVersion(id);
+
+    AuditService.log({
+      usuarioId: id,
+      tipoEvento: 'USUARIO_STATUS_ALTERADO',
+      sucesso: true,
+      detalhes: {
+        ativo: Boolean(ativo ?? result.rows[0].ativo)
+      }
+    });
 
     return {
       success: true,
@@ -354,6 +391,13 @@ export class UsuarioService {
     }
 
     await TokenService.incrementarTokenVersion(id);
+
+    AuditService.log({
+      usuarioId: id,
+      tipoEvento: 'SENHA_RESETADA',
+      sucesso: true,
+      detalhes: { motivo: 'Redefinição de senha por administrador' }
+    });
 
     return {
       success: true,

@@ -114,11 +114,15 @@ export class AdminReservasController {
 
   public static async cancelarReservaAdmin(req: AuthenticatedRequest, res: Response) {
     const user = req.user!;
+    let client;
     try {
+      client = await pool.connect();
       const { id } = req.params;
       const { justificativa } = req.body;
 
-      const resRes = await pool.query(`
+      await client.query('BEGIN');
+
+      const resRes = await client.query(`
         SELECT 
           r.id,
           r.usuario_id,
@@ -137,19 +141,21 @@ export class AdminReservasController {
       `, [id]);
 
       if (resRes.rowCount === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Reserva não encontrada.' });
       }
 
       const reserva = resRes.rows[0];
 
       if (reserva.status !== 'ATIVA') {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: `Reserva não pode ser cancelada pois está com status ${reserva.status}.` });
       }
 
-      await pool.query(`
+      await client.query(`
         UPDATE reservas
         SET status = 'CANCELADA'
-        WHERE id = $1
+        WHERE id = $1 AND status = 'ATIVA'
       `, [id]);
 
       const dataFormatada = typeof reserva.data_reserva === 'string'
@@ -169,7 +175,9 @@ export class AdminReservasController {
           cadeiraIdentificador: reserva.cadeira_identificador,
           justificativa: justificativa || 'Não informada'
         }
-      });
+      }, client);
+
+      await client.query('COMMIT');
 
       wsManager.broadcastSeatUpdate({
         evento: 'assento_atualizado',
@@ -185,8 +193,19 @@ export class AdminReservasController {
         reservaId: id
       });
     } catch (error) {
+      try {
+        if (!client) throw new Error('Cliente de banco não foi obtido.');
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        logger.error('[AdminReservasController.cancelarReservaAdmin] Falha no ROLLBACK:', {
+          correlationId: req.correlationId,
+          error: rollbackError
+        });
+      }
       logger.error('[AdminReservasController.cancelarReservaAdmin] Erro:', { correlationId: req.correlationId, error });
       return res.status(500).json({ error: 'Erro ao cancelar reserva.' });
+    } finally {
+      client?.release();
     }
   }
 }

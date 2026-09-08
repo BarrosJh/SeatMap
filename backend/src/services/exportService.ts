@@ -88,7 +88,7 @@ export class ExportService {
         situacaoPresenca = 'Presença Confirmada';
       } else if (row.status === 'CANCELADA') {
         situacaoPresenca = 'Cancelada';
-      } else if (row.status === 'EXPIRADA_NOSHOW' || row.status === 'CANCELADA_POR_FALTA' || dataIso < hojeIso) {
+      } else if (row.status === 'EXPIRADA_NOSHOW' || dataIso < hojeIso) {
         situacaoPresenca = 'Não Compareceu (No-Show)';
       }
 
@@ -179,7 +179,7 @@ export class ExportService {
     const hojeIso = DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
     const totalNoShows = rows.filter((r: any) => {
       const dataIso = normalizeIsoDate(r.data_reserva);
-      return r.status === 'EXPIRADA_NOSHOW' || r.status === 'CANCELADA_POR_FALTA' || (!r.checkin_realizado && r.status === 'ATIVA' && dataIso < hojeIso);
+      return r.status === 'EXPIRADA_NOSHOW' || (!r.checkin_realizado && r.status === 'ATIVA' && dataIso < hojeIso);
     }).length;
     const taxaPresenca = total > 0 ? ((totalCheckins / total) * 100).toFixed(1) : '0';
 
@@ -298,7 +298,7 @@ export class ExportService {
       } else if (row.status === 'CANCELADA') {
         situacao = 'Cancelada';
         situacaoColor = '#DC2626';
-      } else if (row.status === 'EXPIRADA_NOSHOW' || row.status === 'CANCELADA_POR_FALTA' || dataReservaIso < hojeIso) {
+      } else if (row.status === 'EXPIRADA_NOSHOW' || dataReservaIso < hojeIso) {
         situacao = 'No-Show';
         situacaoColor = '#DC2626';
       }

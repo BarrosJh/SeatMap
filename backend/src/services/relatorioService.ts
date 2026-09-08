@@ -59,7 +59,7 @@ export class RelatorioService {
       } else if (checkinStatus === 'pendente') {
         conditions.push(`r.checkin_realizado = false AND r.status = 'ATIVA' AND r.data_reserva >= CURRENT_DATE`);
       } else if (checkinStatus === 'noshow') {
-        conditions.push(`(r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA'))`);
+        conditions.push(`(r.status = 'EXPIRADA_NOSHOW' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA'))`);
       }
     }
 
@@ -90,7 +90,7 @@ export class RelatorioService {
         COUNT(r.id)::int AS total_reservas,
         COUNT(CASE WHEN r.checkin_realizado = true THEN 1 END)::int AS total_checkins,
         COUNT(CASE WHEN r.status = 'CANCELADA' THEN 1 END)::int AS total_canceladas,
-        COUNT(CASE WHEN r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows,
+        COUNT(CASE WHEN r.status = 'EXPIRADA_NOSHOW' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows,
         COUNT(CASE WHEN r.status = 'ATIVA' AND r.checkin_realizado = false AND r.data_reserva >= CURRENT_DATE THEN 1 END)::int AS total_pendentes
       FROM reservas r
       JOIN usuarios u ON r.usuario_id = u.id
@@ -121,7 +121,7 @@ export class RelatorioService {
         e.cidade,
         COUNT(r.id)::int AS total_reservas,
         COUNT(CASE WHEN r.checkin_realizado = true THEN 1 END)::int AS total_checkins,
-        COUNT(CASE WHEN r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows,
+        COUNT(CASE WHEN r.status = 'EXPIRADA_NOSHOW' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows,
         COUNT(DISTINCT c.id)::int AS total_mesas_utilizadas
       FROM reservas r
       JOIN usuarios u ON r.usuario_id = u.id
@@ -140,7 +140,7 @@ export class RelatorioService {
         COALESCE(d.nome, 'Sem Departamento') AS departamento,
         COUNT(r.id)::int AS total_reservas,
         COUNT(CASE WHEN r.checkin_realizado = true THEN 1 END)::int AS total_checkins,
-        COUNT(CASE WHEN r.status IN ('EXPIRADA_NOSHOW', 'CANCELADA_POR_FALTA') OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows
+        COUNT(CASE WHEN r.status = 'EXPIRADA_NOSHOW' OR (r.data_reserva < CURRENT_DATE AND r.checkin_realizado = false AND r.status = 'ATIVA') THEN 1 END)::int AS total_noshows
       FROM reservas r
       JOIN usuarios u ON r.usuario_id = u.id
       LEFT JOIN departamentos d ON u.departamento_id = d.id

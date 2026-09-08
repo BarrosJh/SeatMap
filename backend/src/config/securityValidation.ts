@@ -3,7 +3,8 @@
  */
 export function validateSecurityConfig(): void {
   const isProd = process.env.NODE_ENV === 'production';
-  if (!isProd) return;
+  const isProductionLike = isProd || process.env.NODE_ENV === 'staging';
+  if (!isProductionLike) return;
 
   const defaultPatterns = ['change_in_prod', 'super_secret', 'default', 'secret_key'];
 
@@ -34,6 +35,18 @@ export function validateSecurityConfig(): void {
   const scimToken = process.env.SCIM_BEARER_TOKEN;
   if (scimToken && (scimToken.length < 32 || defaultPatterns.some(p => scimToken.toLowerCase().includes(p)))) {
     console.error('❌ [ERRO CRÍTICO DE SEGURANÇA]: A variável SCIM_BEARER_TOKEN deve ter pelo menos 32 caracteres e sem chaves padrão!');
+    process.exit(1);
+  }
+
+  const healthToken = process.env.INTERNAL_HEALTH_TOKEN;
+  if (!healthToken || healthToken.length < 32 || defaultPatterns.some(p => healthToken.toLowerCase().includes(p))) {
+    console.error('❌ [ERRO CRÍTICO DE SEGURANÇA]: A variável INTERNAL_HEALTH_TOKEN deve estar configurada em produção/staging com pelo menos 32 caracteres e sem valores padrão!');
+    process.exit(1);
+  }
+
+  const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
+  if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0) {
+    console.error('❌ [ERRO DE CONFIGURAÇÃO]: TRUST_PROXY_HOPS deve ser um número inteiro maior ou igual a zero.');
     process.exit(1);
   }
 }

@@ -5,59 +5,71 @@ import { AdminDepartamentosController } from '../controllers/admin/adminDepartam
 import { AdminReservasController } from '../controllers/admin/adminReservasController';
 import { FacilitiesController } from '../controllers/admin/facilitiesController';
 import { RelatorioController } from '../controllers/relatorioController';
-import { authenticateToken, requireAdmin, requireAdminOrTi, authenticateAdminMfa } from '../middleware/auth';
-import { adminLimiter } from '../middleware/rateLimiter';
+import {
+  authenticateToken,
+  authenticateAdminMfa,
+  requirePermission,
+  requireAdmin,
+  requireAdminOrTi,
+  requireTi
+} from '../middleware/auth';
+import { adminLimiter, batchLimiter, exportLimiter, heavyQueryLimiter, userActionLimiter } from '../middleware/rateLimiter';
 import { validateRequest } from '../middleware/validateRequest';
 import {
   criarUsuarioSchema,
   editarUsuarioSchema,
   colocarManutencaoSchema,
-  updateParametrosSchema
+  updateParametrosSchema,
+  usuarioListQuerySchema,
+  alterarStatusUsuarioSchema,
+  resetSenhaUsuarioSchema,
+  importarLoteUsuariosSchema,
+  criarDepartamentoSchema,
+  idParamSchema,
+  adminReservaQuerySchema,
+  justificativaSchema,
+  limpezaNoShowSchema,
+  singleDateQuerySchema,
+  relatorioQuerySchema,
+  facilitiesQuerySchema,
+  paginationQuerySchema
 } from '../schemas';
 
 const router = Router();
 
-// Todas as rotas administrativas exigem autenticação do usuário, verificação de MFA e rate limit
 router.use(adminLimiter);
 router.use(authenticateToken);
 router.use(authenticateAdminMfa);
 
-// 1. Parâmetros e Políticas (RH Admin)
-router.get('/parametros', requireAdmin, AdminParametrosController.getParametros);
-router.put('/parametros', requireAdmin, validateRequest({ body: updateParametrosSchema }), AdminParametrosController.updateParametros);
-router.post('/limpeza-noshow', requireAdmin, AdminParametrosController.executarLimpezaNoShow);
-router.get('/relatorio/exportar', requireAdmin, AdminParametrosController.exportarRelatorioCsv);
+router.get('/parametros', requirePermission('config:read'), AdminParametrosController.getParametros);
+router.put('/parametros', userActionLimiter, requirePermission('config:write'), validateRequest({ body: updateParametrosSchema }), AdminParametrosController.updateParametros);
+router.post('/limpeza-noshow', userActionLimiter, requirePermission('config:write'), validateRequest({ body: limpezaNoShowSchema }), AdminParametrosController.executarLimpezaNoShow);
+router.get('/relatorio/exportar', exportLimiter, requirePermission('config:write'), validateRequest({ query: singleDateQuerySchema }), AdminParametrosController.exportarRelatorioCsv);
 
-// 2. Módulo Completo de Relatórios & BI (RH Admin)
-router.get('/relatorios/analytics', requireAdmin, RelatorioController.getAnalytics);
-router.get('/relatorios/dados', requireAdmin, RelatorioController.getDadosRelatorio);
-router.get('/relatorios/exportar/xlsx', requireAdmin, RelatorioController.exportarXlsx);
-router.get('/relatorios/exportar/pdf', requireAdmin, RelatorioController.exportarPdf);
+router.get('/relatorios/analytics', requirePermission('relatorios:read'), validateRequest({ query: relatorioQuerySchema }), RelatorioController.getAnalytics);
+router.get('/relatorios/dados', requirePermission('relatorios:read'), validateRequest({ query: relatorioQuerySchema }), RelatorioController.getDadosRelatorio);
+router.get('/relatorios/exportar/xlsx', exportLimiter, requirePermission('relatorios:write'), validateRequest({ query: relatorioQuerySchema }), RelatorioController.exportarXlsx);
+router.get('/relatorios/exportar/pdf', exportLimiter, requirePermission('relatorios:write'), validateRequest({ query: relatorioQuerySchema }), RelatorioController.exportarPdf);
 
-// 3. Gestão de Usuários (RH & TI)
-router.get('/usuarios', requireAdminOrTi, AdminUsuariosController.getUsuarios);
-router.post('/usuarios', requireAdminOrTi, validateRequest({ body: criarUsuarioSchema }), AdminUsuariosController.criarUsuario);
-router.put('/usuarios/:id', requireAdminOrTi, validateRequest({ body: editarUsuarioSchema }), AdminUsuariosController.updateUsuario);
-router.patch('/usuarios/:id/status', requireAdminOrTi, AdminUsuariosController.toggleStatusUsuario);
-router.put('/usuarios/:id/status', requireAdminOrTi, AdminUsuariosController.toggleStatusUsuario);
-router.post('/usuarios/:id/reset-senha', requireAdminOrTi, AdminUsuariosController.resetSenhaUsuario);
-router.post('/usuarios/importar-lote', requireAdminOrTi, AdminUsuariosController.importarLoteUsuarios);
+router.get('/usuarios', heavyQueryLimiter, requirePermission('usuarios:read'), validateRequest({ query: usuarioListQuerySchema }), AdminUsuariosController.getUsuarios);
+router.post('/usuarios', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ body: criarUsuarioSchema }), AdminUsuariosController.criarUsuario);
+router.put('/usuarios/:id', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ params: idParamSchema, body: editarUsuarioSchema }), AdminUsuariosController.updateUsuario);
+router.patch('/usuarios/:id/status', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ params: idParamSchema, body: alterarStatusUsuarioSchema }), AdminUsuariosController.toggleStatusUsuario);
+router.put('/usuarios/:id/status', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ params: idParamSchema, body: alterarStatusUsuarioSchema }), AdminUsuariosController.toggleStatusUsuario);
+router.post('/usuarios/:id/reset-senha', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ params: idParamSchema, body: resetSenhaUsuarioSchema }), AdminUsuariosController.resetSenhaUsuario);
+router.post('/usuarios/importar-lote', batchLimiter, requirePermission('usuarios:write'), validateRequest({ body: importarLoteUsuariosSchema }), AdminUsuariosController.importarLoteUsuarios);
 
-// 4. Departamentos (RH & TI)
-router.get('/departamentos', requireAdminOrTi, AdminDepartamentosController.getDepartamentos);
-router.post('/departamentos', requireAdminOrTi, AdminDepartamentosController.criarDepartamento);
+router.get('/departamentos', requirePermission('usuarios:read'), AdminDepartamentosController.getDepartamentos);
+router.post('/departamentos', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ body: criarDepartamentoSchema }), AdminDepartamentosController.criarDepartamento);
 
-// 5. Gestão Global de Reservas & Cancelamento RH (RH Admin)
-router.get('/reservas', requireAdmin, AdminReservasController.getReservas);
-router.post('/reservas/:id/cancelar', requireAdmin, AdminReservasController.cancelarReservaAdmin);
+router.get('/reservas', heavyQueryLimiter, requirePermission('reservas:read'), validateRequest({ query: adminReservaQuerySchema }), AdminReservasController.getReservas);
+router.post('/reservas/:id/cancelar', userActionLimiter, requirePermission('reservas:write'), validateRequest({ params: idParamSchema, body: justificativaSchema }), AdminReservasController.cancelarReservaAdmin);
 
-// 6. Gestão Operacional de Assentos & Manutenção (Facilities / TI / RH)
-router.get('/cadeiras/manutencao', requireAdminOrTi, FacilitiesController.getCadeirasManutencao);
-router.get('/cadeiras/todas', requireAdminOrTi, FacilitiesController.getTodasCadeiras);
-router.post('/cadeiras/:id/manutencao', requireAdminOrTi, validateRequest({ body: colocarManutencaoSchema }), FacilitiesController.colocarCadeiraEmManutencao);
-router.post('/cadeiras/:id/liberar', requireAdminOrTi, FacilitiesController.liberarCadeiraManutencao);
-router.get('/cadeiras/:id/historico', requireAdminOrTi, FacilitiesController.getHistoricoCadeira);
-
+router.get('/cadeiras/manutencao', requirePermission('infra:read'), validateRequest({ query: facilitiesQuerySchema }), FacilitiesController.getCadeirasManutencao);
+router.get('/cadeiras/todas', requirePermission('infra:read'), validateRequest({ query: facilitiesQuerySchema }), FacilitiesController.getTodasCadeiras);
+router.post('/cadeiras/:id/manutencao', userActionLimiter, requirePermission('infra:write'), validateRequest({ params: idParamSchema, body: colocarManutencaoSchema }), FacilitiesController.colocarCadeiraEmManutencao);
+router.post('/cadeiras/:id/liberar', userActionLimiter, requirePermission('infra:write'), validateRequest({ params: idParamSchema }), FacilitiesController.liberarCadeiraManutencao);
+router.get('/cadeiras/:id/historico', requirePermission('infra:read'), validateRequest({ params: idParamSchema, query: paginationQuerySchema }), FacilitiesController.getHistoricoCadeira);
 
 export default router;
 

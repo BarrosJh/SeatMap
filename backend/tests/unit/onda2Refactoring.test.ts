@@ -204,8 +204,8 @@ describe('Onda 2: Tratamento Centralizado de Erros & Schemas Zod Modulares', () 
       expect(loginSchema.safeParse({ login: 'usr01', senha: '123' }).success).toBe(true);
       expect(loginSchema.safeParse({ login: '', senha: '' }).success).toBe(false);
 
-      expect(redefinirSenhaSchema.safeParse({ token: 'tok-123', novaSenha: 'NovaSenha@123' }).success).toBe(true);
-      expect(redefinirSenhaSchema.safeParse({ token: '', novaSenha: '123' }).success).toBe(false);
+      expect(redefinirSenhaSchema.safeParse({ login: 'usuario@empresa.com', codigo: '123456', novaSenha: 'NovaSenha@123' }).success).toBe(true);
+      expect(redefinirSenhaSchema.safeParse({ login: '', codigo: '123', novaSenha: '123' }).success).toBe(false);
     });
 
     it('deve validar schema de manutenção de facilities', () => {

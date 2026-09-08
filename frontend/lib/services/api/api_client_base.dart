@@ -27,7 +27,8 @@ class ApiClientBase {
   static http.Client? customClient;
 
   // Callbacks para sincronização de estado com o AuthProvider
-  static void Function(String newToken, String? newRefreshToken)? onTokenRefreshed;
+  static void Function(String newToken, String? newRefreshToken)?
+      onTokenRefreshed;
   static void Function(String reason)? onSessionExpired;
 
   // Mutex para evitar múltiplos refresh simultâneos (Single-Flight Pattern)
@@ -42,7 +43,8 @@ class ApiClientBase {
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
-  Map<String, String> headers(String? token, {String? adminToken, String? correlationId}) {
+  Map<String, String> headers(String? token,
+      {String? adminToken, String? correlationId}) {
     final map = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -88,7 +90,8 @@ class ApiClientBase {
       final currentRefreshToken = await storage.getRefreshToken();
 
       if (currentRefreshToken == null || currentRefreshToken.isEmpty) {
-        debugPrint('[ApiClientBase] Nenhum refresh token disponível no storage.');
+        debugPrint(
+            '[ApiClientBase] Nenhum refresh token disponível no storage.');
         _refreshCompleter!.complete(false);
         onSessionExpired?.call('Sessão expirada. Faça login novamente.');
         return false;
@@ -96,15 +99,17 @@ class ApiClientBase {
 
       final client = customClient ?? http.Client();
       final uri = Uri.parse('${AppConstants.baseUrl}/auth/refresh-token');
-      final response = await client.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-correlation-id': generateCorrelationId(),
-        },
-        body: jsonEncode({'refreshToken': currentRefreshToken}),
-      ).timeout(const Duration(seconds: 10));
+      final response = await client
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'x-correlation-id': generateCorrelationId(),
+            },
+            body: jsonEncode({'refreshToken': currentRefreshToken}),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final body = jsonDecode(utf8.decode(response.bodyBytes));
@@ -117,11 +122,13 @@ class ApiClientBase {
         }
 
         onTokenRefreshed?.call(newToken, newRefreshToken);
-        debugPrint('[ApiClientBase] Token renovado com sucesso via auto-refresh interceptor.');
+        debugPrint(
+            '[ApiClientBase] Token renovado com sucesso via auto-refresh interceptor.');
         _refreshCompleter!.complete(true);
         return true;
       } else {
-        debugPrint('[ApiClientBase] Falha ao renovar token (HTTP ${response.statusCode}).');
+        debugPrint(
+            '[ApiClientBase] Falha ao renovar token (HTTP ${response.statusCode}).');
         await storage.clearAll();
         _refreshCompleter!.complete(false);
         onSessionExpired?.call('Sua sessão expirou. Faça login novamente.');
@@ -129,6 +136,7 @@ class ApiClientBase {
       }
     } catch (e) {
       debugPrint('[ApiClientBase] Exceção durante auto-refresh: $e');
+      await SecureStorageService().clearAll();
       if (!_refreshCompleter!.isCompleted) {
         _refreshCompleter!.complete(false);
       }
@@ -162,19 +170,28 @@ class ApiClientBase {
       }
 
       final reqHeaders = headers(authToken, adminToken: adminToken);
-      final encodedBody = body != null ? (body is String ? body : jsonEncode(body)) : null;
+      final encodedBody =
+          body != null ? (body is String ? body : jsonEncode(body)) : null;
 
       switch (method.toUpperCase()) {
         case 'GET':
           return client.get(uri, headers: reqHeaders).timeout(timeout);
         case 'POST':
-          return client.post(uri, headers: reqHeaders, body: encodedBody).timeout(timeout);
+          return client
+              .post(uri, headers: reqHeaders, body: encodedBody)
+              .timeout(timeout);
         case 'PUT':
-          return client.put(uri, headers: reqHeaders, body: encodedBody).timeout(timeout);
+          return client
+              .put(uri, headers: reqHeaders, body: encodedBody)
+              .timeout(timeout);
         case 'PATCH':
-          return client.patch(uri, headers: reqHeaders, body: encodedBody).timeout(timeout);
+          return client
+              .patch(uri, headers: reqHeaders, body: encodedBody)
+              .timeout(timeout);
         case 'DELETE':
-          return client.delete(uri, headers: reqHeaders, body: encodedBody).timeout(timeout);
+          return client
+              .delete(uri, headers: reqHeaders, body: encodedBody)
+              .timeout(timeout);
         default:
           throw UnsupportedError('Método HTTP não suportado: $method');
       }
@@ -184,14 +201,17 @@ class ApiClientBase {
       var response = await executeCall(currentToken);
 
       // 1. Interceptor de 401 Unauthorized (Auto-Refresh + Retry)
-      final isAuthEndpoint = path.contains('/auth/login') || path.contains('/auth/refresh-token');
+      final isAuthEndpoint =
+          path.contains('/auth/login') || path.contains('/auth/refresh-token');
       if (response.statusCode == 401 && autoRefresh && !isAuthEndpoint) {
-        debugPrint('[ApiClientBase] HTTP 401 detectado em $path. Disparando Auto-Refresh...');
+        debugPrint(
+            '[ApiClientBase] HTTP 401 detectado em $path. Disparando Auto-Refresh...');
         final refreshed = await _refreshAuthToken();
         if (refreshed) {
           final storage = SecureStorageService();
           currentToken = await storage.getToken();
-          debugPrint('[ApiClientBase] Repetindo requisição original em $path com novo token...');
+          debugPrint(
+              '[ApiClientBase] Repetindo requisição original em $path com novo token...');
           response = await executeCall(currentToken);
         }
       }
@@ -212,7 +232,9 @@ class ApiClientBase {
             parsedData = decoded;
           }
 
-          final String? msg = (decoded is Map && decoded.containsKey('message')) ? decoded['message']?.toString() : null;
+          final String? msg = (decoded is Map && decoded.containsKey('message'))
+              ? decoded['message']?.toString()
+              : null;
           return ApiResponse(
             success: true,
             data: parsedData,
@@ -220,7 +242,8 @@ class ApiClientBase {
             statusCode: response.statusCode,
           );
         } catch (_) {
-          final decodedString = utf8.decode(response.bodyBytes, allowMalformed: true);
+          final decodedString =
+              utf8.decode(response.bodyBytes, allowMalformed: true);
           return ApiResponse(
             success: true,
             data: (decodedString is T) ? (decodedString as T) : null,
@@ -236,7 +259,8 @@ class ApiClientBase {
             errorMsg = decoded['error'] ?? decoded['message'] ?? errorMsg;
           }
         } catch (_) {
-          if (response.bodyBytes.isNotEmpty && response.bodyBytes.length < 200) {
+          if (response.bodyBytes.isNotEmpty &&
+              response.bodyBytes.length < 200) {
             errorMsg = utf8.decode(response.bodyBytes, allowMalformed: true);
           }
         }
@@ -296,7 +320,8 @@ class ApiClientBase {
           statusCode: 200,
         );
       } else {
-        String errorMsg = 'Falha ao baixar arquivo (HTTP ${response.statusCode})';
+        String errorMsg =
+            'Falha ao baixar arquivo (HTTP ${response.statusCode})';
         try {
           final dynamic decoded = jsonDecode(utf8.decode(response.bodyBytes));
           if (decoded is Map) {
@@ -318,4 +343,3 @@ class ApiClientBase {
     }
   }
 }
-

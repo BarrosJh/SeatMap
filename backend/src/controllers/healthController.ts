@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/db';
 import { logger } from '../utils/logger';
+import { MetricsService } from '../services/metricsService';
 
 export class HealthController {
   /**
@@ -8,16 +9,9 @@ export class HealthController {
    * Verifica se o processo Node.js está responsivo.
    */
   static async live(req: Request, res: Response) {
-    const mem = process.memoryUsage();
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
-      uptimeSeconds: Math.floor(process.uptime()),
-      memory: {
-        rssMb: Math.round((mem.rss / 1024 / 1024) * 100) / 100,
-        heapUsedMb: Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100,
-        heapTotalMb: Math.round((mem.heapTotal / 1024 / 1024) * 100) / 100
-      },
       service: 'seatmap-backend'
     });
   }
@@ -63,14 +57,14 @@ export class HealthController {
         error: error.message,
         latencyMs
       });
+      MetricsService.recordDependencyFailure('postgresql', { correlationId, latencyMs });
 
       res.status(503).json({
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         database: {
           status: 'disconnected',
-          latencyMs,
-          error: error.message
+          latencyMs
         },
         service: 'seatmap-backend'
       });
@@ -85,6 +79,17 @@ export class HealthController {
       status: 'ok',
       timestamp: new Date().toISOString(),
       service: 'seatmap-backend'
+    });
+  }
+
+  static async metrics(req: Request, res: Response) {
+    const snapshot = MetricsService.getSnapshot();
+    const status = snapshot.requests.errors5xx > 0 ? 'degraded' : 'healthy';
+
+    return res.status(status === 'healthy' ? 200 : 503).json({
+      status,
+      service: 'seatmap-backend',
+      ...snapshot
     });
   }
 }

@@ -2,22 +2,52 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:seatmap_frontend/services/api/api_client_base.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockHttpClient extends http.BaseClient {
-  final Future<http.StreamedResponse> Function(http.BaseRequest request) handler;
+  final Future<http.StreamedResponse> Function(http.BaseRequest request)
+      handler;
   MockHttpClient(this.handler);
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) => handler(request);
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      handler(request);
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
+    final secureValues = <String, String>{
+      'seatmap_refresh_token': 'valid-refresh-token',
+      'seatmap_jwt_token': 'old-jwt-token',
+    };
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
+      (call) async {
+        final args = Map<String, dynamic>.from(call.arguments as Map? ?? {});
+        final key = args['key'] as String?;
+        switch (call.method) {
+          case 'read':
+            return key == null ? null : secureValues[key];
+          case 'write':
+            if (key != null) secureValues[key] = args['value'] as String;
+            return null;
+          case 'delete':
+            if (key != null) secureValues.remove(key);
+            return null;
+          case 'deleteAll':
+            secureValues.clear();
+            return null;
+          default:
+            return null;
+        }
+      },
+    );
     SharedPreferences.setMockInitialValues({
       'seatmap_jwt_token': 'old-jwt-token',
       'seatmap_refresh_token': 'valid-refresh-token',
@@ -30,20 +60,31 @@ void main() {
     ApiClientBase.onSessionExpired = null;
   });
 
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
+      null,
+    );
+  });
+
   group('1. Sanitização de Erros de Conexão', () {
     test('deve sanitizar TimeoutException', () {
       final err = TimeoutException('Timeout');
-      expect(ApiClientBase.sanitizeError(err), contains('Tempo limite de conexão'));
+      expect(ApiClientBase.sanitizeError(err),
+          contains('Tempo limite de conexão'));
     });
 
     test('deve sanitizar SocketException', () {
       const err = SocketException('Failed host lookup');
-      expect(ApiClientBase.sanitizeError(err), contains('Não foi possível conectar ao servidor'));
+      expect(ApiClientBase.sanitizeError(err),
+          contains('Não foi possível conectar ao servidor'));
     });
 
     test('deve sanitizar FormatException', () {
       const err = FormatException('Bad format');
-      expect(ApiClientBase.sanitizeError(err), contains('Resposta em formato inesperado'));
+      expect(ApiClientBase.sanitizeError(err),
+          contains('Resposta em formato inesperado'));
     });
   });
 
@@ -52,7 +93,9 @@ void main() {
       ApiClientBase.customClient = MockHttpClient((req) async {
         expect(req.url.path, contains('/escritorios'));
         return http.StreamedResponse(
-          Stream.value(utf8.encode(jsonEncode([{'id': 1, 'nome': 'Matriz'}]))),
+          Stream.value(utf8.encode(jsonEncode([
+            {'id': 1, 'nome': 'Matriz'}
+          ]))),
           200,
         );
       });
@@ -73,7 +116,8 @@ void main() {
     test('deve processar erro 400 com mensagem amigável', () async {
       ApiClientBase.customClient = MockHttpClient((req) async {
         return http.StreamedResponse(
-          Stream.value(utf8.encode(jsonEncode({'error': 'Assento já reservado'}))),
+          Stream.value(
+              utf8.encode(jsonEncode({'error': 'Assento já reservado'}))),
           400,
         );
       });
@@ -92,7 +136,9 @@ void main() {
   });
 
   group('3. HTTP Client Interceptor - 401 Auto-Refresh & Retry', () {
-    test('deve interceptar 401, renovar token e repetir requisição original com sucesso', () async {
+    test(
+        'deve interceptar 401, renovar token e repetir requisição original com sucesso',
+        () async {
       int callCount = 0;
       bool refreshCalled = false;
       String? updatedToken;
@@ -124,7 +170,8 @@ void main() {
           // Segunda tentativa (retry) com o novo token
           expect(req.headers['Authorization'], 'Bearer brand-new-jwt-token');
           return http.StreamedResponse(
-            Stream.value(utf8.encode(jsonEncode({'message': 'Sucesso após retry'}))),
+            Stream.value(
+                utf8.encode(jsonEncode({'message': 'Sucesso após retry'}))),
             200,
           );
         }
@@ -145,7 +192,8 @@ void main() {
       expect(updatedToken, 'brand-new-jwt-token');
     });
 
-    test('deve disparar onSessionExpired quando o refresh token falhar (401)', () async {
+    test('deve disparar onSessionExpired quando o refresh token falhar (401)',
+        () async {
       bool sessionExpiredFired = false;
 
       ApiClientBase.onSessionExpired = (reason) {
@@ -155,7 +203,8 @@ void main() {
       ApiClientBase.customClient = MockHttpClient((req) async {
         if (req.url.path.contains('/auth/refresh-token')) {
           return http.StreamedResponse(
-            Stream.value(utf8.encode(jsonEncode({'error': 'Refresh token inválido'}))),
+            Stream.value(
+                utf8.encode(jsonEncode({'error': 'Refresh token inválido'}))),
             401,
           );
         }

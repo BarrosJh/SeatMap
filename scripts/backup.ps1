@@ -13,8 +13,8 @@
 param (
     [string]$DbHost = $env:DB_HOST,
     [int]$DbPort = $(if ($env:DB_PORT) { [int]$env:DB_PORT } else { 5432 }),
-    [string]$DbUser = $(if ($env:DB_USER) { $env:DB_USER } else { "postgres" }),
-    [string]$DbName = $(if ($env:DB_NAME) { $env:DB_NAME } else { "seatmap" }),
+    [string]$DbUser = $(if ($env:DB_USER) { $env:DB_USER } else { "seatmap_user" }),
+    [string]$DbName = $(if ($env:DB_NAME) { $env:DB_NAME } else { "seatmap_db" }),
     [string]$DbPassword = $env:DB_PASSWORD,
     [string]$BackupDir = $(Join-Path $PSScriptRoot "..\backups"),
     [int]$RetentionDays = 30

@@ -1,119 +1,55 @@
-# ==============================================================================
-# SeatMap PostgreSQL Restore Script for PowerShell (Windows Server / Dev)
-# ==============================================================================
-# Restaura um arquivo de backup (.sql.gz ou .sql) no banco de dados PostgreSQL
-# após validação de integridade SHA256 do arquivo.
-#
-# Uso:
-#   .\scripts\restore.ps1 -BackupFile "backups\seatmap_backup_20260907_120000.sql.gz"
-# ==============================================================================
-
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
     [string]$BackupFile,
-
-    [string]$DbHost = $env:DB_HOST,
+    [string]$DbHost = $(if ($env:DB_HOST) { $env:DB_HOST } else { "localhost" }),
     [int]$DbPort = $(if ($env:DB_PORT) { [int]$env:DB_PORT } else { 5432 }),
-    [string]$DbUser = $(if ($env:DB_USER) { $env:DB_USER } else { "postgres" }),
-    [string]$DbName = $(if ($env:DB_NAME) { $env:DB_NAME } else { "seatmap" }),
-    [string]$DbPassword = $env:DB_PASSWORD
+    [string]$DbUser = $(if ($env:DB_USER) { $env:DB_USER } else { "seatmap_user" }),
+    [string]$DbName = $(if ($env:DB_NAME) { $env:DB_NAME } else { "seatmap_db" }),
+    [string]$DbPassword = $env:DB_PASSWORD,
+    [switch]$ConfirmRestore
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not $DbHost) { $DbHost = "localhost" }
-if (-not (Test-Path $BackupFile)) {
-    Write-Error "[-] ERRO: Arquivo de backup '$BackupFile' não foi encontrado."
-    exit 1
-}
+if (-not (Test-Path $BackupFile)) { throw "Backup nao encontrado: $BackupFile" }
+if (-not $ConfirmRestore) { throw "Restore bloqueado. Use -ConfirmRestore explicitamente." }
 
-Write-Host "================================================================================" -ForegroundColor Cyan
-Write-Host " [SeatMap] Iniciando Processo de Restauração do PostgreSQL (PowerShell)" -ForegroundColor Cyan
-Write-Host " Data/Hora : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-Write-Host " Arquivo   : ${BackupFile}"
-Write-Host " Host      : ${DbHost}:${DbPort}"
-Write-Host " Banco     : ${DbName}"
-Write-Host "================================================================================" -ForegroundColor Cyan
+$pgTools = Get-Command psql -ErrorAction SilentlyContinue
+if (-not $pgTools) { throw "psql nao encontrado no PATH." }
+$gzipTool = Get-Command gzip -ErrorAction SilentlyContinue
+if (-not $gzipTool) { throw "gzip nao encontrado no PATH." }
 
-# Verificação de Checksum se existir .sha256
-$ChecksumFile = "${BackupFile}.sha256"
-if (Test-Path $ChecksumFile) {
-    Write-Host "[*] Validando integridade do backup com arquivo de Checksum..." -ForegroundColor Yellow
-    $ExpectedHash = (Get-Content $ChecksumFile | Select-Object -First 1).Split(" ")[0].Trim()
-    $ActualHash = (Get-FileHash -Path $BackupFile -Algorithm SHA256).Hash.Trim()
+$checksumFile = "${BackupFile}.sha256"
+if (-not (Test-Path $checksumFile)) { throw "Arquivo de checksum ausente: $checksumFile" }
 
-    if ($ExpectedHash.ToUpper() -eq $ActualHash.ToUpper()) {
-        Write-Host "[+] Checksum SHA-256 verificado com sucesso!" -ForegroundColor Green
-    } else {
-        Write-Error "[-] ERRO CRÍTICO: Checksum SHA-256 divergente! O arquivo pode estar corrompido."
-        exit 1
-    }
-}
+$expected = (Get-Content $checksumFile | Select-Object -First 1).Split(' ')[0].Trim().ToUpperInvariant()
+$actual = (Get-FileHash -Path $BackupFile -Algorithm SHA256).Hash.ToUpperInvariant()
+if ($expected -ne $actual) { throw "Checksum invalido. Restore cancelado." }
 
-# Localiza utilitário psql
-$psqlCmd = Get-Command "psql" -ErrorAction SilentlyContinue
-if (-not $psqlCmd) {
-    $pgPathDefault = "C:\Program Files\PostgreSQL\*\bin\psql.exe"
-    $foundPg = Resolve-Path $pgPathDefault -ErrorAction SilentlyContinue | Select-Object -Last 1
-    if ($foundPg) {
-        $psqlExe = $foundPg.Path
-    } else {
-        Write-Error "[-] ERRO: 'psql' não encontrado no PATH ou em Program Files\PostgreSQL."
-        exit 1
-    }
-} else {
-    $psqlExe = "psql"
-}
+if ($DbPassword) { $env:PGPASSWORD = $DbPassword }
 
-if ($DbPassword) {
-    $env:PGPASSWORD = $DbPassword
-}
+Write-Host "[*] Validando compressao do backup..."
+& $gzipTool.Source -t $BackupFile
 
-$Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+Write-Host "[*] Restaurando $BackupFile em ${DbName}@${DbHost}:${DbPort}..."
+& $gzipTool.Source -dc $BackupFile | & $pgTools.Source `
+    --host $DbHost `
+    --port $DbPort `
+    --username $DbUser `
+    --dbname $DbName `
+    --set ON_ERROR_STOP=1 `
+    --single-transaction
 
-try {
-    # Descompacta se for .gz
-    $SqlToExecute = $BackupFile
-    $TempUnzipped = $null
+Write-Host "[*] Executando verificacao pos-restore..."
+$verification = @"
+SELECT current_database() AS database,
+       (SELECT COUNT(*) FROM usuarios) AS usuarios,
+       (SELECT COUNT(*) FROM reservas) AS reservas,
+       (SELECT COUNT(*) FROM auditoria_acessos) AS auditoria_acessos;
+"@
+$verification | & $pgTools.Source --host $DbHost --port $DbPort --username $DbUser --dbname $DbName --set ON_ERROR_STOP=1
 
-    if ($BackupFile.EndsWith(".gz", [System.StringComparison]::OrdinalIgnoreCase)) {
-        Write-Host "[*] Descompactando arquivo GZip em memória temporária..." -ForegroundColor Yellow
-        $TempUnzipped = [System.IO.Path]::GetTempFileName() + ".sql"
-        
-        $inputStream = [System.IO.File]::OpenRead($BackupFile)
-        $gzipStream = New-Object System.IO.Compression.GZipStream($inputStream, [System.IO.Compression.CompressionMode]::Decompress)
-        $outputStream = [System.IO.File]::Create($TempUnzipped)
-        $gzipStream.CopyTo($outputStream)
-        $outputStream.Dispose()
-        $gzipStream.Dispose()
-        $inputStream.Dispose()
+Write-Host "[+] Restore concluido e verificacao pos-restore executada." -ForegroundColor Green
 
-        $SqlToExecute = $TempUnzipped
-    }
-
-    Write-Host "[*] Encerrando conexões ativas no banco $DbName..." -ForegroundColor Yellow
-    try {
-        & $psqlExe -h $DbHost -p $DbPort -U $DbUser -d "postgres" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DbName' AND pid <> pg_backend_pid();" | Out-Null
-    } catch {
-        Write-Host "    [!] Aviso: Não foi possível terminar sessões automaticamente." -ForegroundColor DarkGray
-    }
-
-    Write-Host "[*] Executando restore do banco $DbName via psql..." -ForegroundColor Yellow
-    & $psqlExe -h $DbHost -p $DbPort -U $DbUser -d $DbName -f $SqlToExecute
-
-    if ($TempUnzipped -and (Test-Path $TempUnzipped)) {
-        Remove-Item $TempUnzipped -Force
-    }
-
-    $Stopwatch.Stop()
-    Write-Host "================================================================================" -ForegroundColor Cyan
-    Write-Host " [SeatMap] Restauração Concluída com Sucesso em $($Stopwatch.Elapsed.TotalSeconds.ToString('F2'))s!" -ForegroundColor Green
-    Write-Host "================================================================================" -ForegroundColor Cyan
-    exit 0
-} catch {
-    Write-Error "[-] Falha crítica durante restauração: $_"
-    if ($TempUnzipped -and (Test-Path $TempUnzipped)) { Remove-Item $TempUnzipped -Force }
-    exit 1
-}
 

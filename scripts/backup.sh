@@ -15,8 +15,8 @@ set -euo pipefail
 # Configurações de Banco de Dados (com fallbacks para variáveis de ambiente)
 DB_HOST="${DB_HOST:-${PGHOST:-localhost}}"
 DB_PORT="${DB_PORT:-${PGPORT:-5432}}"
-DB_USER="${DB_USER:-${PGUSER:-postgres}}"
-DB_NAME="${DB_NAME:-${PGDATABASE:-seatmap}}"
+DB_USER="${DB_USER:-${PGUSER:-seatmap_user}}"
+DB_NAME="${DB_NAME:-${PGDATABASE:-seatmap_db}}"
 BACKUP_DIR="${BACKUP_DIR:-$(pwd)/backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 

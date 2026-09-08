@@ -333,7 +333,7 @@ export class LoginController {
   }
 
   public static async logout(req: Request, res: Response) {
-    const { refreshToken } = req.body;
+    const { refreshToken } = req.body || {};
     const ip = AuditService.getClientIp(req);
     const userAgent = AuditService.getUserAgent(req);
 

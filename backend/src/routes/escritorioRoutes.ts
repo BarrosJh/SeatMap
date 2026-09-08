@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import { EscritorioController } from '../controllers/escritorioController';
 import { authenticateToken } from '../middleware/auth';
-import { globalLimiter } from '../middleware/rateLimiter';
+import { validateRequest } from '../middleware/validateRequest';
+import { dateQuerySchema, idParamSchema } from '../schemas';
 
 const router = Router();
-
-router.use(globalLimiter);
 
 // GET /api/escritorios
 router.get('/', authenticateToken, EscritorioController.listar);
@@ -18,7 +17,7 @@ router.get('/ocupacao/semanal', authenticateToken, EscritorioController.getOcupa
 router.get('/aviso', authenticateToken, EscritorioController.getAvisoGlobal);
 
 // GET /api/escritorios/:id/mapa?data=YYYY-MM-DD
-router.get('/:id/mapa', authenticateToken, EscritorioController.getMapa);
+router.get('/:id/mapa', authenticateToken, validateRequest({ params: idParamSchema, query: dateQuerySchema }), EscritorioController.getMapa);
 
 export default router;
 

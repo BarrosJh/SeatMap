@@ -14,12 +14,14 @@ import { requestLoggerMiddleware } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
 import pool from './config/db';
+import { MetricsService } from './services/metricsService';
 
 dotenv.config();
 validateSecurityConfig();
 
 const app = express();
-app.set('trust proxy', true);
+const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
+app.set('trust proxy', Number.isFinite(trustProxyHops) && trustProxyHops > 0 ? trustProxyHops : false);
 
 // Injeção de X-Correlation-ID em todas as requisições antes de qualquer outro middleware
 app.use(correlationIdMiddleware);
@@ -67,6 +69,7 @@ app.use(cors({
   exposedHeaders: ['X-Correlation-Id']
 }));
 app.use(express.json({
+  limit: '256kb',
   type: ['application/json', 'application/scim+json', 'application/*+json']
 }));
 
@@ -163,10 +166,12 @@ if (process.env.NODE_ENV !== 'test') {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
   process.on('unhandledRejection', (reason: any) => {
+    MetricsService.recordProcessFailure('UNHANDLED_REJECTION', { reason: reason instanceof Error ? reason.message : String(reason) });
     logger.error('[SeatMap API - Unhandled Rejection]', { reason: reason instanceof Error ? reason.stack : reason });
   });
 
   process.on('uncaughtException', (error: Error) => {
+    MetricsService.recordProcessFailure('UNCAUGHT_EXCEPTION', { error: error.message });
     logger.error('[SeatMap API - Uncaught Exception]', { error: error.stack });
     gracefulShutdown('uncaughtException');
   });

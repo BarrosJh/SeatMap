@@ -5,13 +5,20 @@ on:
     branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master, develop ]
+  workflow_dispatch:
+    inputs:
+      run_staging_smoke:
+        description: 'Executar smoke test no ambiente de staging'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
   backend-ci:
-    name: Backend CI (TypeScript, Lint & Jest Tests)
+    name: Backend CI (TypeScript, Audit, Build & Jest Tests)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,11 +41,27 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Audit Dependencies (High/Critical)
+        run: npm audit --audit-level=high
+
       - name: Verify TypeScript Type Checking
         run: npm run typecheck
 
       - name: Compile Backend Production Build
         run: npm run build
+
+      - name: Build Production Container
+        run: docker build --tag seatmap-backend:${{ github.sha }} .
+
+      - name: Scan Production Container
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: seatmap-backend:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
 
       - name: Run Automated Jest Unit & Integration Tests
         run: npm test
@@ -81,6 +104,87 @@ jobs:
       - name: Run Automated Flutter Unit Tests
         run: flutter test
 
+      - name: Check Flutter Dependency Health
+        run: flutter pub outdated --no-dev-dependencies
+
       - name: Compile Flutter Web Release Build
         run: flutter build web --release --no-tree-shake-icons
+
+  dependency-review:
+    name: Dependency Review (Pull Requests)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Review Dependency Changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+      - name: Skip Diff Review on Push
+        if: github.event_name != 'pull_request'
+        run: echo "Dependency diff review is only applicable to pull requests."
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan Repository for Secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  quality-gate:
+    name: Release Quality Gate
+    needs: [backend-ci, frontend-ci, dependency-review, secret-scan]
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - name: Reject Failed Required Jobs
+        if: needs.backend-ci.result != 'success' || needs.frontend-ci.result != 'success' || needs.dependency-review.result != 'success' || needs.secret-scan.result != 'success'
+        run: |
+          echo "Quality gate rejected: backend=${{ needs.backend-ci.result }}, frontend=${{ needs.frontend-ci.result }}, dependencies=${{ needs.dependency-review.result }}, secrets=${{ needs.secret-scan.result }}"
+          exit 1
+
+      - name: Approve Quality Gate
+        run: echo "Backend and frontend quality gates passed."
+
+  staging-smoke:
+    name: Staging Smoke Test (Manual Promotion)
+    needs: quality-gate
+    if: github.event_name == 'workflow_dispatch' && inputs.run_staging_smoke == true
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Verify Staging Health
+        env:
+          STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
+          INTERNAL_HEALTH_TOKEN: ${{ secrets.INTERNAL_HEALTH_TOKEN }}
+        run: |
+          test -n "$STAGING_HEALTH_URL"
+          test -n "$INTERNAL_HEALTH_TOKEN"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 \
+            -H "x-health-token: $INTERNAL_HEALTH_TOKEN" \
+            "$STAGING_HEALTH_URL/api/health/ready"
+
+      - name: Verify Staging Metrics Endpoint
+        env:
+          STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
+          INTERNAL_HEALTH_TOKEN: ${{ secrets.INTERNAL_HEALTH_TOKEN }}
+        run: curl --fail --silent --show-error \
+          -H "x-health-token: $INTERNAL_HEALTH_TOKEN" \
+          "$STAGING_HEALTH_URL/api/health/metrics"
 

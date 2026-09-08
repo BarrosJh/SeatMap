@@ -162,18 +162,17 @@ describe('Prioridade 2: Observabilidade & Governança de Infraestrutura', () => 
       } as unknown as Response;
     });
 
-    it('HealthController.live deve responder 200 com métricas de memória e uptime', async () => {
+    it('HealthController.live deve responder 200 sem expor detalhes do processo', async () => {
       await HealthController.live(mockReq, mockRes);
 
       expect(statusMock).toHaveBeenCalledWith(200);
       expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
         status: 'ok',
-        service: 'seatmap-backend',
-        memory: expect.objectContaining({
-          rssMb: expect.any(Number),
-          heapUsedMb: expect.any(Number)
-        })
+        service: 'seatmap-backend'
       }));
+
+      expect(jsonMock.mock.calls[0][0]).not.toHaveProperty('memory');
+      expect(jsonMock.mock.calls[0][0]).not.toHaveProperty('uptimeSeconds');
     });
 
     it('HealthController.ready deve responder 200 e status connected quando banco responde', async () => {
@@ -206,10 +205,11 @@ describe('Prioridade 2: Observabilidade & Governança de Infraestrutura', () => 
       expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({
         status: 'unhealthy',
         database: expect.objectContaining({
-          status: 'disconnected',
-          error: 'Connection terminated unexpectedly'
+          status: 'disconnected'
         })
       }));
+
+      expect(jsonMock.mock.calls[0][0].database).not.toHaveProperty('error');
 
       querySpy.mockRestore();
     });

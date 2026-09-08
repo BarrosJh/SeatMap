@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
 
 class SecureStorageService {
-  static final SecureStorageService _instance = SecureStorageService._internal();
+  static final SecureStorageService _instance =
+      SecureStorageService._internal();
   factory SecureStorageService() => _instance;
   SecureStorageService._internal();
 
@@ -21,66 +22,63 @@ class SecureStorageService {
   Future<void> migrateFromSharedPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
-      final legacyToken = prefs.getString(AppConstants.keyToken);
-      if (legacyToken != null && legacyToken.isNotEmpty) {
-        await write(AppConstants.keyToken, legacyToken);
-        await prefs.remove(AppConstants.keyToken);
-      }
 
-      final legacyUserData = prefs.getString(AppConstants.keyUserData);
-      if (legacyUserData != null && legacyUserData.isNotEmpty) {
-        await write(AppConstants.keyUserData, legacyUserData);
-        await prefs.remove(AppConstants.keyUserData);
-      }
+      await _migrateKey(prefs, AppConstants.keyToken);
+      await _migrateKey(prefs, AppConstants.keyRefreshToken);
+      await _migrateKey(prefs, AppConstants.keyUserData);
 
-      final legacyAdminToken = prefs.getString(AppConstants.keyAdminToken);
-      if (legacyAdminToken != null && legacyAdminToken.isNotEmpty) {
-        await write(AppConstants.keyAdminToken, legacyAdminToken);
-        await prefs.remove(AppConstants.keyAdminToken);
-      }
+      // Admin step-up tokens are intentionally not migrated or persisted.
+      await prefs.remove(AppConstants.keyAdminToken);
     } catch (e, stackTrace) {
-      debugPrint('[SecureStorageService] Falha não crítica na migração de SharedPreferences: $e\n$stackTrace');
+      debugPrint(
+          '[SecureStorageService] Falha não crítica na migração de SharedPreferences: $e\n$stackTrace');
     }
   }
 
-  /// Gravação segura com fallback automático para SharedPreferences
+  Future<void> _migrateKey(SharedPreferences prefs, String key) async {
+    final legacyValue = prefs.getString(key);
+    if (legacyValue == null || legacyValue.isEmpty) return;
+
+    try {
+      await write(key, legacyValue);
+    } catch (e) {
+      debugPrint(
+          '[SecureStorageService] Não foi possível migrar $key para o cofre seguro: $e');
+    } finally {
+      // Never leave a credential in the insecure legacy store after startup.
+      await prefs.remove(key);
+    }
+  }
+
+  /// Gravação exclusivamente no armazenamento seguro.
   Future<void> write(String key, String value) async {
     try {
       await _storage.write(key: key, value: value);
     } catch (e, stackTrace) {
-      debugPrint('[SecureStorageService] Falha ao gravar no FlutterSecureStorage ($key): $e\n$stackTrace');
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(key, value);
-      } catch (fallbackError) {
-        debugPrint('[SecureStorageService] Falha no fallback SharedPreferences: $fallbackError');
-      }
+      debugPrint(
+          '[SecureStorageService] Falha ao gravar no FlutterSecureStorage ($key): $e\n$stackTrace');
+      rethrow;
     }
   }
 
-  /// Leitura segura com fallback automático para SharedPreferences
+  /// Leitura exclusivamente do armazenamento seguro.
   Future<String?> read(String key) async {
     try {
-      final val = await _storage.read(key: key);
-      if (val != null) return val;
+      return await _storage.read(key: key);
     } catch (e) {
-      debugPrint('[SecureStorageService] Falha ao ler do FlutterSecureStorage ($key): $e');
-    }
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(key);
-    } catch (e) {
+      debugPrint(
+          '[SecureStorageService] Falha ao ler do FlutterSecureStorage ($key): $e');
       return null;
     }
   }
 
-  /// Exclusão segura com sincronização em SharedPreferences
+  /// Remove a credencial do armazenamento seguro e qualquer cópia legada.
   Future<void> delete(String key) async {
     try {
       await _storage.delete(key: key);
     } catch (e) {
-      debugPrint('[SecureStorageService] Falha ao deletar do FlutterSecureStorage ($key): $e');
+      debugPrint(
+          '[SecureStorageService] Falha ao deletar do FlutterSecureStorage ($key): $e');
     }
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -90,18 +88,23 @@ class SecureStorageService {
     }
   }
 
-  Future<void> saveToken(String token) async => write(AppConstants.keyToken, token);
+  Future<void> saveToken(String token) async =>
+      write(AppConstants.keyToken, token);
   Future<String?> getToken() async => read(AppConstants.keyToken);
 
-  Future<void> saveRefreshToken(String refreshToken) async => write(AppConstants.keyRefreshToken, refreshToken);
+  Future<void> saveRefreshToken(String refreshToken) async =>
+      write(AppConstants.keyRefreshToken, refreshToken);
   Future<String?> getRefreshToken() async => read(AppConstants.keyRefreshToken);
-  Future<void> deleteRefreshToken() async => delete(AppConstants.keyRefreshToken);
+  Future<void> deleteRefreshToken() async =>
+      delete(AppConstants.keyRefreshToken);
 
-  Future<void> saveUserData(String userDataJson) async => write(AppConstants.keyUserData, userDataJson);
+  Future<void> saveUserData(String userDataJson) async =>
+      write(AppConstants.keyUserData, userDataJson);
   Future<String?> getUserData() async => read(AppConstants.keyUserData);
 
-  Future<void> saveAdminToken(String adminToken) async => write(AppConstants.keyAdminToken, adminToken);
-  Future<String?> getAdminToken() async => read(AppConstants.keyAdminToken);
+  // Step-up token is session-only and intentionally not persisted.
+  Future<void> saveAdminToken(String adminToken) async {}
+  Future<String?> getAdminToken() async => null;
 
   Future<void> clearAll() async {
     await delete(AppConstants.keyToken);
@@ -110,4 +113,3 @@ class SecureStorageService {
     await delete(AppConstants.keyAdminToken);
   }
 }
-

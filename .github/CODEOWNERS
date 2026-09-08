@@ -1,0 +1,9 @@
+# Revisao obrigatoria para mudancas de seguranca, dados e release.
+* @seatmap-team
+/backend/src/config/ @seatmap-security @seatmap-platform
+/backend/src/middleware/ @seatmap-security
+/backend/src/services/ @seatmap-security @seatmap-platform
+/backend/src/database/ @seatmap-platform @seatmap-security
+/frontend/lib/services/ @seatmap-security @seatmap-frontend
+/.github/ @seatmap-platform @seatmap-security
+/docs/ @seatmap-platform

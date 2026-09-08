@@ -4,6 +4,18 @@ import pool from '../config/db';
 import { ConfigService } from '../services/configService';
 import { env } from '../config/env';
 
+export type Permission =
+  | 'config:read'
+  | 'config:write'
+  | 'usuarios:read'
+  | 'usuarios:write'
+  | 'relatorios:read'
+  | 'relatorios:write'
+  | 'reservas:read'
+  | 'reservas:write'
+  | 'infra:read'
+  | 'infra:write';
+
 export interface AuthUser {
   userId: number;
   nome: string;
@@ -26,6 +38,94 @@ export interface AuthenticatedRequest extends Request {
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_ADMIN_SECRET = env.JWT_ADMIN_SECRET;
 
+export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
+  COLABORADOR: ['reservas:read'],
+  GESTAO: ['reservas:read', 'reservas:write'],
+  ADMIN_RH: [
+    'config:read',
+    'config:write',
+    'usuarios:read',
+    'usuarios:write',
+    'relatorios:read',
+    'relatorios:write',
+    'reservas:read',
+    'reservas:write'
+  ],
+  ADMIN_TI: [
+    'infra:read',
+    'infra:write',
+    'usuarios:read',
+    'usuarios:write',
+    'reservas:read',
+    'reservas:write'
+  ]
+};
+
+export const getUserPermissions = (user?: Pick<AuthUser, 'perfil' | 'permissaoRh' | 'permissaoTi' | 'is_admin'>): Permission[] => {
+  if (!user) return [];
+
+  const permissions = new Set<Permission>(ROLE_PERMISSIONS[user.perfil] || []);
+
+  if (user.permissaoRh === true) {
+    permissions.add('config:read');
+    permissions.add('config:write');
+    permissions.add('usuarios:read');
+    permissions.add('usuarios:write');
+    permissions.add('relatorios:read');
+    permissions.add('relatorios:write');
+    permissions.add('reservas:read');
+    permissions.add('reservas:write');
+  }
+
+  if (user.permissaoTi === true) {
+    permissions.add('infra:read');
+    permissions.add('infra:write');
+    permissions.add('usuarios:read');
+    permissions.add('usuarios:write');
+    permissions.add('reservas:read');
+    permissions.add('reservas:write');
+  }
+
+  if (user.is_admin === true) {
+    permissions.add('config:read');
+    permissions.add('config:write');
+    permissions.add('usuarios:read');
+    permissions.add('usuarios:write');
+    permissions.add('infra:read');
+    permissions.add('infra:write');
+    permissions.add('relatorios:read');
+    permissions.add('relatorios:write');
+    permissions.add('reservas:read');
+    permissions.add('reservas:write');
+  }
+
+  return Array.from(permissions);
+};
+
+export const userHasPermission = (
+  user: Pick<AuthUser, 'perfil' | 'permissaoRh' | 'permissaoTi' | 'is_admin'> | undefined,
+  permission: Permission
+): boolean => {
+  if (!user) return false;
+  return getUserPermissions(user).includes(permission);
+};
+
+export const requirePermission = (permission: Permission) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Token de autenticação não fornecido' });
+    }
+
+    if (!userHasPermission(req.user, permission)) {
+      return res.status(403).json({
+        error: `Permissão insuficiente para executar esta operação (${permission}).`
+      });
+    }
+
+    return next();
+  };
+};
+
 export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -40,7 +140,6 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     }
 
     try {
-      // Validação de Revogação Instantânea de Sessão e Status Ativo no Banco
       const userCheck = await pool.query(
         'SELECT ativo, COALESCE(token_version, 1) AS token_version FROM usuarios WHERE id = $1',
         [decoded.userId]
@@ -69,28 +168,21 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
 export const authMiddleware = authenticateToken;
 
 export const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  const hasAdminAccess = req.user?.permissaoRh === true || req.user?.is_admin === true || req.user?.perfil === 'ADMIN_RH';
-  if (!req.user || !hasAdminAccess) {
+  if (!req.user || !userHasPermission(req.user, 'config:write')) {
     return res.status(403).json({ error: 'Acesso restrito à equipe de gestão e administração de RH' });
   }
   next();
 };
 
 export const requireTi = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  const hasTiAccess = req.user?.permissaoTi === true || req.user?.perfil === 'ADMIN_TI';
-  if (!req.user || !hasTiAccess) {
+  if (!req.user || !userHasPermission(req.user, 'infra:write')) {
     return res.status(403).json({ error: 'Acesso restrito à equipe de Administração de TI e Infraestrutura' });
   }
   next();
 };
 
 export const requireAdminOrTi = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  const hasAccess = req.user?.permissaoRh === true ||
-                    req.user?.permissaoTi === true ||
-                    req.user?.is_admin === true ||
-                    req.user?.perfil === 'ADMIN_RH' ||
-                    req.user?.perfil === 'ADMIN_TI';
-  if (!req.user || !hasAccess) {
+  if (!req.user || (!userHasPermission(req.user, 'config:write') && !userHasPermission(req.user, 'infra:write'))) {
     return res.status(403).json({ error: 'Acesso restrito à equipe de Administração de RH ou TI' });
   }
   next();
@@ -101,13 +193,11 @@ export const authenticateAdminMfa = async (req: AuthenticatedRequest, res: Respo
     const mfaPolicy = await ConfigService.get('MFA_POLICY', 'DESATIVADO');
     const isMfaEnforcedForRh = mfaPolicy === 'OBRIGATORIO_RH' || mfaPolicy === 'OBRIGATORIO_TODOS';
 
-    // Se MFA estiver DESATIVADO ou OPCIONAL (padrão de desenvolvimento), autoriza diretamente
     if (!isMfaEnforcedForRh) {
       req.isAdminMfaValidated = true;
       return next();
     }
 
-    // Se MFA for exigido por política administrativa, valida o x-admin-token
     const adminToken = req.headers['x-admin-token'] as string;
     if (!adminToken) {
       return res.status(403).json({

@@ -75,6 +75,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS unq_usuario_data_ativa ON reservas (usuario_id
 CREATE INDEX IF NOT EXISTS idx_reservas_data_status ON reservas(data_reserva, status);
 CREATE INDEX IF NOT EXISTS idx_reservas_usuario_data ON reservas(usuario_id, data_reserva);
 CREATE INDEX IF NOT EXISTS idx_reservas_relatorio ON reservas(data_reserva, status, usuario_id, checkin_realizado);
+-- Índices alinhados às listagens paginadas e à ordenação mais frequente.
+CREATE INDEX IF NOT EXISTS idx_reservas_usuario_data_id ON reservas(usuario_id, data_reserva DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_reservas_data_criado_id ON reservas(data_reserva DESC, criado_em DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_usuarios_dept_ativo ON usuarios(departamento_id, ativo);
 CREATE INDEX IF NOT EXISTS idx_cadeiras_baia ON cadeiras(baia_id);
 CREATE INDEX IF NOT EXISTS idx_baias_escritorio ON baias(escritorio_id);
@@ -111,6 +114,7 @@ CREATE TABLE IF NOT EXISTS auth_password_resets (
     criado_em TIMESTAMP DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_password_resets_usuario ON auth_password_resets(usuario_id, utilizado);
+CREATE INDEX IF NOT EXISTS idx_mfa_codes_usuario_utilizado_expira ON auth_mfa_codes(usuario_id, utilizado, expira_em DESC);
 
 -- Colunas de Segurança, TOTP e SSO na tabela usuarios
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tentativas_login_falhas INT DEFAULT 0;
@@ -123,6 +127,7 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS sso_provider VARCHAR(50);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS sso_id VARCHAR(255);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS exigir_mfa BOOLEAN DEFAULT false;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 1 NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_usuarios_sso ON usuarios(sso_provider, sso_id);
 
 -- Inserir chaves padrão para Bloqueio de Sessão por Inatividade
 INSERT INTO configuracoes_sistema (chave, valor, descricao)
@@ -192,6 +197,8 @@ CREATE INDEX IF NOT EXISTS idx_historico_usuario ON historico_reservas(usuario_i
 CREATE INDEX IF NOT EXISTS idx_historico_reserva ON historico_reservas(reserva_id);
 CREATE INDEX IF NOT EXISTS idx_historico_criado_em ON historico_reservas(criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_historico_tipo ON historico_reservas(tipo_evento);
+CREATE INDEX IF NOT EXISTS idx_historico_cadeira_criado_id ON historico_reservas(cadeira_id, criado_em DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_historico_usuario_criado_id ON historico_reservas(usuario_id, criado_em DESC, id DESC);
 
 -- ======================================================================================
 -- GARANTIA DE NÃO-REPÚDIO E IMUTABILIDADE DE LOGS (PADRÃO BANCÁRIO BACEN / CMN 4.893 WORM)

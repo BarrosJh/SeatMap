@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
+import { MetricsService } from '../services/metricsService';
 
 export const requestLoggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
   // Ignora logs ruidosos de polling de health se não estiver em debug
@@ -9,7 +10,8 @@ export const requestLoggerMiddleware = (req: Request, res: Response, next: NextF
   }
 
   const startTime = process.hrtime();
-  const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+  MetricsService.requestStarted();
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const correlationId = req.correlationId;
 
   res.on('finish', () => {
@@ -22,11 +24,12 @@ export const requestLoggerMiddleware = (req: Request, res: Response, next: NextF
       path: req.originalUrl || req.path,
       statusCode: res.statusCode,
       durationMs,
-      ip: ip.split(',')[0].trim(),
+      ip,
       userAgent: req.headers['user-agent']
     };
 
     const reqLogger = req.logger || logger;
+    MetricsService.requestFinished(req.route?.path || req.path, res.statusCode, durationMs);
 
     if (res.statusCode >= 500) {
       reqLogger.error(`HTTP ${req.method} ${req.originalUrl || req.path} ${res.statusCode} (${durationMs}ms)`, logContext);

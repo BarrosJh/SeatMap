@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../core/constants.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/api/api_client_base.dart';
 import '../services/secure_storage_service.dart';
+import '../services/websocket_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
   final SecureStorageService _secureStorage = SecureStorageService();
+  final WebSocketService _webSocketService = WebSocketService();
 
   UserModel? _user;
   String? _token;
@@ -34,8 +37,10 @@ class AuthProvider extends ChangeNotifier {
   bool get requiresMfaStep => _mfaTempToken != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  bool get isAuthenticated => _token != null && _user != null;
-  bool get isAdminStepUpAuthenticated => _user?.isAdmin == true;
+  bool get isAuthenticated =>
+      _token != null && _user != null && _isTokenUsable(_token!);
+  bool get isAdminStepUpAuthenticated =>
+      _adminToken != null && _isTokenUsable(_adminToken!);
 
   bool get autoLockAtivo => _autoLockAtivo;
   int get autoLockMinutos => _autoLockMinutos;
@@ -65,7 +70,8 @@ class AuthProvider extends ChangeNotifier {
         }
       }
     } catch (e, stackTrace) {
-      debugPrint('[AuthProvider] Erro ao carregar configurações públicas de segurança: $e\n$stackTrace');
+      debugPrint(
+          '[AuthProvider] Erro ao carregar configurações públicas de segurança: $e\n$stackTrace');
     }
   }
 
@@ -101,9 +107,34 @@ class AuthProvider extends ChangeNotifier {
       }
     }
     _adminToken = await _secureStorage.getAdminToken();
+
+    if (_token != null && !_isTokenUsable(_token!)) {
+      _token = null;
+      _adminToken = null;
+      await _secureStorage.delete(AppConstants.keyToken);
+    }
+
+    if (_token == null && _refreshToken == null) {
+      _user = null;
+      await _secureStorage.delete(AppConstants.keyUserData);
+    } else if (_token == null && _refreshToken != null) {
+      await renovarSessaoComRefreshToken();
+    }
     notifyListeners();
   }
 
+  bool _isTokenUsable(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return false;
+      final payload = jsonDecode(
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      final exp = payload['exp'];
+      return exp is num && DateTime.now().millisecondsSinceEpoch < exp * 1000;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Future<bool> login(String login, String senha) async {
     _isLoading = true;
@@ -182,7 +213,8 @@ class AuthProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    final response = await _apiService.validarLoginEmailMfa(_mfaTempToken!, codigo);
+    final response =
+        await _apiService.validarLoginEmailMfa(_mfaTempToken!, codigo);
     _isLoading = false;
 
     if (response.success && response.data != null) {
@@ -202,7 +234,8 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } else {
-      _errorMessage = response.error ?? 'Código de verificação por e-mail inválido ou expirado.';
+      _errorMessage = response.error ??
+          'Código de verificação por e-mail inválido ou expirado.';
       notifyListeners();
       return false;
     }
@@ -315,14 +348,17 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     _adminToken = null;
     _isSessionLocked = false;
+    _mfaTempToken = null;
+    _mfaType = null;
+    _emailMascarado = null;
+    _webSocketService.disconnect();
     await _secureStorage.clearAll();
     notifyListeners();
 
     AppConstants.navigatorKey.currentState?.popUntil((route) => route.isFirst);
 
     if (currentToken != null || currentRefresh != null) {
-      _apiService.logout(currentToken, refreshToken: currentRefresh);
+      await _apiService.logout(currentToken, refreshToken: currentRefresh);
     }
   }
 }
-

@@ -1,6 +1,7 @@
 import { ConfigService } from '../configService';
 import { wsManager } from '../../websocket/wsServer';
 import { validateSingleParam } from '../../schemas/parametrosSchemas';
+import { AuditService } from '../auditService';
 
 export class ParametrosService {
   /**
@@ -46,6 +47,16 @@ export class ParametrosService {
 
     for (const item of itemsToUpdate) {
       await ConfigService.set(item.chave, item.valor, item.descricao);
+      AuditService.log({
+        tipoEvento: 'CONFIGURACAO_ALTERADA',
+        sucesso: true,
+        loginInformado: 'sistema',
+        detalhes: {
+          chave: item.chave,
+          descricao: item.descricao || 'Atualização de configuração',
+          valor: item.chave.toUpperCase().includes('SECRET') || item.chave.toUpperCase().includes('PASS') ? '[REDACTED]' : item.valor
+        }
+      });
     }
 
     const atualizadas = await ConfigService.getAll();
