@@ -24,12 +24,24 @@ app.set('trust proxy', true);
 // Injeção de X-Correlation-ID em todas as requisições antes de qualquer outro middleware
 app.use(correlationIdMiddleware);
 
-// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS)
+// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP)
 app.use(helmet({
   frameguard: { action: 'deny' },
-  contentSecurityPolicy: false, // Permite que a API sirva endpoints REST e SPA
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", 'ws:', 'wss:']
+    }
+  },
   crossOriginEmbedderPolicy: false,
-  hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true } : false
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
 }));
 app.disable('x-powered-by');
 
