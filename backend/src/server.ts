@@ -28,16 +28,19 @@ app.set('trust proxy', Number.isFinite(trustProxyHops) && trustProxyHops > 0 ? t
 // Injeção de X-Correlation-ID em todas as requisições antes de qualquer outro middleware
 app.use(correlationIdMiddleware);
 
-// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP)
+// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP para Flutter Web)
 app.use(helmet({
   frameguard: { action: 'deny' },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'ws:', 'wss:']
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'blob:', 'https:'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+      connectSrc: ["'self'", 'ws:', 'wss:', 'https:', 'http:', 'data:', 'blob:'],
+      workerSrc: ["'self'", 'blob:'],
+      objectSrc: ["'none'"]
     }
   },
   crossOriginEmbedderPolicy: false,
