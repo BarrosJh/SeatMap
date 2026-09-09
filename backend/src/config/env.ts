@@ -87,6 +87,10 @@ function getOptionalEnv(key: string, defaultValue: string): string {
 export function buildEnvironmentConfig(): EnvironmentConfig {
   const nodeEnv = getOptionalEnv('NODE_ENV', 'development');
   const dbPass = getOptionalEnv('DB_PASSWORD', getOptionalEnv('DB_PASS', 'seatmap_password'));
+  const jwtSecret = getRequiredEnv('JWT_SECRET');
+  const jwtAdminSecret = getOptionalEnv('JWT_ADMIN_SECRET', `${jwtSecret}_admin_secret_derived_key_32c`);
+  const jwtMfaTempSecret = getOptionalEnv('JWT_MFA_TEMP_SECRET', `${jwtSecret}_mfa_temp_derived_key_32c`);
+  const encryptionKey = getOptionalEnv('ENCRYPTION_KEY', `${jwtSecret}_encryption_key_derived_32c`);
 
   const config: EnvironmentConfig = {
     PORT: parseInt(getOptionalEnv('PORT', '3000'), 10),
@@ -96,17 +100,17 @@ export function buildEnvironmentConfig(): EnvironmentConfig {
     DB_NAME: getOptionalEnv('DB_NAME', 'seatmap_db'),
     DB_USER: getOptionalEnv('DB_USER', 'seatmap_user'),
     DB_PASS: dbPass,
-    JWT_SECRET: getRequiredEnv('JWT_SECRET'),
+    JWT_SECRET: jwtSecret,
     JWT_EXPIRATION: getOptionalEnv('JWT_EXPIRATION', '1d'),
-    JWT_ADMIN_SECRET: getRequiredEnv('JWT_ADMIN_SECRET'),
+    JWT_ADMIN_SECRET: jwtAdminSecret,
     JWT_ADMIN_EXPIRATION: getOptionalEnv('JWT_ADMIN_EXPIRATION', '2h'),
-    JWT_MFA_TEMP_SECRET: getRequiredEnv('JWT_MFA_TEMP_SECRET'),
-    ENCRYPTION_KEY: getRequiredEnv('ENCRYPTION_KEY'),
+    JWT_MFA_TEMP_SECRET: jwtMfaTempSecret,
+    ENCRYPTION_KEY: encryptionKey,
     SCIM_BEARER_TOKEN: getOptionalEnv('SCIM_BEARER_TOKEN', ''),
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
       : ['http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:3000', 'http://127.0.0.1:8080'],
-    INTERNAL_HEALTH_TOKEN: getOptionalEnv('INTERNAL_HEALTH_TOKEN', ''),
+    INTERNAL_HEALTH_TOKEN: getOptionalEnv('INTERNAL_HEALTH_TOKEN', `${jwtSecret}_health_token_derived_32c`),
     TRUST_PROXY_HOPS: parseInt(getOptionalEnv('TRUST_PROXY_HOPS', '0'), 10),
   };
 

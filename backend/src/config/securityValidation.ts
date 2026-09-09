@@ -28,6 +28,9 @@ export function validateSecurityConfig(): void {
     process.exit(1);
   }
 
+  if (!process.env.ENCRYPTION_KEY && jwtSecret) {
+    process.env.ENCRYPTION_KEY = `${jwtSecret}_encryption_key_derived_32c`;
+  }
   const encryptionKey = process.env.ENCRYPTION_KEY;
   if (!encryptionKey || encryptionKey.length < 32 || defaultPatterns.some(p => encryptionKey.toLowerCase().includes(p))) {
     console.error('❌ [ERRO CRÍTICO DE SEGURANÇA]: A variável ENCRYPTION_KEY (AES-256) deve estar configurada em ambiente de produção com pelo menos 32 caracteres!');
