@@ -20,12 +20,23 @@ async function runMigrations() {
     await client.query('COMMIT');
 
     console.log('[Migration] Migrações executadas com sucesso!');
+
+    const userCount = await client.query('SELECT COUNT(*)::int AS total FROM usuarios');
+    if (userCount.rows[0]?.total === 0) {
+      console.log('[Migration] Banco de dados vazio. Executando seed automático de dados iniciais...');
+      client.release();
+      const seedModule = await import('./seed');
+      if (typeof seedModule.default === 'function') {
+        await seedModule.default();
+      }
+      return;
+    }
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('[Migration] Erro ao executar migrações:', error);
     process.exit(1);
   } finally {
-    client.release();
+    try { client.release(); } catch (_) {}
     await pool.end();
   }
 }
