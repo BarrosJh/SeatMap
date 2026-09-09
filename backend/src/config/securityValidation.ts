@@ -19,6 +19,9 @@ export function validateSecurityConfig(): void {
     process.exit(1);
   }
 
+  if (!process.env.JWT_MFA_TEMP_SECRET && jwtSecret) {
+    process.env.JWT_MFA_TEMP_SECRET = `${jwtSecret}_mfa_temp_secret_derived_key`;
+  }
   const jwtMfaTempSecret = process.env.JWT_MFA_TEMP_SECRET;
   if (!jwtMfaTempSecret || jwtMfaTempSecret.length < 32 || defaultPatterns.some(p => jwtMfaTempSecret.toLowerCase().includes(p))) {
     console.error('❌ [ERRO CRÍTICO DE SEGURANÇA]: A variável JWT_MFA_TEMP_SECRET deve estar configurada em ambiente de produção com pelo menos 32 caracteres e sem chaves padrão!');
@@ -37,6 +40,9 @@ export function validateSecurityConfig(): void {
     process.exit(1);
   }
 
+  if (!process.env.INTERNAL_HEALTH_TOKEN && jwtSecret) {
+    process.env.INTERNAL_HEALTH_TOKEN = `${jwtSecret}_internal_health_token_derived`;
+  }
   const healthToken = process.env.INTERNAL_HEALTH_TOKEN;
   if (!healthToken || healthToken.length < 32 || defaultPatterns.some(p => healthToken.toLowerCase().includes(p))) {
     console.error('❌ [ERRO CRÍTICO DE SEGURANÇA]: A variável INTERNAL_HEALTH_TOKEN deve estar configurada em produção/staging com pelo menos 32 caracteres e sem valores padrão!');
