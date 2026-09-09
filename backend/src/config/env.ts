@@ -50,6 +50,7 @@ export function validateEnvironmentValues(values: Record<string, any>, mode: str
 
   for (const [key, rawValue] of Object.entries(values)) {
     if (rawValue === undefined || rawValue === null || rawValue === '') continue;
+    if (key === 'DB_PASS' && (process.env.DATABASE_URL || values.DATABASE_URL)) continue;
 
     const value = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue).trim();
 
@@ -86,7 +87,7 @@ function getOptionalEnv(key: string, defaultValue: string): string {
 
 export function buildEnvironmentConfig(): EnvironmentConfig {
   const nodeEnv = getOptionalEnv('NODE_ENV', 'development');
-  const dbPass = getOptionalEnv('DB_PASSWORD', getOptionalEnv('DB_PASS', 'seatmap_password'));
+  const dbPass = getOptionalEnv('DB_PASSWORD', getOptionalEnv('DB_PASS', process.env.DATABASE_URL ? '' : 'seatmap_password'));
   const jwtSecret = getRequiredEnv('JWT_SECRET');
   const jwtAdminSecret = getOptionalEnv('JWT_ADMIN_SECRET', `${jwtSecret}_admin_secret_derived_key_32c`);
   const jwtMfaTempSecret = getOptionalEnv('JWT_MFA_TEMP_SECRET', `${jwtSecret}_mfa_temp_derived_key_32c`);
