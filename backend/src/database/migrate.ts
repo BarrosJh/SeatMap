@@ -37,7 +37,7 @@ async function runMigrations() {
     process.exit(1);
   } finally {
     try { client.release(); } catch (_) {}
-    await pool.end();
+    try { await pool.end(); } catch (_) {}
   }
 }
 
