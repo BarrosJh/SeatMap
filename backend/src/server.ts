@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import http from 'http';
 import dotenv from 'dotenv';
@@ -76,19 +78,32 @@ app.use(express.json({
 // Logger Estruturado de Requisições HTTP (SIEM / SOC)
 app.use(requestLoggerMiddleware);
 
-// Rate Limiting Global
-// Rota Raiz para Health Check do Load Balancer / Render
-app.all('/', (req, res) => {
-  res.status(200).json({
-    status: 'online',
-    service: 'SeatMap API Enterprise',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
+// Servir Aplicação Flutter Web (Frontend Monolith) se a pasta public existir
+const publicPath = path.join(__dirname, '../public');
+if (fs.existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+} else {
+  // Rota Raiz para Health Check do Load Balancer / Render quando rodando sem frontend embutido
+  app.get('/', (req, res) => {
+    res.status(200).json({
+      status: 'online',
+      service: 'SeatMap API Enterprise',
+      version: '1.0.0',
+      timestamp: new Date().toISOString()
+    });
   });
-});
+}
 
 // Rotas da API
 app.use('/api', routes);
+
+// Fallback SPA para navegação do Flutter Web
+if (fs.existsSync(publicPath)) {
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/ws')) return next();
+    res.sendFile(path.join(publicPath, 'index.html'));
+  });
+}
 
 // Middleware Global de Tratamento de Erros (AppSec / SIEM / AppError / Zod)
 app.use(errorHandler);
