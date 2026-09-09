@@ -225,7 +225,7 @@ class CheckinTodayReservationCard extends StatelessWidget {
                       ? (reservaHoje!.checkinEm != null
                           ? DateFormat('HH:mm').format(DateTime.parse(reservaHoje!.checkinEm!).toLocal())
                           : 'Hoje')
-                      : 'Até as 11h00',
+                      : 'Até as ${reservaHoje!.limiteCheckinFormatado}',
                   icon: Icons.schedule_rounded,
                   color: isConfirmado ? const Color(0xFF15803D) : const Color(0xFFD97706),
                 ),
@@ -234,7 +234,113 @@ class CheckinTodayReservationCard extends StatelessWidget {
           ),
 
           if (!isConfirmado) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
+
+            // Card Destacado da Modalidade e Tempo Remanescente
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: reservaHoje!.tempoRestanteCheckin.isNegative
+                    ? const Color(0xFFFEF2F2)
+                    : (reservaHoje!.tempoRestanteCheckin.inMinutes <= 30
+                        ? const Color(0xFFFFFBEB)
+                        : (reservaHoje!.isReservaTardia ? const Color(0xFFF5F3FF) : const Color(0xFFF0FDF4))),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: reservaHoje!.tempoRestanteCheckin.isNegative
+                      ? const Color(0xFFFECACA)
+                      : (reservaHoje!.tempoRestanteCheckin.inMinutes <= 30
+                          ? const Color(0xFFFDE68A)
+                          : (reservaHoje!.isReservaTardia ? const Color(0xFFDDD6FE) : const Color(0xFFBBF7D0))),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        reservaHoje!.tempoRestanteCheckin.isNegative
+                            ? Icons.error_outline_rounded
+                            : (reservaHoje!.isReservaTardia ? Icons.hourglass_bottom_rounded : Icons.alarm_rounded),
+                        color: reservaHoje!.tempoRestanteCheckin.isNegative
+                            ? const Color(0xFFDC2626)
+                            : (reservaHoje!.tempoRestanteCheckin.inMinutes <= 30
+                                ? const Color(0xFFD97706)
+                                : (reservaHoje!.isReservaTardia ? const Color(0xFF7C3AED) : const Color(0xFF16A34A))),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Modalidade: ${reservaHoje!.modalidadeCheckin}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: reservaHoje!.tempoRestanteCheckin.isNegative
+                              ? const Color(0xFF991B1B)
+                              : (reservaHoje!.tempoRestanteCheckin.inMinutes <= 30
+                                  ? const Color(0xFF92400E)
+                                  : (reservaHoje!.isReservaTardia ? const Color(0xFF5B21B6) : const Color(0xFF166534))),
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: reservaHoje!.tempoRestanteCheckin.isNegative
+                                ? const Color(0xFFFCA5A5)
+                                : (reservaHoje!.isReservaTardia ? const Color(0xFFC4B5FD) : const Color(0xFF86EFAC)),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.timer_outlined,
+                              size: 13,
+                              color: reservaHoje!.tempoRestanteCheckin.isNegative
+                                  ? const Color(0xFFDC2626)
+                                  : (reservaHoje!.isReservaTardia ? const Color(0xFF7C3AED) : const Color(0xFF16A34A)),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              reservaHoje!.tempoRestanteCheckin.isNegative
+                                  ? 'Expirado'
+                                  : 'Restam ${reservaHoje!.tempoRestanteFormatado}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: reservaHoje!.tempoRestanteCheckin.isNegative
+                                    ? const Color(0xFFDC2626)
+                                    : (reservaHoje!.isReservaTardia ? const Color(0xFF7C3AED) : const Color(0xFF15803D)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    reservaHoje!.isReservaTardia
+                        ? 'Reserva realizada no mesmo dia com janela dinâmica de tolerância (+2h a partir do momento da reserva).'
+                        : 'Reserva sujeita ao horário de corte padrão fixo da empresa (até as ${reservaHoje!.limiteCheckinFormatado}).',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: reservaHoje!.tempoRestanteCheckin.isNegative
+                          ? const Color(0xFFB91C1C)
+                          : (reservaHoje!.isReservaTardia ? const Color(0xFF6D28D9) : const Color(0xFF15803D)),
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -341,7 +447,7 @@ class CheckinHowItWorksCard extends StatelessWidget {
           _buildStepItem(
             number: '3',
             title: 'Presença Confirmada',
-            description: 'O sistema valida a estação e confirma sua presença em tempo real até as 11h00.',
+            description: 'O sistema valida a estação e confirma sua presença em tempo real dentro do limite (horário fixo ou tolerância dinâmica).',
           ),
         ],
       ),

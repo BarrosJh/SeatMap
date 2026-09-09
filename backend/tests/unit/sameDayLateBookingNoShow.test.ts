@@ -67,7 +67,24 @@ describe('Regra de Tolerância de No-Show para Reservas Tardias do Mesmo Dia', (
     expect(res1605.isExpirada).toBe(true);
   });
 
-  it('4. Reserva de dia anterior deve ser marcada como expirada imediatamente', () => {
+  it('4. Reserva criada exatamente no início do período tardio recebe tolerância, sem ultrapassar o dia da reserva', () => {
+    const criadoNoInicio = '2026-09-07T10:00:00-03:00';
+    const agora1130 = DateTime.fromISO('2026-09-07T11:30:00-03:00', { zone: 'America/Sao_Paulo' });
+    const resultadoInicio = ReservaToleranceUtils.calcularLimiteCheckin(hojeIso, criadoNoInicio, params, agora1130);
+
+    expect(resultadoInicio.isReservaTardia).toBe(true);
+    expect(resultadoInicio.limiteFormatado).toBe('12:00');
+    expect(resultadoInicio.isExpirada).toBe(false);
+
+    const criadoNoFimDoDia = '2026-09-07T23:30:00-03:00';
+    const agora2359 = DateTime.fromISO('2026-09-07T23:59:00-03:00', { zone: 'America/Sao_Paulo' });
+    const resultadoFimDoDia = ReservaToleranceUtils.calcularLimiteCheckin(hojeIso, criadoNoFimDoDia, params, agora2359);
+
+    expect(resultadoFimDoDia.limiteCheckin.toISODate()).toBe(hojeIso);
+    expect(resultadoFimDoDia.limiteFormatado).toBe('23:59');
+  });
+
+  it('5. Reserva de dia anterior deve ser marcada como expirada imediatamente', () => {
     const dataPassada = '2026-09-06';
     const criadoEm = '2026-09-05T15:00:00-03:00';
     const agoraHoje = DateTime.fromISO('2026-09-07T09:00:00-03:00', { zone: 'America/Sao_Paulo' });
@@ -76,7 +93,7 @@ describe('Regra de Tolerância de No-Show para Reservas Tardias do Mesmo Dia', (
     expect(res.isExpirada).toBe(true);
   });
 
-  it('5. Fachada ReservaService deve exportar e expor todos os métodos delegados corretamente', () => {
+  it('6. Fachada ReservaService deve exportar e expor todos os métodos delegados corretamente', () => {
     expect(typeof ReservaService.criarReserva).toBe('function');
     expect(typeof ReservaService.fazerCheckin).toBe('function');
     expect(typeof ReservaService.cancelarReserva).toBe('function');

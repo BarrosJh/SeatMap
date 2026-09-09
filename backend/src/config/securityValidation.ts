@@ -1,6 +1,5 @@
-/**
- * Validação de segurança para inicialização em ambiente de produção
- */
+// Validação de segurança para inicialização em ambiente de produção
+ 
 export function validateSecurityConfig(): void {
   const isProd = process.env.NODE_ENV === 'production';
   const isProductionLike = isProd || process.env.NODE_ENV === 'staging';

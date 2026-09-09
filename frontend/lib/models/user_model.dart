@@ -29,25 +29,29 @@ class UserModel {
   bool get isColaborador => perfil == 'COLABORADOR';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    final perfilStr = json['perfil'] ?? 'COLABORADOR';
+    final perfilStr = json['perfil']?.toString() ?? 'COLABORADOR';
+    final isSuperAdmin = json['is_admin'] == true && perfilStr != 'ADMIN_TI' && perfilStr != 'ADMIN_RH';
     final hasRh = json['permissaoRh'] == true || 
                   json['permissao_rh'] == true || 
-                  json['is_admin'] == true || 
+                  isSuperAdmin ||
                   perfilStr == 'ADMIN_RH';
     final hasTi = json['permissaoTi'] == true ||
-                  json['permissao_ti'] == true ||
+                  json['permissao_ti'] == true || 
+                  isSuperAdmin ||
                   perfilStr == 'ADMIN_TI';
 
     return UserModel(
-      userId: json['userId'] ?? json['id'] ?? 0,
-      nome: json['nome'] ?? '',
-      email: json['email'] ?? '',
-      matricula: json['matricula'] ?? '',
+      userId: int.tryParse(json['userId']?.toString() ?? json['id']?.toString() ?? '0') ?? 0,
+      nome: json['nome']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      matricula: json['matricula']?.toString() ?? '',
       perfil: perfilStr,
       permissaoRh: hasRh,
       permissaoTi: hasTi,
-      departamentoId: json['departamentoId'] ?? json['departamento_id'],
-      departamentoNome: json['departamentoNome'] ?? json['departamento_nome'],
+      departamentoId: json['departamentoId'] != null 
+          ? int.tryParse(json['departamentoId'].toString()) 
+          : (json['departamento_id'] != null ? int.tryParse(json['departamento_id'].toString()) : null),
+      departamentoNome: json['departamentoNome']?.toString() ?? json['departamento_nome']?.toString(),
     );
   }
 

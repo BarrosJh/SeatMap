@@ -30,7 +30,7 @@ export function toUserResponseDto(user: any): UserResponseDto {
     departamentoNome: user.departamento_nome || user.departamentoNome || null,
     permissaoRh: Boolean(user.permissao_rh !== undefined ? user.permissao_rh : (user.permissaoRh || user.perfil === 'ADMIN_RH')),
     permissaoTi: Boolean(user.permissao_ti !== undefined ? user.permissao_ti : (user.permissaoTi || user.perfil === 'ADMIN_TI')),
-    is_admin: Boolean(user.is_admin || user.perfil === 'ADMIN_RH' || user.perfil === 'ADMIN_TI'),
+    is_admin: Boolean(user.is_admin === true),
     ativo: user.ativo !== undefined ? Boolean(user.ativo) : true,
     totpAtivo: Boolean(user.totp_ativo !== undefined ? user.totp_ativo : user.totpAtivo),
     exigirMfa: Boolean(user.exigir_mfa !== undefined ? user.exigir_mfa : user.exigirMfa),

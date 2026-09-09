@@ -108,6 +108,7 @@ class TabUsuarios extends StatelessWidget {
                           DropdownMenuItem(value: 'COLABORADOR', child: Text('Colaborador')),
                           DropdownMenuItem(value: 'GESTAO', child: Text('Gestão')),
                           DropdownMenuItem(value: 'ADMIN_RH', child: Text('Administrador RH')),
+                          DropdownMenuItem(value: 'ADMIN_TI', child: Text('Administrador TI')),
                         ],
                         onChanged: onFiltroPerfilChanged,
                       );

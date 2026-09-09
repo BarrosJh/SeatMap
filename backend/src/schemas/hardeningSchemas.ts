@@ -34,8 +34,9 @@ export const relatorioQuerySchema = z.object({
   status: boundedText(30).optional(),
   checkinStatus: boundedText(30).optional(),
   busca: boundedText(255).optional(),
-  limit: z.coerce.number().int().min(1).max(10000).default(100),
-  offset: z.coerce.number().int().min(0).max(100000).default(0),
+  page: z.coerce.number().int().min(1).default(1).optional(),
+  limit: z.coerce.number().int().min(1).max(10000).default(100).optional(),
+  offset: z.coerce.number().int().min(0).max(100000).default(0).optional(),
   formato: z.enum(['excel', 'pdf', 'csv']).optional()
 }).strict();
 

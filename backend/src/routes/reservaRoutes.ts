@@ -16,7 +16,7 @@ router.get('/minhas', authenticateToken, validateRequest({ query: paginationQuer
 router.get('/historico', authenticateToken, validateRequest({ query: paginationQuerySchema }), ReservaController.historicoMinhasReservas);
 
 
-// POST /api/reservas/:id/checkin (Confirmação de presença manual com trava às 11:00)
+// POST /api/reservas/:id/checkin (Confirmação de presença conforme limite individual da reserva)
 router.post('/:id/checkin', authenticateToken, validateRequest({ params: idParamSchema, body: fazerCheckinSchema }), ReservaController.fazerCheckin);
 
 // POST /api/reservas/:id/enviar-comprovante-email (Disparo do voucher por e-mail)

@@ -26,6 +26,7 @@ class ComprovanteDialog extends StatefulWidget {
   final String? usuarioMatricula;
   final String? dataHoraAcao;
   final String? tituloCustomizado;
+  final String? modalidadeCheckin;
 
   const ComprovanteDialog({
     super.key,
@@ -41,6 +42,7 @@ class ComprovanteDialog extends StatefulWidget {
     this.usuarioMatricula,
     this.dataHoraAcao,
     this.tituloCustomizado,
+    this.modalidadeCheckin,
   });
 
   static Future<void> show(
@@ -57,6 +59,7 @@ class ComprovanteDialog extends StatefulWidget {
     String? usuarioMatricula,
     String? dataHoraAcao,
     String? tituloCustomizado,
+    String? modalidadeCheckin,
   }) {
     return showDialog(
       context: context,
@@ -73,6 +76,7 @@ class ComprovanteDialog extends StatefulWidget {
         usuarioMatricula: usuarioMatricula,
         dataHoraAcao: dataHoraAcao,
         tituloCustomizado: tituloCustomizado,
+        modalidadeCheckin: modalidadeCheckin,
       ),
     );
   }
@@ -301,6 +305,16 @@ class _ComprovanteDialogState extends State<ComprovanteDialog> {
                       'Mesa ${widget.cadeiraIdentificador}',
                       isDestacado: true,
                     ),
+                    if (widget.tipo != TipoComprovante.cancelamento) ...[
+                      const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                      _buildLinha(
+                        'Modalidade Check-in',
+                        widget.modalidadeCheckin ??
+                            ((widget.dataReserva.contains(DateFormat('yyyy-MM-dd').format(DateTime.now())) && DateTime.now().hour >= 10)
+                                ? 'Tempo Remanescente (+2h)'
+                                : 'Horário Fixo (Até 11h00)'),
+                      ),
+                    ],
                     if (widget.dataHoraAcao != null) ...[
                       const Divider(height: 14, color: Color(0xFFE2E8F0)),
                       _buildLinha(
@@ -315,6 +329,58 @@ class _ComprovanteDialogState extends State<ComprovanteDialog> {
                   ],
                 ),
               ),
+
+              if (widget.tipo == TipoComprovante.reserva || widget.tipo == TipoComprovante.troca) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (widget.modalidadeCheckin?.contains('Tempo Remanescente') ??
+                            (widget.dataReserva.contains(DateFormat('yyyy-MM-dd').format(DateTime.now())) && DateTime.now().hour >= 10))
+                        ? const Color(0xFFF5F3FF)
+                        : const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: (widget.modalidadeCheckin?.contains('Tempo Remanescente') ??
+                              (widget.dataReserva.contains(DateFormat('yyyy-MM-dd').format(DateTime.now())) && DateTime.now().hour >= 10))
+                          ? const Color(0xFFDDD6FE)
+                          : const Color(0xFFBBF7D0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        (widget.modalidadeCheckin?.contains('Tempo Remanescente') ??
+                                (widget.dataReserva.contains(DateFormat('yyyy-MM-dd').format(DateTime.now())) && DateTime.now().hour >= 10))
+                            ? Icons.hourglass_bottom_rounded
+                            : Icons.alarm_rounded,
+                        size: 18,
+                        color: (widget.modalidadeCheckin?.contains('Tempo Remanescente') ??
+                                (widget.dataReserva.contains(DateFormat('yyyy-MM-dd').format(DateTime.now())) && DateTime.now().hour >= 10))
+                            ? const Color(0xFF7C3AED)
+                            : const Color(0xFF16A34A),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          (widget.modalidadeCheckin?.contains('Tempo Remanescente') ??
+                                  (widget.dataReserva.contains(DateFormat('yyyy-MM-dd').format(DateTime.now())) && DateTime.now().hour >= 10))
+                              ? 'Modalidade Tempo Remanescente: Tolerância de 2 horas a partir da reserva para validar presença via QR Code.'
+                              : 'Modalidade Horário Fixo: Valide sua presença no dia agendado até as 11h00 na estação de trabalho.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: (widget.modalidadeCheckin?.contains('Tempo Remanescente') ??
+                                    (widget.dataReserva.contains(DateFormat('yyyy-MM-dd').format(DateTime.now())) && DateTime.now().hour >= 10))
+                                ? const Color(0xFF5B21B6)
+                                : const Color(0xFF166534),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
 
               // Botões de Ação

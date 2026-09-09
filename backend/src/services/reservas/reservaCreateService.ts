@@ -5,6 +5,7 @@ import { ConfigService } from '../configService';
 import { ReservaHistoryService } from '../reservaHistoryService';
 import { wsManager } from '../../websocket/wsServer';
 import { getWorkWeekDiff, isProximaSemanaLiberada } from '../../utils/workWeekUtils';
+import { ReservaToleranceUtils } from './reservaToleranceUtils';
 import { logger } from '../../utils/logger';
 
 export interface CriarReservaInput {
@@ -233,12 +234,29 @@ export class ReservaCreateService {
         });
       }
 
+      const horarioCortePadrao = await ConfigService.get('HORARIO_LIMITE_CHECKIN', '11:00');
+      const horarioInicioTardia = await ConfigService.get('HORARIO_INICIO_RESERVA_TARDIA', '10:00');
+      const toleranciaMinutos = await ConfigService.getNumber('TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS', 120);
+      const calculoLimite = ReservaToleranceUtils.calcularLimiteCheckin(
+        dataAlvoIso,
+        novaReserva.criado_em,
+        { horarioCortePadrao, horarioInicioTardia, toleranciaMinutos }
+      );
+
+      const reservaEnriquecida = {
+        ...novaReserva,
+        limite_checkin: calculoLimite.limiteCheckin.toISO(),
+        limite_formatado: calculoLimite.limiteFormatado,
+        is_reserva_tardia: calculoLimite.isReservaTardia,
+        modalidade_checkin: calculoLimite.isReservaTardia ? 'TEMPO_REMANESCENTE' : 'HORARIO_FIXO'
+      };
+
       return {
         success: true,
         code: 201,
         message: isTroca ? 'Troca de assento realizada com sucesso!' : 'Reserva realizada com sucesso!',
         comprovante: codigoComprovante,
-        reserva: novaReserva,
+        reserva: reservaEnriquecida,
         trocaRealizada: isTroca
       };
     } catch (error: any) {

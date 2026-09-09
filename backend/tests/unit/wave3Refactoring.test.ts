@@ -238,9 +238,22 @@ describe('Onda 3: Refatoração de Serviços, DTO Unificado & Resiliência Opera
         permissaoTi: true
       };
 
-      const dto = toUserResponseDto(tiUser);
-      expect(dto.permissaoTi).toBe(true);
-      expect(dto.is_admin).toBe(true);
+      const dtoTi = toUserResponseDto(tiUser);
+      expect(dtoTi.permissaoTi).toBe(true);
+      expect(dtoTi.permissaoRh).toBe(false);
+
+      const rhUser = {
+        userId: 10,
+        nome: 'Admin RH',
+        email: 'rh@empresa.com',
+        matricula: 'RH001',
+        perfil: 'ADMIN_RH',
+        is_admin: true
+      };
+
+      const dtoRh = toUserResponseDto(rhUser);
+      expect(dtoRh.permissaoRh).toBe(true);
+      expect(dtoRh.is_admin).toBe(true);
     });
   });
 

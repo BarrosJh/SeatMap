@@ -33,7 +33,7 @@ export class ReservaToleranceUtils {
     const [corteH, corteM] = params.horarioCortePadrao.split(':').map(Number);
     const [tardiaH, tardiaM] = params.horarioInicioTardia.split(':').map(Number);
 
-    // Limite padrão do dia da reserva às 11:00 (ou configurado)
+    // Limite padrão do dia da reserva no horário configurado.
     const limitePadrao = dataReservaLuxon.set({ hour: corteH, minute: corteM, second: 0, millisecond: 0 });
 
     // Se for de dia anterior, já expirou no limite padrão daquele dia
@@ -82,8 +82,10 @@ export class ReservaToleranceUtils {
       // Limite estendido = momento da criação + tolerância em minutos
       const limiteEstendido = criadoEmLuxon.plus({ minutes: params.toleranciaMinutos });
       
-      // O limite nunca deve ser menor que o limite padrão
-      const limiteFinal = limiteEstendido > limitePadrao ? limiteEstendido : limitePadrao;
+      // O limite nunca deve ser menor que o limite padrão nem ultrapassar o dia da reserva.
+      const fimDoDia = dataReservaLuxon.endOf('day');
+      const limiteComTolerancia = limiteEstendido > limitePadrao ? limiteEstendido : limitePadrao;
+      const limiteFinal = limiteComTolerancia > fimDoDia ? fimDoDia : limiteComTolerancia;
 
       return {
         limiteCheckin: limiteFinal,

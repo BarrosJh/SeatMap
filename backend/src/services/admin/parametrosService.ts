@@ -45,6 +45,22 @@ export class ParametrosService {
       return { success: false, code: 400, error: 'Nenhuma configuração válida enviada para atualização.' };
     }
 
+    const horariosAtualizados = new Map(itemsToUpdate.map((item) => [item.chave, item.valor]));
+    const horarioInicioCheckin = horariosAtualizados.get('HORARIO_INICIO_CHECKIN')
+      || await ConfigService.get('HORARIO_INICIO_CHECKIN', '06:00');
+    const horarioLimiteCheckin = horariosAtualizados.get('HORARIO_LIMITE_CHECKIN')
+      || await ConfigService.get('HORARIO_LIMITE_CHECKIN', '11:00');
+    const horarioInicioReservaTardia = horariosAtualizados.get('HORARIO_INICIO_RESERVA_TARDIA')
+      || await ConfigService.get('HORARIO_INICIO_RESERVA_TARDIA', '10:00');
+
+    if (horarioInicioCheckin > horarioLimiteCheckin) {
+      return { success: false, code: 400, error: 'HORARIO_INICIO_CHECKIN não pode ser posterior a HORARIO_LIMITE_CHECKIN.' };
+    }
+
+    if (horarioInicioReservaTardia > horarioLimiteCheckin) {
+      return { success: false, code: 400, error: 'HORARIO_INICIO_RESERVA_TARDIA não pode ser posterior a HORARIO_LIMITE_CHECKIN.' };
+    }
+
     for (const item of itemsToUpdate) {
       await ConfigService.set(item.chave, item.valor, item.descricao);
       AuditService.log({

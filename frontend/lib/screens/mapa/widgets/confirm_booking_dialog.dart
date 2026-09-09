@@ -17,6 +17,21 @@ class ConfirmBookingDialog {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final dataStr = DateFormat('dd/MM/yyyy (EEEE)', 'pt_BR').format(seatProvider.selectedDate);
 
+    final agora = DateTime.now();
+    final hojeStr = DateFormat('yyyy-MM-dd').format(agora);
+    final isHoje = seatProvider.selectedDateIso == hojeStr;
+    final isTardiaHoje = isHoje && agora.hour >= 10;
+
+    final modalidadeTitulo = isTardiaHoje ? 'Tempo Remanescente' : 'Horário Fixo';
+    final limitePrevisto = isTardiaHoje
+        ? DateFormat('HH:mm').format(agora.add(const Duration(minutes: 120)))
+        : '11:00';
+    final modalidadeDescricao = isTardiaHoje
+        ? 'Reserva realizada no mesmo dia após às 10h00. Você terá tolerância dinâmica de 2h a partir de agora (até aproximadamente às $limitePrevisto) para fazer o check-in na mesa.'
+        : isHoje
+            ? 'Reserva sujeita ao horário de corte padrão fixo. O check-in deverá ser realizado hoje até as 11h00.'
+            : 'Reserva antecipada. O check-in deverá ser realizado no dia agendado até o horário de corte fixo das 11h00.';
+
     showDialog(
       context: context,
       builder: (ctx) {
@@ -50,7 +65,53 @@ class ConfirmBookingDialog {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+
+              // Modalidade de Check-in em Destaque
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isTardiaHoje ? const Color(0xFFF5F3FF) : const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isTardiaHoje ? const Color(0xFFDDD6FE) : const Color(0xFFBBF7D0),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isTardiaHoje ? Icons.hourglass_bottom_rounded : Icons.alarm_rounded,
+                          size: 16,
+                          color: isTardiaHoje ? const Color(0xFF7C3AED) : const Color(0xFF16A34A),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Modalidade de Check-in: $modalidadeTitulo',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isTardiaHoje ? const Color(0xFF5B21B6) : const Color(0xFF166534),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      modalidadeDescricao,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isTardiaHoje ? const Color(0xFF6D28D9) : const Color(0xFF15803D),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 10),
               const Text(
                 'Nota: Se você já tiver um assento marcado no mesmo dia, a troca de assento será realizada automaticamente.',
                 style: TextStyle(fontSize: 12, color: Colors.black54),
@@ -87,6 +148,7 @@ class ConfirmBookingDialog {
                       usuarioNome: auth.user?.nome,
                       usuarioMatricula: auth.user?.matricula,
                       dataHoraAcao: DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()),
+                      modalidadeCheckin: modalidadeTitulo,
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(

@@ -270,11 +270,13 @@ class CorporateSidebar extends StatelessWidget {
                 // 4. Menu de Administração RH e TI
                 if (isAdmin || isTi) ...[
                   const SizedBox(height: 16),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                     child: Text(
-                      'ADMINISTRAÇÃO & TI',
-                      style: TextStyle(
+                      (isAdmin && isTi)
+                          ? 'ADMINISTRAÇÃO & TI'
+                          : (isTi ? 'TECNOLOGIA DA INFORMAÇÃO' : 'GESTÃO & RECURSOS HUMANOS'),
+                      style: const TextStyle(
                         color: Color(0xFF64748B),
                         fontSize: 10,
                         fontWeight: FontWeight.bold,

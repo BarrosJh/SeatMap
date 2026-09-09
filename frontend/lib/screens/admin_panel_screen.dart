@@ -163,6 +163,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> with SingleTickerPr
         if (res.success && res.data != null) {
           _usuarios = res.data!['usuarios'] as List<AdminUsuarioModel>;
           _totalUsuarios = res.data!['total'] as int;
+        } else if (!res.success && res.error != null && setLoading) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res.error ?? 'Erro ao listar colaboradores.'),
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
         }
       });
     }

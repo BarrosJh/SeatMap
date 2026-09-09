@@ -33,7 +33,12 @@ class CorporateTopBar extends StatelessWidget {
           : 'Planta Baixa Interativa 2D • 66 Assentos Disponíveis';
     } else if (activeIndex == 2) {
       sectionTitle = 'Check-in por QR Code — Validação de Presença';
-      sectionSubtitle = 'Escaneie o código fixado na sua estação de trabalho até as 11h30';
+      final resHoje = seatProvider.reservaHoje;
+      if (resHoje != null && !resHoje.checkinRealizado) {
+        sectionSubtitle = 'Escaneie o QR Code na sua mesa (${resHoje.modalidadeCheckin}: limite até as ${resHoje.limiteCheckinFormatado})';
+      } else {
+        sectionSubtitle = 'Escaneie o código fixado na sua estação de trabalho para validar a presença';
+      }
     } else if (activeIndex == 3) {
       String filtroNome;
       switch (seatProvider.filtroReservas) {

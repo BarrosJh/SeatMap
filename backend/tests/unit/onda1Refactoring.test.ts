@@ -140,6 +140,19 @@ describe('Onda 1: Desacoplamento de Controllers e Validação Declarativa com Zo
       expect(result.code).toBe(400);
       expect(result.error).toContain('não é permitida ou não existe na whitelist');
     });
+
+    it('deve rejeitar início de reserva tardia posterior ao limite de check-in', async () => {
+      const result = await ParametrosService.updateParametros([
+        { chave: 'HORARIO_INICIO_CHECKIN', valor: '06:00' },
+        { chave: 'HORARIO_LIMITE_CHECKIN', valor: '11:00' },
+        { chave: 'HORARIO_INICIO_RESERVA_TARDIA', valor: '12:00' }
+      ]);
+
+      expect(result.success).toBe(false);
+      expect(result.code).toBe(400);
+      expect(result.error).toContain('HORARIO_INICIO_RESERVA_TARDIA não pode ser posterior');
+      expect(ConfigService.set).not.toHaveBeenCalled();
+    });
   });
 
   describe('3. RelatorioService & RelatorioSchemas', () => {

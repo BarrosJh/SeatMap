@@ -735,6 +735,7 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                             dataHoraAcao: r.checkinEm != null
                                 ? DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.tryParse(r.checkinEm!)?.toLocal() ?? DateTime.now())
                                 : null,
+                            modalidadeCheckin: r.modalidadeCheckin,
                           );
                         },
                         borderRadius: BorderRadius.circular(6),
@@ -763,6 +764,38 @@ class _MinhasReservasScreenState extends State<MinhasReservasScreen> {
                               const Icon(Icons.open_in_new_rounded, size: 11, color: Color(0xFF94A3B8)),
                             ],
                           ),
+                        ),
+                      ),
+
+                    // Chip de Modalidade de Check-in (para reservas ativas pendentes)
+                    if (!r.checkinRealizado && r.isAtiva)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: r.isReservaTardia ? const Color(0xFFF5F3FF) : const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: r.isReservaTardia ? const Color(0xFFDDD6FE) : const Color(0xFFBFDBFE),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              r.isReservaTardia ? Icons.hourglass_bottom_rounded : Icons.alarm_rounded,
+                              size: 12,
+                              color: r.isReservaTardia ? const Color(0xFF7C3AED) : const Color(0xFF2563EB),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${r.modalidadeCheckin} (Até ${r.limiteCheckinFormatado})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: r.isReservaTardia ? const Color(0xFF5B21B6) : const Color(0xFF1E40AF),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 

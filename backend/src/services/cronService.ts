@@ -89,7 +89,7 @@ export class CronService {
   private static async executeCancelExpiredNoShows(forcedDate?: string): Promise<{ totalExpiradas: number; reservas: any[] }> {
     const dataAlvo = forcedDate || DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
     const agora = DateTime.now().setZone('America/Sao_Paulo');
-    const horarioCortePadrao = await ConfigService.get('HORARIO_CORTE_NOSHOW', '11:00');
+    const horarioCortePadrao = await ConfigService.get('HORARIO_LIMITE_CHECKIN', '11:00');
     const horarioInicioTardia = await ConfigService.get('HORARIO_INICIO_RESERVA_TARDIA', '10:00');
     const toleranciaMinutos = await ConfigService.getNumber('TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS', 120);
 

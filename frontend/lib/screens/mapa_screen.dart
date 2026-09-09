@@ -339,49 +339,6 @@ class _MapaScreenState extends State<MapaScreen> {
                           onCadeiraTapped: (cadeira) => _onCadeiraTapped(cadeira, auth.user!, auth.token!),
                         )),
             ),
-
-            // Alerta Inferior de Check-in (se houver reserva ativa hoje pendente)
-            if (seatProvider.temCheckinPendenteHoje)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  border: Border(top: BorderSide(color: Colors.amber.shade300, width: 1.5)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.alarm_on_rounded, color: Color(0xFFD97706), size: 24),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Presença Pendente Hoje!',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF78350F)),
-                          ),
-                          Text(
-                            'Confirme sua presença para evitar o cancelamento automático por No-Show.',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF92400E)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 16),
-                      label: const Text('Ler QR Code / Check-in', style: TextStyle(fontWeight: FontWeight.bold)),
-                      onPressed: () {
-                        widget.onNavegarParaCheckin?.call();
-                      },
-                    ),
-                  ],
-                ),
-              ),
           ],
         ),
       ),

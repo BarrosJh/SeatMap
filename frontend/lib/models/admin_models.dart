@@ -31,10 +31,9 @@ class AdminUsuarioModel {
   bool get isTi => permissaoTi || perfil == 'ADMIN_TI';
 
   factory AdminUsuarioModel.fromJson(Map<String, dynamic> json) {
-    final perfilStr = json['perfil'] as String? ?? 'COLABORADOR';
+    final perfilStr = json['perfil']?.toString() ?? 'COLABORADOR';
     final hasRh = json['permissao_rh'] == true || 
                   json['permissaoRh'] == true || 
-                  json['is_admin'] == true || 
                   perfilStr == 'ADMIN_RH';
     final hasTi = json['permissao_ti'] == true ||
                   json['permissaoTi'] == true ||
@@ -42,17 +41,17 @@ class AdminUsuarioModel {
     final needsMfa = json['exigir_mfa'] == true || json['exigirMfa'] == true;
 
     return AdminUsuarioModel(
-      id: json['id'] as int,
-      nome: json['nome'] as String? ?? '',
-      email: json['email'] as String? ?? '',
-      matricula: json['matricula'] as String? ?? '',
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      nome: json['nome']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      matricula: json['matricula']?.toString() ?? '',
       perfil: perfilStr,
       permissaoRh: hasRh,
       permissaoTi: hasTi,
       exigirMfa: needsMfa,
-      ativo: json['ativo'] == true,
-      departamentoId: json['departamento_id'] as int?,
-      departamentoNome: json['departamento_nome'] as String?,
+      ativo: json['ativo'] == true || json['ativo'] == 1 || json['ativo']?.toString() == 'true',
+      departamentoId: json['departamento_id'] != null ? int.tryParse(json['departamento_id'].toString()) : null,
+      departamentoNome: json['departamento_nome']?.toString(),
       totalReservasAtivas: int.tryParse(json['total_reservas_ativas']?.toString() ?? '0') ?? 0,
     );
   }
@@ -87,8 +86,8 @@ class DepartamentoModel {
 
   factory DepartamentoModel.fromJson(Map<String, dynamic> json) {
     return DepartamentoModel(
-      id: json['id'] as int,
-      nome: json['nome'] as String? ?? '',
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      nome: json['nome']?.toString() ?? '',
       totalUsuarios: int.tryParse(json['total_usuarios']?.toString() ?? '0') ?? 0,
     );
   }
@@ -135,23 +134,23 @@ class AdminReservaModel {
 
   factory AdminReservaModel.fromJson(Map<String, dynamic> json) {
     return AdminReservaModel(
-      id: json['id'] as int,
-      cadeiraId: json['cadeira_id'] as int,
-      assento: json['assento'] as String? ?? '',
-      baiaNome: json['baia_nome'] as String? ?? '',
-      escritorioId: json['escritorio_id'] as int? ?? 1,
-      escritorioNome: json['escritorio_nome'] as String? ?? '',
-      usuarioId: json['usuario_id'] as int,
-      usuarioNome: json['usuario_nome'] as String? ?? '',
-      matricula: json['matricula'] as String? ?? '',
-      usuarioEmail: json['usuario_email'] as String?,
-      departamentoNome: json['departamento_nome'] as String?,
-      dataReserva: json['data_reserva'] as String? ?? '',
-      checkinRealizado: json['checkin_realizado'] == true,
-      checkinEm: json['checkin_em'] as String?,
-      status: json['status'] as String? ?? 'ATIVA',
-      codigoComprovante: json['codigo_comprovante'] as String?,
-      criadoEm: json['criado_em'] as String?,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      cadeiraId: int.tryParse(json['cadeira_id']?.toString() ?? '0') ?? 0,
+      assento: json['assento']?.toString() ?? '',
+      baiaNome: json['baia_nome']?.toString() ?? '',
+      escritorioId: int.tryParse(json['escritorio_id']?.toString() ?? '1') ?? 1,
+      escritorioNome: json['escritorio_nome']?.toString() ?? '',
+      usuarioId: int.tryParse(json['usuario_id']?.toString() ?? '0') ?? 0,
+      usuarioNome: json['usuario_nome']?.toString() ?? '',
+      matricula: json['matricula']?.toString() ?? '',
+      usuarioEmail: json['usuario_email']?.toString(),
+      departamentoNome: json['departamento_nome']?.toString(),
+      dataReserva: json['data_reserva']?.toString() ?? '',
+      checkinRealizado: json['checkin_realizado'] == true || json['checkin_realizado'] == 1 || json['checkin_realizado']?.toString() == 'true',
+      checkinEm: json['checkin_em']?.toString(),
+      status: json['status']?.toString() ?? 'ATIVA',
+      codigoComprovante: json['codigo_comprovante']?.toString(),
+      criadoEm: json['criado_em']?.toString(),
     );
   }
 }
