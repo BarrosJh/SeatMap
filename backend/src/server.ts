@@ -77,7 +77,15 @@ app.use(express.json({
 app.use(requestLoggerMiddleware);
 
 // Rate Limiting Global
-app.use('/api', globalLimiter);
+// Rota Raiz para Health Check do Load Balancer / Render
+app.all('/', (req, res) => {
+  res.status(200).json({
+    status: 'online',
+    service: 'SeatMap API Enterprise',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Rotas da API
 app.use('/api', routes);
