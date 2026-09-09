@@ -57,16 +57,25 @@ const server = http.createServer(app);
 // Configuração segura de CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-  : ['http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:3000', 'http://127.0.0.1:8080'];
+  : ['*'];
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permite chamadas sem origin (mobile apps, curl, server-to-server) e origens permitidas
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(new Error('Origem não permitida pela política de CORS'));
+    // Permite chamadas sem origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.includes('*') ||
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.onrender.com') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1') ||
+      process.env.NODE_ENV !== 'production'
+    ) {
+      return callback(null, true);
     }
+
+    callback(new Error('Origem não permitida pela política de CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
