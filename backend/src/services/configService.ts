@@ -7,6 +7,7 @@ export class ConfigService {
   private static readonly TTL_MS = 60 * 1000; // 1 minuto de cache
   private static readonly SENSITIVE_KEYS: ReadonlySet<string> = new Set([
     'SMTP_PASS',
+    'RESEND_API_KEY',
     'SSO_GOOGLE_CLIENT_SECRET',
     'SSO_AZURE_CLIENT_SECRET',
     'SSO_OKTA_CLIENT_SECRET'

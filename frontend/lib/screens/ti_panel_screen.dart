@@ -31,7 +31,12 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
   bool _isRefreshingStatus = false;
   bool _isLoadingAudit = false;
 
-  // TAB 1: SMTP Controllers
+  // TAB 1: Email Controllers (Resend API & SMTP)
+  String _emailProvider = 'RESEND'; // 'RESEND' ou 'SMTP'
+  final _resendApiKeyController = TextEditingController();
+  bool _resendApiKeyObscure = true;
+  bool _resendApiKeyConfigurada = false;
+
   final _smtpHostController = TextEditingController();
   final _smtpPortController = TextEditingController(text: '587');
   bool _smtpSecure = false;
@@ -133,6 +138,7 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
   void dispose() {
     _statusTimer?.cancel();
     _tabController.dispose();
+    _resendApiKeyController.dispose();
     _smtpHostController.dispose();
     _smtpPortController.dispose();
     _smtpUserController.dispose();
@@ -381,6 +387,8 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
     final res = await _apiService.getConfiguracoesTi(auth.token!);
     if (res.success && res.data != null && mounted) {
       final data = res.data!;
+      final email = data['email'] ?? {};
+      final resend = email['resend'] ?? {};
       final smtp = data['smtp'] ?? {};
       final mfa = data['mfa'] ?? {};
       final autoLock = data['autoLock'] ?? {};
@@ -390,13 +398,17 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
       final okta = sso['okta'] ?? {};
 
       setState(() {
+        _emailProvider = email['provider'] ?? 'RESEND';
+        _resendApiKeyConfigurada = resend['apiKeyConfigured'] == true;
+        _resendApiKeyController.text = _resendApiKeyConfigurada ? '••••••••••••' : '';
+
         _smtpHostController.text = smtp['host'] ?? 'smtp.gmail.com';
         _smtpPortController.text = (smtp['port'] ?? 587).toString();
         _smtpSecure = smtp['secure'] == true;
         _smtpUserController.text = smtp['user'] ?? '';
-        _smtpPassConfigurada = smtp['passConfigurada'] == true;
+        _smtpPassConfigurada = smtp['passConfigured'] == true || smtp['passConfigurada'] == true;
         _smtpPassController.text = _smtpPassConfigurada ? '••••••••••••' : '';
-        _emailFromController.text = smtp['from'] ?? '"SeatMap Corporativo" <nao-responda@seatmap.local>';
+        _emailFromController.text = email['emailFrom'] ?? smtp['from'] ?? smtp['emailFrom'] ?? 'SeatMap Corporativo <onboarding@resend.dev>';
 
         _mfaPolicy = mfa['policy'] ?? 'OPCIONAL';
         _mfaEmailEnabled = mfa['emailEnabled'] ?? true;
@@ -496,42 +508,58 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
     final messenger = ScaffoldMessenger.of(context);
     if (auth.token == null) return;
 
-    final host = _smtpHostController.text.trim();
-    final port = int.tryParse(_smtpPortController.text.trim()) ?? 587;
-    final user = _smtpUserController.text.trim();
-    final pass = _smtpPassController.text.trim();
     final from = _emailFromController.text.trim();
-
-    if (host.isEmpty || user.isEmpty) {
+    if (from.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Host e Usuário SMTP são obrigatórios.'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('E-mail Remetente (From) é obrigatório.'), backgroundColor: Colors.red),
       );
       return;
     }
 
-    setState(() => _isSavingSmtp = true);
-
     final payload = <String, dynamic>{
-      'smtpHost': host,
-      'smtpPort': port,
-      'smtpSecure': _smtpSecure,
-      'smtpUser': user,
+      'emailProvider': _emailProvider,
       'emailFrom': from,
     };
 
-    if (pass.isNotEmpty && pass != '••••••••••••') {
-      payload['smtpPass'] = pass;
+    if (_emailProvider == 'RESEND') {
+      final resendKey = _resendApiKeyController.text.trim();
+      if (resendKey.isNotEmpty && resendKey != '••••••••••••') {
+        payload['resendApiKey'] = resendKey;
+      }
+    } else {
+      final host = _smtpHostController.text.trim();
+      final port = int.tryParse(_smtpPortController.text.trim()) ?? 587;
+      final user = _smtpUserController.text.trim();
+      final pass = _smtpPassController.text.trim();
+
+      if (host.isEmpty || user.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Host e Usuário SMTP são obrigatórios para o modo SMTP.'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      payload['smtpHost'] = host;
+      payload['smtpPort'] = port;
+      payload['smtpSecure'] = _smtpSecure;
+      payload['smtpUser'] = user;
+      if (pass.isNotEmpty && pass != '••••••••••••') {
+        payload['smtpPass'] = pass;
+      }
     }
 
+    setState(() => _isSavingSmtp = true);
     final res = await _apiService.updateConfiguracoesTi(auth.token!, payload);
     setState(() => _isSavingSmtp = false);
 
     messenger.showSnackBar(
       SnackBar(
-        content: Text(res.message ?? res.error ?? 'Configurações SMTP atualizadas com sucesso.'),
+        content: Text(res.message ?? res.error ?? 'Configurações de E-mail atualizadas com sucesso.'),
         backgroundColor: res.success ? Colors.green.shade700 : Colors.red.shade700,
       ),
     );
+
+    await _carregarConfiguracoesTi();
   }
 
   Future<void> _salvarSegurancaESso() async {
@@ -671,7 +699,7 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
           unselectedLabelColor: const Color(0xFF94A3B8),
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
-            Tab(icon: Icon(Icons.mail_outline_rounded, size: 20), text: 'Servidor SMTP'),
+            Tab(icon: Icon(Icons.mail_outline_rounded, size: 20), text: 'Canal de E-mail'),
             Tab(icon: Icon(Icons.shield_rounded, size: 20), text: 'Segurança, MFA & SSO'),
             Tab(icon: Icon(Icons.people_alt_outlined, size: 20), text: 'Usuários'),
             Tab(icon: Icon(Icons.upload_file_outlined, size: 20), text: 'Importação em Lote'),
@@ -686,6 +714,12 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
               controller: _tabController,
               children: [
                 TabTiSmtp(
+                  emailProvider: _emailProvider,
+                  onProviderChanged: (v) => setState(() => _emailProvider = v),
+                  resendApiKeyController: _resendApiKeyController,
+                  resendApiKeyObscure: _resendApiKeyObscure,
+                  onToggleResendApiKeyObscure: () => setState(() => _resendApiKeyObscure = !_resendApiKeyObscure),
+                  resendApiKeyConfigured: _resendApiKeyConfigurada,
                   hostController: _smtpHostController,
                   portController: _smtpPortController,
                   secure: _smtpSecure,
@@ -694,6 +728,7 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
                   passController: _smtpPassController,
                   passObscure: _smtpPassObscure,
                   onTogglePassObscure: () => setState(() => _smtpPassObscure = !_smtpPassObscure),
+                  passConfigured: _smtpPassConfigurada,
                   emailFromController: _emailFromController,
                   testEmailController: _testEmailDestinoController,
                   isSaving: _isSavingSmtp,

@@ -13,12 +13,19 @@ export class TiController {
    */
   public static async getConfiguracoesTi(req: Request, res: Response): Promise<void> {
     try {
+      const emailProvider = await ConfigService.get('EMAIL_PROVIDER', '');
+      const resendApiKeyRaw = await ConfigService.get('RESEND_API_KEY', process.env.RESEND_API_KEY || '');
       const smtpHost = await ConfigService.get('SMTP_HOST', process.env.SMTP_HOST || 'smtp.gmail.com');
       const smtpPort = await ConfigService.get('SMTP_PORT', process.env.SMTP_PORT || '587');
       const smtpSecure = await ConfigService.get('SMTP_SECURE', process.env.SMTP_SECURE || 'false');
       const smtpUser = await ConfigService.get('SMTP_USER', process.env.SMTP_USER || '');
       const rawPass = await ConfigService.get('SMTP_PASS', process.env.SMTP_PASS || '');
       const emailFrom = await ConfigService.get('EMAIL_FROM', process.env.EMAIL_FROM || '"SeatMap Corporativo" <nao-responda@seatmap.local>');
+
+      // Determina provedor ativo (padrão RESEND se chave configurada ou se SMTP_PASS começar com re_)
+      const activeProvider = emailProvider
+        ? emailProvider
+        : (resendApiKeyRaw.length > 0 || rawPass.startsWith('re_') ? 'RESEND' : 'SMTP');
 
       // Configurações de MFA
       const mfaExpiracao = await ConfigService.getNumber('MFA_EXPIRACAO_MINUTOS', 10);
@@ -62,6 +69,20 @@ export class TiController {
       const autoLockMinutos = await ConfigService.getNumber('AUTO_LOCK_MINUTOS', 15);
 
       res.status(200).json({
+        email: {
+          provider: activeProvider,
+          emailFrom,
+          resend: {
+            apiKeyConfigured: resendApiKeyRaw.length > 0 || rawPass.startsWith('re_')
+          },
+          smtp: {
+            host: smtpHost,
+            port: parseInt(smtpPort, 10),
+            secure: smtpSecure === 'true',
+            user: smtpUser,
+            passConfigured: rawPass.length > 0 && !rawPass.startsWith('re_')
+          }
+        },
         smtp: {
           host: smtpHost,
           port: parseInt(smtpPort, 10),
@@ -124,6 +145,8 @@ export class TiController {
   public static async updateConfiguracoesTi(req: Request, res: Response): Promise<void> {
     try {
       const {
+        emailProvider,
+        resendApiKey,
         smtpHost,
         smtpPort,
         smtpSecure,
@@ -161,6 +184,13 @@ export class TiController {
         ssoOktaClientSecret
       } = req.body;
 
+      if (emailProvider !== undefined) {
+        await ConfigService.set('EMAIL_PROVIDER', String(emailProvider).toUpperCase().trim(), 'Provedor de E-mail (RESEND ou SMTP)');
+      }
+      if (resendApiKey !== undefined && resendApiKey !== '••••••••••••' && resendApiKey.trim() !== '') {
+        const cleanKey = String(resendApiKey).replace(/\s+/g, '');
+        await ConfigService.set('RESEND_API_KEY', cleanKey, 'Chave de API do Resend AES-256');
+      }
       if (smtpHost !== undefined) await ConfigService.set('SMTP_HOST', String(smtpHost).trim(), 'Servidor SMTP');
       if (smtpPort !== undefined) await ConfigService.set('SMTP_PORT', String(smtpPort).trim(), 'Porta SMTP');
       if (smtpSecure !== undefined) await ConfigService.set('SMTP_SECURE', String(smtpSecure), 'Conexão segura SSL/TLS');

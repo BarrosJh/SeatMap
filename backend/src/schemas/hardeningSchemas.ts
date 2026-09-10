@@ -48,6 +48,8 @@ export const facilitiesQuerySchema = z.object({
 }).strict();
 
 export const tiConfigSchema = z.object({
+  emailProvider: z.enum(['RESEND', 'SMTP']).optional(),
+  resendApiKey: boundedText(500).optional(),
   smtpHost: boundedText(255).optional(),
   smtpPort: z.union([z.string().regex(/^\d{1,5}$/), z.number().int().min(1).max(65535)]).optional(),
   smtpSecure: z.union([z.boolean(), z.string().max(5)]).optional(),

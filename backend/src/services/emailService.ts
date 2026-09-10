@@ -263,6 +263,33 @@ export class EmailService {
     });
   }
 
+  private static async getActiveProvider(): Promise<{
+    provider: 'RESEND' | 'SMTP';
+    resendApiKey?: string;
+  }> {
+    const configuredProvider = await ConfigService.get('EMAIL_PROVIDER');
+    const resendApiKey = (await ConfigService.get('RESEND_API_KEY')) || process.env.RESEND_API_KEY || '';
+    const smtpPass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS || '';
+    const smtpHost = (await ConfigService.get('SMTP_HOST')) || process.env.SMTP_HOST || '';
+
+    if (configuredProvider === 'RESEND') {
+      const apiKey = resendApiKey || (smtpPass.startsWith('re_') ? smtpPass : '');
+      return { provider: 'RESEND', resendApiKey: apiKey.trim().replace(/\s+/g, '') };
+    }
+
+    if (configuredProvider === 'SMTP') {
+      return { provider: 'SMTP' };
+    }
+
+    // Auto-detecção inteligente caso não haja EMAIL_PROVIDER explícito
+    if (resendApiKey || smtpPass.startsWith('re_') || smtpHost.toLowerCase().includes('resend')) {
+      const apiKey = resendApiKey || (smtpPass.startsWith('re_') ? smtpPass : '');
+      return { provider: 'RESEND', resendApiKey: apiKey.trim().replace(/\s+/g, '') };
+    }
+
+    return { provider: 'SMTP' };
+  }
+
   /**
    * 4. Envio de E-mail de Teste da TI
    */
@@ -290,24 +317,24 @@ export class EmailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>SeatMap TI - Teste de Conexão SMTP</h1>
+            <h1>SeatMap TI - Teste de Conexão de E-mail</h1>
           </div>
           <div class="content">
-            <h2 style="margin: 0 0 10px 0; color: #1E293B; font-size: 18px;">Teste de Conectividade SMTP Concluído com Sucesso!</h2>
+            <h2 style="margin: 0 0 10px 0; color: #1E293B; font-size: 18px;">Conectividade de E-mail Validada com Sucesso!</h2>
             <p style="color: #475569; font-size: 14px; margin: 0;">
-              Olá, <strong>${nomeOperador}</strong>. Se você está lendo esta mensagem, o servidor SMTP e os parâmetros de envio de e-mail do SeatMap estão funcionando perfeitamente.
+              Olá, <strong>${nomeOperador}</strong>. Se você está lendo esta mensagem, o canal de saída de e-mails corporativos do SeatMap está operacional e autenticado.
             </p>
 
             <div class="success-box">
-              ✔ <strong>Status:</strong> Conexão estabelecida e autenticada com sucesso.<br>
+              ✔ <strong>Status:</strong> Canal ativo e mensagens sendo entregues.<br>
               ✔ <strong>Disparado em:</strong> ${timestamp}
             </div>
 
             <div class="details">
               <strong>Informações de Diagnóstico:</strong><br>
               • Destinatário: ${para}<br>
-              • Sistema: SeatMap Corporate Engine<br>
-              • Autenticação: Verificada
+              • Sistema: SeatMap Enterprise Engine<br>
+              • Criptografia: AES-256-GCM at-rest
             </div>
           </div>
           <div class="footer">
@@ -319,12 +346,18 @@ export class EmailService {
     `;
 
     try {
-      const rawPass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS || process.env.RESEND_API_KEY || '';
-      const pass = rawPass.trim().replace(/\s+/g, '');
-      const host = (await ConfigService.get('SMTP_HOST')) || process.env.SMTP_HOST || '';
+      const { provider, resendApiKey } = await this.getActiveProvider();
 
       // Modo Resend HTTPS API (Porta 443 - Sem bloqueio de firewall em nuvem)
-      if (pass.startsWith('re_') || host.toLowerCase().includes('resend')) {
+      if (provider === 'RESEND') {
+        if (!resendApiKey) {
+          return {
+            success: false,
+            message: 'Chave de API do Resend não foi configurada. Acesse resend.com para gerar sua chave.',
+            detalhes: { error: 'MISSING_RESEND_API_KEY' }
+          };
+        }
+
         let from = await this.getFromAddress();
         if (from.includes('@seatmap.local')) {
           from = 'SeatMap Corporativo <onboarding@resend.dev>';
@@ -333,7 +366,7 @@ export class EmailService {
         const res = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${pass}`,
+            'Authorization': `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -369,14 +402,14 @@ export class EmailService {
       const mailOptions = {
         from,
         to: para,
-        subject: `[SeatMap TI] Teste de Disparo de E-mail (${timestamp})`,
+        subject: `[SeatMap TI] Teste de Disparo SMTP (${timestamp})`,
         html
       };
 
       const info = await transporter.sendMail(mailOptions);
       return {
         success: true,
-        message: 'E-mail de teste despachado com sucesso!',
+        message: 'E-mail de teste despachado com sucesso via SMTP!',
         detalhes: {
           messageId: info.messageId,
           response: info.response || 'OK'
@@ -406,12 +439,10 @@ export class EmailService {
     tipoLog: string;
   }): Promise<boolean> {
     try {
-      const rawPass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS || process.env.RESEND_API_KEY || '';
-      const pass = rawPass.trim().replace(/\s+/g, '');
-      const host = (await ConfigService.get('SMTP_HOST')) || process.env.SMTP_HOST || '';
+      const { provider, resendApiKey } = await this.getActiveProvider();
 
       // Modo Resend HTTPS API (Porta 443 - Bypassa bloqueio de portas SMTP do Render)
-      if (pass.startsWith('re_') || host.toLowerCase().includes('resend')) {
+      if (provider === 'RESEND' && resendApiKey) {
         let from = await this.getFromAddress();
         if (from.includes('@seatmap.local')) {
           from = 'SeatMap Corporativo <onboarding@resend.dev>';
@@ -420,7 +451,7 @@ export class EmailService {
         const res = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${pass}`,
+            'Authorization': `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
@@ -458,7 +489,7 @@ export class EmailService {
       const info = await transporter.sendMail(mailOptions);
 
       console.log('================================================================');
-      console.log('[EmailService] E-mail enviado com sucesso!');
+      console.log('[EmailService SMTP] E-mail enviado com sucesso!');
       console.log('[EmailService] Tipo:', opts.tipoLog, '| Destinatário:', opts.to);
       console.log('[EmailService] Assunto:', opts.subject);
       if (info.messageId) {
