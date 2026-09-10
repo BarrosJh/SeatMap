@@ -319,6 +319,51 @@ export class EmailService {
     `;
 
     try {
+      const rawPass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS || process.env.RESEND_API_KEY || '';
+      const pass = rawPass.trim().replace(/\s+/g, '');
+      const host = (await ConfigService.get('SMTP_HOST')) || process.env.SMTP_HOST || '';
+
+      // Modo Resend HTTPS API (Porta 443 - Sem bloqueio de firewall em nuvem)
+      if (pass.startsWith('re_') || host.toLowerCase().includes('resend')) {
+        let from = await this.getFromAddress();
+        if (from.includes('@seatmap.local')) {
+          from = 'SeatMap Corporativo <onboarding@resend.dev>';
+        }
+
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${pass}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from,
+            to: [para],
+            subject: `[SeatMap TI] Teste de Disparo Resend HTTPS (${timestamp})`,
+            html
+          })
+        });
+
+        const resData: any = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          console.error('[EmailService Resend Teste Error]:', res.status, resData);
+          return {
+            success: false,
+            message: resData.message || `Erro na API do Resend (HTTP ${res.status})`,
+            detalhes: resData
+          };
+        }
+
+        return {
+          success: true,
+          message: 'E-mail de teste despachado via API HTTPS do Resend com sucesso!',
+          detalhes: {
+            resendId: resData.id,
+            statusCode: res.status
+          }
+        };
+      }
+
       const transporter = await this.getTransporter();
       const from = await this.getFromAddress();
       const mailOptions = {
@@ -361,6 +406,46 @@ export class EmailService {
     tipoLog: string;
   }): Promise<boolean> {
     try {
+      const rawPass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS || process.env.RESEND_API_KEY || '';
+      const pass = rawPass.trim().replace(/\s+/g, '');
+      const host = (await ConfigService.get('SMTP_HOST')) || process.env.SMTP_HOST || '';
+
+      // Modo Resend HTTPS API (Porta 443 - Bypassa bloqueio de portas SMTP do Render)
+      if (pass.startsWith('re_') || host.toLowerCase().includes('resend')) {
+        let from = await this.getFromAddress();
+        if (from.includes('@seatmap.local')) {
+          from = 'SeatMap Corporativo <onboarding@resend.dev>';
+        }
+
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${pass}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from,
+            to: [opts.to],
+            subject: opts.subject,
+            html: opts.html
+          })
+        });
+
+        const resData: any = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          console.error('[EmailService Resend API Error]:', res.status, resData);
+          return false;
+        }
+
+        console.log('================================================================');
+        console.log('[EmailService Resend HTTPS] E-mail enviado com sucesso!');
+        console.log('[EmailService] Tipo:', opts.tipoLog, '| Destinatário:', opts.to);
+        console.log('[EmailService] Resend ID:', resData?.id);
+        console.log('================================================================');
+
+        return true;
+      }
+
       const transporter = await this.getTransporter();
       const from = await this.getFromAddress();
       const mailOptions = {
