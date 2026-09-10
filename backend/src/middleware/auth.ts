@@ -49,7 +49,9 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'relatorios:read',
     'relatorios:write',
     'reservas:read',
-    'reservas:write'
+    'reservas:write',
+    'infra:read',
+    'infra:write'
   ],
   ADMIN_TI: [
     'infra:read',
@@ -75,6 +77,8 @@ export const getUserPermissions = (user?: Pick<AuthUser, 'perfil' | 'permissaoRh
     permissions.add('relatorios:write');
     permissions.add('reservas:read');
     permissions.add('reservas:write');
+    permissions.add('infra:read');
+    permissions.add('infra:write');
   }
 
   if (user.permissaoTi === true) {

@@ -261,7 +261,7 @@ describe('Onda 3: Refatoração de Serviços, DTO Unificado & Resiliência Opera
     it('deve mascarar erro interno e não vazar stack trace no teste de SMTP', async () => {
       mockReq.body = { emailDestino: 'teste@empresa.com' };
 
-      const emailSpy = jest.spyOn(EmailService, 'enviarEmailGenerico').mockImplementation(async () => {
+      const emailSpy = jest.spyOn(EmailService, 'enviarEmailTeste').mockImplementation(async () => {
         throw new Error('EAUTH: Invalid login: 535-5.7.8 Username and Password not accepted at line 149 /internal/secret/path');
       });
 

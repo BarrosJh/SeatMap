@@ -28,6 +28,8 @@ export class EmailService {
       const pass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS;
       const secureStr = (await ConfigService.get('SMTP_SECURE')) || process.env.SMTP_SECURE;
       const secure = secureStr === 'true' || port === 465;
+      const rejectUnauthorizedStr = (await ConfigService.get('SMTP_REJECT_UNAUTHORIZED')) || process.env.SMTP_REJECT_UNAUTHORIZED;
+      const rejectUnauthorized = rejectUnauthorizedStr === 'true';
 
       if (host && user && pass) {
         this.transporter = nodemailer.createTransport({
@@ -35,7 +37,9 @@ export class EmailService {
           port,
           secure,
           auth: { user, pass },
-          tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' }
+          tls: {
+            rejectUnauthorized
+          }
         });
       } else {
         // Fallback para desenvolvimento / simulação com JSON transport e logs formatados
@@ -369,8 +373,13 @@ export class EmailService {
       console.log('================================================================');
 
       return true;
-    } catch (error) {
-      console.error('[EmailService Error] Falha ao despachar e-mail para:', opts.to, error);
+    } catch (error: any) {
+      console.error('[EmailService Error] Falha ao despachar e-mail para:', opts.to, {
+        message: error?.message,
+        code: error?.code,
+        response: error?.response,
+        command: error?.command
+      });
       return false;
     }
   }

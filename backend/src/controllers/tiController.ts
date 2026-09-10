@@ -241,33 +241,24 @@ export class TiController {
       }
 
       const inicio = performance.now();
-      const enviado = await EmailService.enviarEmailGenerico(
+      const resultado = await EmailService.enviarEmailTeste(
         emailDestino,
-        '🧪 Teste de Conectividade SMTP — SeatMap Enterprise',
-        `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px;">
-          <h2 style="color: #0f172a; margin-top: 0;">Conectividade SMTP Validada!</h2>
-          <p style="color: #334155; font-size: 14px;">Este e-mail confirma que as credenciais do servidor SMTP foram validadas com sucesso pelo módulo de infraestrutura do <strong>SeatMap Enterprise</strong>.</p>
-          <div style="background: #f8fafc; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 13px; color: #166534;">
-            ✓ Criptografia AES-256-GCM ativa at-rest<br/>
-            ✓ Conexão autenticada e entregue em tempo real
-          </div>
-          <p style="color: #94a3b8; font-size: 12px; margin-bottom: 0;">Disparado em: ${new Date().toLocaleString('pt-BR')}</p>
-        </div>
-        `
+        (req as any).user?.nome || 'Administrador TI'
       );
       const latenciaMs = Math.round(performance.now() - inicio);
 
-      if (enviado) {
+      if (resultado.success) {
         res.status(200).json({
           success: true,
-          message: `E-mail de teste disparado com sucesso para ${emailDestino}.`,
-          latenciaMs
+          message: resultado.message,
+          latenciaMs,
+          detalhes: resultado.detalhes
         });
       } else {
         res.status(502).json({
           success: false,
-          error: 'Falha ao autenticar ou enviar através do servidor SMTP configurado.'
+          error: resultado.message || 'Falha ao autenticar ou enviar através do servidor SMTP configurado.',
+          detalhes: resultado.detalhes
         });
       }
     } catch (error: any) {
