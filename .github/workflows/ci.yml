@@ -184,7 +184,8 @@ jobs:
         env:
           STAGING_HEALTH_URL: ${{ vars.STAGING_HEALTH_URL }}
           INTERNAL_HEALTH_TOKEN: ${{ secrets.INTERNAL_HEALTH_TOKEN }}
-        run: curl --fail --silent --show-error \
-          -H "x-health-token: $INTERNAL_HEALTH_TOKEN" \
-          "$STAGING_HEALTH_URL/api/health/metrics"
+        run: |
+          curl --fail --silent --show-error \
+            -H "x-health-token: $INTERNAL_HEALTH_TOKEN" \
+            "$STAGING_HEALTH_URL/api/health/metrics"
 
