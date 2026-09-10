@@ -71,118 +71,208 @@ class TabTiSmtp extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(Icons.mark_email_read_rounded, color: Color(0xFF2563EB), size: 22),
-                          SizedBox(width: 10),
-                          Text(
-                            'Canal de E-mails Corporativos (Criptografia AES-256-GCM)',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          const Row(
+                            children: [
+                              Icon(Icons.mark_email_read_rounded, color: Color(0xFF2563EB), size: 24),
+                              SizedBox(width: 10),
+                              Text(
+                                'Canal de E-mails Corporativos',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isResend ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: isResend ? const Color(0xFFA7F3D0) : const Color(0xFFBFDBFE)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.circle, size: 8, color: isResend ? const Color(0xFF10B981) : const Color(0xFF2563EB)),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isResend ? 'PROVEDOR SELECIONADO: RESEND API' : 'PROVEDOR SELECIONADO: SMTP',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isResend ? const Color(0xFF065F46) : const Color(0xFF1E40AF),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Selecione o provedor de saída para despacho de comprovantes de reserva, códigos MFA e alertas.',
+                        'Escolha qual mecanismo de saída o SeatMap utilizará para despachar comprovantes de reserva, códigos MFA e alertas.',
                         style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                       ),
                       const SizedBox(height: 20),
 
-                      // Seletor de Provedor
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        padding: const EdgeInsets.all(4),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => onProviderChanged('RESEND'),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: isResend ? Colors.white : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: isResend
-                                        ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
-                                        : null,
+                      // SELETOR COM SWITCH / RADIO VISUAL CLARO
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => onProviderChanged('RESEND'),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isResend ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isResend ? const Color(0xFF22C55E) : const Color(0xFFE2E8F0),
+                                    width: isResend ? 2 : 1,
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.bolt_rounded, size: 18, color: isResend ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Resend API (Nuvem / HTTPS)',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: isResend ? FontWeight.bold : FontWeight.w500,
-                                          color: isResend ? const Color(0xFF0F172A) : const Color(0xFF64748B),
-                                        ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Radio<String>(
+                                      value: 'RESEND',
+                                      groupValue: emailProvider,
+                                      activeColor: const Color(0xFF16A34A),
+                                      onChanged: (val) {
+                                        if (val != null) onProviderChanged(val);
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Text(
+                                                'Resend API (HTTPS)',
+                                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: isResend ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  isResend ? 'ATIVO' : 'CLIQUE P/ ATIVAR',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isResend ? const Color(0xFF15803D) : const Color(0xFF94A3B8),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          const Text(
+                                            'Recomendado para Nuvem / Render (Porta 443 sem bloqueios)',
+                                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => onProviderChanged('SMTP'),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: !isResend ? Colors.white : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: !isResend
-                                        ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
-                                        : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => onProviderChanged('SMTP'),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: !isResend ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: !isResend ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                                    width: !isResend ? 2 : 1,
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.dns_rounded, size: 18, color: !isResend ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'SMTP Tradicional (Gmail / M365)',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: !isResend ? FontWeight.bold : FontWeight.w500,
-                                          color: !isResend ? const Color(0xFF0F172A) : const Color(0xFF64748B),
-                                        ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Radio<String>(
+                                      value: 'SMTP',
+                                      groupValue: emailProvider,
+                                      activeColor: const Color(0xFF2563EB),
+                                      onChanged: (val) {
+                                        if (val != null) onProviderChanged(val);
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Text(
+                                                'SMTP Tradicional',
+                                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: !isResend ? const Color(0xFFDBEAFE) : const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  !isResend ? 'ATIVO' : 'CLIQUE P/ ATIVAR',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: !isResend ? const Color(0xFF1E40AF) : const Color(0xFF94A3B8),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          const Text(
+                                            'Gmail, Office 365 ou Servidor de E-mail Dedicado',
+                                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 24),
 
-                      // PAINEL RESEND API
+                      // CAMPOS DO PROVEDOR RESEND API
                       if (isResend) ...[
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
+                            color: const Color(0xFFF0FDF4),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 20),
+                              Icon(Icons.bolt_rounded, color: Color(0xFF16A34A), size: 22),
                               SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'O Resend opera via HTTPS (Porta 443), garantindo entrega instantânea sem bloqueios de firewall em provedores como Render, AWS ou VPS. Gratuito para até 3.000 e-mails/mês.',
-                                  style: TextStyle(fontSize: 12, color: Color(0xFF1E40AF), height: 1.4),
+                                  'Conexão Direta HTTPS ativa. As mensagens são despachadas instantaneamente através da API oficial do Resend.',
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF166534), height: 1.4),
                                 ),
                               ),
                             ],
@@ -194,7 +284,7 @@ class TabTiSmtp extends StatelessWidget {
                           obscureText: resendApiKeyObscure,
                           decoration: InputDecoration(
                             labelText: 'API Key do Resend (re_...) *',
-                            helperText: resendApiKeyConfigured ? '✔ Chave criptografada ativa no banco' : 'Obtenha gratuitamente em resend.com/api-keys',
+                            helperText: resendApiKeyConfigured ? '✔ Chave criptografada com AES-256 ativa no banco' : 'Obtenha gratuitamente em resend.com/api-keys',
                             border: const OutlineInputBorder(),
                             suffixIcon: IconButton(
                               icon: Icon(resendApiKeyObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
@@ -212,7 +302,7 @@ class TabTiSmtp extends StatelessWidget {
                           ),
                         ),
                       ] else ...[
-                        // PAINEL SMTP TRADICIONAL
+                        // CAMPOS DO PROVEDOR SMTP TRADICIONAL
                         Row(
                           children: [
                             Expanded(
@@ -256,7 +346,7 @@ class TabTiSmtp extends StatelessWidget {
                                 obscureText: passObscure,
                                 decoration: InputDecoration(
                                   labelText: 'Senha / App Password *',
-                                  helperText: passConfigured ? '✔ Senha criptografada ativa' : null,
+                                  helperText: passConfigured ? '✔ Senha criptografada com AES-256 ativa' : null,
                                   border: const OutlineInputBorder(),
                                   suffixIcon: IconButton(
                                     icon: Icon(passObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
@@ -290,7 +380,10 @@ class TabTiSmtp extends StatelessWidget {
                           icon: isSaving
                               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Icon(Icons.save_rounded, size: 18),
-                          label: const Text('Salvar Configurações de E-mail', style: TextStyle(fontWeight: FontWeight.bold)),
+                          label: Text(
+                            isResend ? 'Salvar & Ativar Resend API' : 'Salvar & Ativar SMTP',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           onPressed: isSaving ? null : onSalvar,
                         ),
                       ),
@@ -312,13 +405,26 @@ class TabTiSmtp extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Teste de Disparo em Tempo Real',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Teste de Disparo em Tempo Real',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                          Text(
+                            isResend ? 'Canal: Resend API (HTTPS)' : 'Canal: SMTP (${hostController.text})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isResend ? const Color(0xFF16A34A) : const Color(0xFF2563EB),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Envie uma mensagem de diagnóstico para verificar a autenticação e tempo de resposta.',
+                        'Envie uma mensagem de diagnóstico para verificar a autenticação e tempo de resposta do canal configurado.',
                         style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                       ),
                       const SizedBox(height: 14),
