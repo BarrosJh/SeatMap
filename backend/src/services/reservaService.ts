@@ -56,12 +56,13 @@ export class ReservaService {
    */
   public static async enviarComprovanteEmail(
     reservaId: number,
+    usuarioId: number,
     userEmail: string,
     userPerfil: string,
     isRh: boolean,
     correlationId?: string
   ) {
-    return ReservaQueryService.enviarComprovanteEmail(reservaId, userEmail, userPerfil, isRh, correlationId);
+    return ReservaQueryService.enviarComprovanteEmail(reservaId, usuarioId, userEmail, userPerfil, isRh, correlationId);
   }
 }
 

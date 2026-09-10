@@ -39,10 +39,18 @@ export class ReservaQueryService {
   /**
    * Envia comprovante por e-mail
    */
-  public static async enviarComprovanteEmail(reservaId: number, userEmail: string, userPerfil: string, isRh: boolean, correlationId?: string) {
+  public static async enviarComprovanteEmail(
+    reservaId: number,
+    usuarioId: number,
+    userEmail: string,
+    userPerfil: string,
+    isRh: boolean,
+    correlationId?: string
+  ) {
     const result = await pool.query(`
       SELECT 
         r.id,
+        r.usuario_id,
         to_char(r.data_reserva, 'YYYY-MM-DD') AS data_reserva,
         r.codigo_comprovante,
         r.status,
@@ -66,7 +74,9 @@ export class ReservaQueryService {
     }
 
     const reserva = result.rows[0];
-    const hasPermission = reserva.usuario_email === userEmail || userPerfil === 'ADMIN_RH' || isRh;
+    const emailMatches = (reserva.usuario_email || '').trim().toLowerCase() === (userEmail || '').trim().toLowerCase();
+    const idMatches = Number(reserva.usuario_id) === Number(usuarioId);
+    const hasPermission = idMatches || emailMatches || userPerfil === 'ADMIN_RH' || userPerfil === 'ADMIN_TI' || isRh;
 
     if (!hasPermission) {
       return { success: false, code: 403, error: 'Você não tem permissão para acessar o comprovante desta reserva.' };

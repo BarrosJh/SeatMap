@@ -25,7 +25,8 @@ export class EmailService {
       const portStr = (await ConfigService.get('SMTP_PORT')) || process.env.SMTP_PORT || '587';
       const port = parseInt(portStr, 10);
       const user = (await ConfigService.get('SMTP_USER')) || process.env.SMTP_USER;
-      const pass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS;
+      const rawPass = (await ConfigService.get('SMTP_PASS')) || process.env.SMTP_PASS;
+      const pass = rawPass ? rawPass.trim().replace(/\s+/g, '') : undefined;
       const secureStr = (await ConfigService.get('SMTP_SECURE')) || process.env.SMTP_SECURE;
       const secure = secureStr === 'true' || port === 465;
       const rejectUnauthorizedStr = (await ConfigService.get('SMTP_REJECT_UNAUTHORIZED')) || process.env.SMTP_REJECT_UNAUTHORIZED;

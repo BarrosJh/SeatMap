@@ -173,9 +173,10 @@ export class ReservaController {
     }
 
     try {
-      const isRh = user.perfil === 'ADMIN_RH' || user.permissaoRh === true;
+      const isRh = user.perfil === 'ADMIN_RH' || user.perfil === 'ADMIN_TI' || user.permissaoRh === true || user.permissaoTi === true || user.is_admin === true;
       const result = await ReservaService.enviarComprovanteEmail(
         reservaId,
+        user.userId,
         user.email,
         user.perfil,
         isRh,

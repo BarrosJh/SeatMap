@@ -166,7 +166,8 @@ export class TiController {
       if (smtpSecure !== undefined) await ConfigService.set('SMTP_SECURE', String(smtpSecure), 'Conexão segura SSL/TLS');
       if (smtpUser !== undefined) await ConfigService.set('SMTP_USER', String(smtpUser).trim(), 'Usuário SMTP');
       if (smtpPass !== undefined && smtpPass !== '••••••••••••' && smtpPass.trim() !== '') {
-        await ConfigService.set('SMTP_PASS', String(smtpPass).trim(), 'Senha SMTP Criptografada AES-256');
+        const cleanPass = String(smtpPass).replace(/\s+/g, '');
+        await ConfigService.set('SMTP_PASS', cleanPass, 'Senha SMTP Criptografada AES-256');
       }
       if (emailFrom !== undefined) await ConfigService.set('EMAIL_FROM', String(emailFrom).trim(), 'Remetente padrão');
 
