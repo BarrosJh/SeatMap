@@ -1,6 +1,11 @@
 import fs from 'fs';
 import path from 'path';
+import dns from 'dns';
 import express from 'express';
+
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
 import http from 'http';
 import dotenv from 'dotenv';
 import cors from 'cors';

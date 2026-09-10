@@ -1,5 +1,10 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import dns from 'dns';
 import { ConfigService } from './configService';
+
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 export interface ComprovanteEmailData {
   escritorioNome: string;
@@ -38,6 +43,9 @@ export class EmailService {
           port,
           secure,
           auth: { user, pass },
+          connectionTimeout: 15000,
+          greetingTimeout: 10000,
+          socketTimeout: 20000,
           tls: {
             rejectUnauthorized
           }
