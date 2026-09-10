@@ -1,20 +1,36 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class AppConstants {
   // Global Navigator Key para controle centralizado de rotas e logout seguro
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-  // URLs configuráveis dinamicamente via --dart-define ou fallback padrão
+  // URLs configuráveis dinamicamente via --dart-define ou detecção de host na Web
   static const String _definedBaseUrl = String.fromEnvironment('API_URL');
   static const String _definedWsUrl = String.fromEnvironment('WS_URL');
 
   static String get baseUrl {
     if (_definedBaseUrl.isNotEmpty) return _definedBaseUrl;
+    if (kIsWeb) {
+      final origin = Uri.base.origin;
+      if (origin.isNotEmpty && !origin.startsWith('file:') && !origin.contains('localhost')) {
+        return '$origin/api';
+      }
+    }
     return 'http://localhost:3000/api';
   }
 
   static String get wsUrl {
     if (_definedWsUrl.isNotEmpty) return _definedWsUrl;
+    if (kIsWeb) {
+      final origin = Uri.base.origin;
+      if (origin.isNotEmpty && !origin.startsWith('file:') && !origin.contains('localhost')) {
+        final wsProtocol = origin.startsWith('https:') ? 'wss:' : 'ws:';
+        final host = Uri.base.host;
+        final port = Uri.base.hasPort ? ':${Uri.base.port}' : '';
+        return '$wsProtocol//$host$port/ws';
+      }
+    }
     return 'ws://localhost:3000/ws';
   }
 

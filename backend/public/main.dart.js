@@ -36090,8 +36090,8 @@ b=o}s=b+2
 if(p===s)return s
 if(a.charCodeAt(s)!==47)return q
 return b+3},
-cE(){return"http://localhost:3000/api"},
-bfK(){return"ws://localhost:3000/ws"},
+cE(){return"https://seatmap-api-tvy9.onrender.com/api"},
+bfK(){return"wss://seatmap-api-tvy9.onrender.com/ws"},
 am5(a,b){var s=0,r=A.u(t.ob),q,p,o,n,m,l
 var $async$am5=A.v(function(c,d){if(c===1)return A.q(d,r)
 for(;;)switch(s){case 0:if(B.c.lq(b,".xlsx"))p="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
