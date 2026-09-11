@@ -383,6 +383,46 @@ export class LoginController {
     }
   }
 
+  public static async getMe(req: Request, res: Response) {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Sessão inválida ou não autenticada.' });
+    }
+
+    try {
+      const userRes = await pool.query(`
+        SELECT u.id, u.nome, u.email, u.matricula, u.perfil, 
+               COALESCE(u.permissao_rh, false) AS permissao_rh,
+               COALESCE(u.permissao_ti, false) AS permissao_ti,
+               COALESCE(u.exigir_mfa, false) AS exigir_mfa,
+               u.ativo,
+               COALESCE(u.totp_ativo, false) AS totp_ativo,
+               u.departamento_id, d.nome AS departamento_nome,
+               u.ultimo_login
+        FROM usuarios u
+        LEFT JOIN departamentos d ON u.departamento_id = d.id
+        WHERE u.id = $1
+      `, [userId]);
+
+      if (userRes.rowCount === 0) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      const user = userRes.rows[0];
+
+      if (!user.ativo) {
+        return res.status(401).json({ error: 'Usuário inativo. Entre em contato com o RH.' });
+      }
+
+      return res.status(200).json(toUserResponseDto(user));
+    } catch (error) {
+      logger.error('[LoginController.getMe] Erro ao buscar perfil:', { correlationId: req.correlationId, error });
+      return res.status(500).json({ error: 'Erro interno ao buscar perfil do usuário.' });
+    }
+  }
+
   public static async getConfigSeguranca(req: Request, res: Response) {
     try {
       const autoLockAtivo = (await ConfigService.get('AUTO_LOCK_ATIVO', 'true')) === 'true';

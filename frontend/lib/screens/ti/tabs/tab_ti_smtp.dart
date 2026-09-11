@@ -298,7 +298,7 @@ class TabTiSmtp extends StatelessWidget {
                           decoration: const InputDecoration(
                             labelText: 'E-mail Remetente (From) *',
                             helperText: 'Ex: SeatMap Corporativo <onboarding@resend.dev> ou seu domínio verificado',
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(),
                           ),
                         ),
                       ] else ...[
@@ -363,7 +363,7 @@ class TabTiSmtp extends StatelessWidget {
                           decoration: const InputDecoration(
                             labelText: 'E-mail Remetente (From) *',
                             helperText: 'Ex: "SeatMap Corporativo" <nao-responda@suaempresa.com.br>',
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(),
                           ),
                         ),
                       ],

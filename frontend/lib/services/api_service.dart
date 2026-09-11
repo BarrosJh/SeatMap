@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import '../models/seat_model.dart';
 import '../models/admin_models.dart';
+import '../models/user_model.dart';
 import 'api/api_client_base.dart';
 import 'api/auth_api.dart';
 import 'api/reserva_api.dart';
@@ -29,6 +30,9 @@ class ApiService {
   // ==========================================
   Future<ApiResponse<Map<String, dynamic>>> getConfigSeguranca() =>
       _authApi.getConfigSeguranca();
+
+  Future<ApiResponse<UserModel>> getMe(String token) =>
+      _authApi.getMe(token);
 
   Future<ApiResponse<Map<String, dynamic>>> login(String login, String senha) =>
       _authApi.login(login, senha);

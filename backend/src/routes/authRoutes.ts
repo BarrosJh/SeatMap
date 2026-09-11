@@ -24,11 +24,12 @@ const router = Router();
 // Rate limiting estrito para autenticação e recuperação de senha
 router.use(authLimiter);
 
-// 1. Login Padrão, Configurações de Segurança & SSO
+// 1. Login Padrão, Perfil Autoritativo, Configurações de Segurança & SSO
 router.get('/config-seguranca', LoginController.getConfigSeguranca);
+router.get('/me', authenticateToken, LoginController.getMe);
 router.post('/login', authUserLimiter, validateRequest({ body: loginSchema }), LoginController.login);
 router.get('/sso/config', SsoController.getSsoConfig);
-router.post('/sso/login', authUserLimiter, validateRequest({ body: ssoLoginSchema }), SsoController.loginSso);
+router.post('/sso/login', authUserLimiter, validateRequest({ body: ssoLoginSchema }), LoginController.loginSso);
 
 // 2. Validação de Login com TOTP ou E-mail (Passo 2 do 2FA)
 router.post('/totp/validar-login', validateRequest({ body: validarTotpSchema }), MfaController.validarLoginTotp);

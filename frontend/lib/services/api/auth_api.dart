@@ -22,6 +22,35 @@ class AuthApi extends ApiClientBase {
     }
   }
 
+  Future<ApiResponse<UserModel>> getMe(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/auth/me'),
+        headers: headers(token),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: UserModel.fromJson(body),
+          statusCode: 200,
+        );
+      } else {
+        return ApiResponse(
+          success: false,
+          error: body['error'] ?? 'Falha ao validar sessão.',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        error: 'Erro de conexão ao validar sessão: $e',
+        statusCode: 0,
+      );
+    }
+  }
+
   Future<ApiResponse<Map<String, dynamic>>> login(String login, String senha) async {
     try {
       final response = await http.post(

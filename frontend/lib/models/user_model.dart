@@ -30,14 +30,11 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final perfilStr = json['perfil']?.toString() ?? 'COLABORADOR';
-    final isSuperAdmin = json['is_admin'] == true && perfilStr != 'ADMIN_TI' && perfilStr != 'ADMIN_RH';
     final hasRh = json['permissaoRh'] == true || 
                   json['permissao_rh'] == true || 
-                  isSuperAdmin ||
                   perfilStr == 'ADMIN_RH';
     final hasTi = json['permissaoTi'] == true ||
                   json['permissao_ti'] == true || 
-                  isSuperAdmin ||
                   perfilStr == 'ADMIN_TI';
 
     return UserModel(
@@ -66,7 +63,6 @@ class UserModel {
       'permissao_rh': permissaoRh,
       'permissaoTi': permissaoTi,
       'permissao_ti': permissaoTi,
-      'is_admin': permissaoRh,
       'departamentoId': departamentoId,
       'departamentoNome': departamentoNome,
     };

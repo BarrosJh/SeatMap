@@ -119,6 +119,22 @@ class AuthProvider extends ChangeNotifier {
       await _secureStorage.delete(AppConstants.keyUserData);
     } else if (_token == null && _refreshToken != null) {
       await renovarSessaoComRefreshToken();
+    } else if (_token != null) {
+      // Validação autoritativa e busca de perfil mais recente no Backend (PostgreSQL)
+      try {
+        final meRes = await _apiService.getMe(_token!);
+        if (meRes.success && meRes.data != null) {
+          _user = meRes.data;
+          await _secureStorage.saveUserData(_user!.toJsonString());
+        } else if (meRes.statusCode == 401) {
+          // Token revogado, usuário inativo ou tokenVersion alterada
+          debugPrint('[AuthProvider] Sessão inválida no backend ao iniciar. Executando logout.');
+          await logout();
+          return;
+        }
+      } catch (e) {
+        debugPrint('[AuthProvider] Falha de conexão ao sincronizar com /auth/me: $e');
+      }
     }
     notifyListeners();
   }
