@@ -100,4 +100,41 @@ describe('Regra de Tolerância de No-Show para Reservas Tardias do Mesmo Dia', (
     expect(typeof ReservaService.minhasReservas).toBe('function');
     expect(typeof ReservaService.enviarComprovanteEmail).toBe('function');
   });
+
+  it('7. Deve lidar corretamente com dataReserva vindo como objeto JS Date do PostgreSQL sem retroceder o dia', () => {
+    // Objeto JS Date em UTC retornado pelo driver pg para coluna DATE
+    const dataReservaPgDate = new Date('2026-09-07T00:00:00.000Z');
+    const criadoEmSql = '2026-09-07 14:15:00'; // Formato string SQL sem timezone
+    const agora1500 = DateTime.fromISO('2026-09-07T15:00:00-03:00', { zone: 'America/Sao_Paulo' });
+
+    const res = ReservaToleranceUtils.calcularLimiteCheckin(dataReservaPgDate, criadoEmSql, params, agora1500);
+
+    expect(res.isReservaTardia).toBe(true);
+    expect(res.limiteFormatado).toBe('16:15');
+    expect(res.isExpirada).toBe(false);
+  });
+
+  it('8. Deve lidar corretamente com criadoEm vindo como timestamp UTC ISO do PostgreSQL', () => {
+    // 17:30 UTC equivale a 14:30 no horário de Brasília (UTC-3)
+    const criadoEmUtc = '2026-09-07T17:30:00.000Z';
+    const agora1530 = DateTime.fromISO('2026-09-07T15:30:00-03:00', { zone: 'America/Sao_Paulo' });
+
+    const res = ReservaToleranceUtils.calcularLimiteCheckin(hojeIso, criadoEmUtc, params, agora1530);
+
+    expect(res.isReservaTardia).toBe(true);
+    expect(res.limiteFormatado).toBe('16:30');
+    expect(res.isExpirada).toBe(false);
+  });
+
+  it('9. Deve lidar com criadoEm vindo como objeto Date puro de timestamptz', () => {
+    // 17:30 UTC = 14:30 BRT
+    const criadoEmDate = new Date('2026-09-07T17:30:00.000Z');
+    const agora1620 = DateTime.fromISO('2026-09-07T16:20:00-03:00', { zone: 'America/Sao_Paulo' });
+
+    const res = ReservaToleranceUtils.calcularLimiteCheckin(hojeIso, criadoEmDate, params, agora1620);
+
+    expect(res.isReservaTardia).toBe(true);
+    expect(res.limiteFormatado).toBe('16:30');
+    expect(res.isExpirada).toBe(false);
+  });
 });

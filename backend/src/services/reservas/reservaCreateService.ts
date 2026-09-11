@@ -177,16 +177,16 @@ export class ReservaCreateService {
       if (isTroca && reservaAntiga) {
         const updateRes = await client.query(`
           UPDATE reservas
-          SET cadeira_id = $1, checkin_realizado = $2, checkin_em = $3, status = 'ATIVA', codigo_comprovante = $4
+          SET cadeira_id = $1, checkin_realizado = $2, checkin_em = $3, status = 'ATIVA', codigo_comprovante = $4, criado_em = NOW()
           WHERE id = $5
-          RETURNING id, cadeira_id, usuario_id, data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante, criado_em
+          RETURNING id, cadeira_id, usuario_id, to_char(data_reserva, 'YYYY-MM-DD') AS data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante, criado_em
         `, [cadeiraId, checkinRealizado, checkinEm, codigoComprovante, reservaAntiga.id]);
         novaReserva = updateRes.rows[0];
       } else {
         const insertRes = await client.query(`
           INSERT INTO reservas (cadeira_id, usuario_id, data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante)
           VALUES ($1, $2, $3, $4, $5, 'ATIVA', $6)
-          RETURNING id, cadeira_id, usuario_id, data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante, criado_em
+          RETURNING id, cadeira_id, usuario_id, to_char(data_reserva, 'YYYY-MM-DD') AS data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante, criado_em
         `, [cadeiraId, usuarioId, dataAlvoIso, checkinRealizado, checkinEm, codigoComprovante]);
         novaReserva = insertRes.rows[0];
       }

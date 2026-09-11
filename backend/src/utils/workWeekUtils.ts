@@ -14,7 +14,18 @@ export function normalizeIsoDate(date: string | Date | null | undefined): string
     const parsed = DateTime.fromISO(date, { zone: 'America/Sao_Paulo' });
     return parsed.isValid ? parsed.toISODate()! : date;
   }
-  return DateTime.fromJSDate(date).setZone('America/Sao_Paulo').toISODate()!;
+  if (date instanceof Date) {
+    // Se o Date for à meia-noite UTC (como retornado pelo driver do PostgreSQL para campos DATE),
+    // usamos getUTCFullYear/Month/Date para preservar o dia exato da data de reserva sem shift de fuso.
+    if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0) {
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(date.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    return DateTime.fromJSDate(date).setZone('America/Sao_Paulo').toISODate()!;
+  }
+  return '';
 }
 
 /**

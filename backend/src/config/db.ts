@@ -1,5 +1,8 @@
-import { Pool, PoolConfig } from 'pg';
+import { Pool, PoolConfig, types } from 'pg';
 import dotenv from 'dotenv';
+
+// Garante que colunas DATE (OID 1082) sejam sempre retornadas como string pura 'YYYY-MM-DD'
+types.setTypeParser(1082, (val: string) => val);
 
 dotenv.config();
 

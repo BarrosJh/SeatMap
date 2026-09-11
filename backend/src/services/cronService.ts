@@ -115,7 +115,7 @@ export class CronService {
 
       // Buscar reservas ativas sem checkin com data igual ou anterior à data alvo
       const selectRes = await client.query(`
-        SELECT r.id, r.cadeira_id, r.usuario_id, r.data_reserva, r.criado_em, b.escritorio_id, c.identificador
+        SELECT r.id, r.cadeira_id, r.usuario_id, to_char(r.data_reserva, 'YYYY-MM-DD') AS data_reserva, r.criado_em, b.escritorio_id, c.identificador
         FROM reservas r
         JOIN cadeiras c ON r.cadeira_id = c.id
         JOIN baias b ON c.baia_id = b.id

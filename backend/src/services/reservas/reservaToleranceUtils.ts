@@ -59,9 +59,24 @@ export class ReservaToleranceUtils {
     // A reserva é para HOJE (dataReserva == hoje)
     let criadoEmLuxon: DateTime;
     if (criadoEm) {
-      criadoEmLuxon = typeof criadoEm === 'string'
-        ? DateTime.fromISO(criadoEm, { zone: 'America/Sao_Paulo' })
-        : DateTime.fromJSDate(new Date(criadoEm)).setZone('America/Sao_Paulo');
+      if (typeof criadoEm === 'string') {
+        const rawStr = criadoEm.trim();
+        // Se a string contiver fuso ou Z (ex: 2026-09-11T17:30:00.000Z), faz parse e converte para Sao_Paulo
+        if (rawStr.endsWith('Z') || /[+-]\d{2}(:?\d{2})?$/.test(rawStr)) {
+          criadoEmLuxon = DateTime.fromISO(rawStr).setZone('America/Sao_Paulo');
+        } else {
+          // Se for sem timezone (timestamp SQL local como '2026-09-11 14:30:00')
+          const isoCandidate = rawStr.includes(' ') ? rawStr.replace(' ', 'T') : rawStr;
+          criadoEmLuxon = DateTime.fromISO(isoCandidate, { zone: 'America/Sao_Paulo' });
+          if (!criadoEmLuxon.isValid) {
+            criadoEmLuxon = DateTime.fromSQL(rawStr, { zone: 'America/Sao_Paulo' });
+          }
+        }
+      } else if (criadoEm instanceof Date) {
+        criadoEmLuxon = DateTime.fromJSDate(criadoEm).setZone('America/Sao_Paulo');
+      } else {
+        criadoEmLuxon = agora;
+      }
       if (!criadoEmLuxon.isValid) {
         criadoEmLuxon = agora;
       }
