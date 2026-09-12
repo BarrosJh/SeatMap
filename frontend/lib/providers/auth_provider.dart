@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/api/api_client_base.dart';
 import '../services/secure_storage_service.dart';
 import '../services/websocket_service.dart';
+import '../services/webauthn_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -352,6 +353,86 @@ class AuthProvider extends ChangeNotifier {
     } else {
       _errorMessage = response.error ?? 'Erro ao realizar login via SSO.';
       notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> isBiometricsAvailable() async {
+    return await WebAuthnClientService().isBiometricsAvailable();
+  }
+
+  Future<bool> loginComBiometria({String? emailOrMatricula}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final optRes = await _apiService.getWebAuthnLoginOptions(emailOrMatricula: emailOrMatricula);
+      if (!optRes.success || optRes.data == null) {
+        _isLoading = false;
+        _errorMessage = optRes.error ?? 'Falha ao iniciar autenticação biométrica.';
+        notifyListeners();
+        return false;
+      }
+
+      final challengeKey = optRes.data!['challengeKey'] as String;
+      final options = optRes.data!['options'] as Map<String, dynamic>;
+
+      final credentialPayload = await WebAuthnClientService().authenticateBiometrics(options);
+      if (credentialPayload == null) {
+        _isLoading = false;
+        _errorMessage = 'Biometria cancelada.';
+        notifyListeners();
+        return false;
+      }
+
+      final verifyRes = await _apiService.verifyWebAuthnLogin(challengeKey, credentialPayload);
+      _isLoading = false;
+
+      if (verifyRes.success && verifyRes.data != null) {
+        _token = verifyRes.data!['token'];
+        _refreshToken = verifyRes.data!['refreshToken'];
+        _user = verifyRes.data!['user'];
+
+        await _secureStorage.saveToken(_token!);
+        if (_refreshToken != null) {
+          await _secureStorage.saveRefreshToken(_refreshToken!);
+        }
+        await _secureStorage.saveUserData(_user!.toJsonString());
+
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = verifyRes.error ?? 'Falha ao validar biometria.';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Erro ao processar biometria: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> cadastrarBiometriaAtual({String? deviceName}) async {
+    if (_token == null) return false;
+    try {
+      final optRes = await _apiService.getWebAuthnRegisterOptions(_token!);
+      if (!optRes.success || optRes.data == null) {
+        _errorMessage = optRes.error ?? 'Falha ao obter opções de registro.';
+        notifyListeners();
+        return false;
+      }
+
+      final options = optRes.data!;
+      final credentialPayload = await WebAuthnClientService().registerBiometrics(options);
+      if (credentialPayload == null) return false;
+
+      final verifyRes = await _apiService.verifyWebAuthnRegister(_token!, credentialPayload, deviceName: deviceName);
+      return verifyRes.success;
+    } catch (e) {
+      debugPrint('[AuthProvider] Erro ao cadastrar biometria: $e');
       return false;
     }
   }

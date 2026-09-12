@@ -64,6 +64,24 @@ class ApiService {
   Future<ApiResponse<String>> redefinirSenha(String login, String codigo, String novaSenha) =>
       _authApi.redefinirSenha(login, codigo, novaSenha);
 
+  Future<ApiResponse<Map<String, dynamic>>> getWebAuthnRegisterOptions(String token) =>
+      _authApi.getWebAuthnRegisterOptions(token);
+
+  Future<ApiResponse<Map<String, dynamic>>> verifyWebAuthnRegister(String token, Map<String, dynamic> responsePayload, {String? deviceName}) =>
+      _authApi.verifyWebAuthnRegister(token, responsePayload, deviceName: deviceName);
+
+  Future<ApiResponse<Map<String, dynamic>>> getWebAuthnLoginOptions({String? emailOrMatricula}) =>
+      _authApi.getWebAuthnLoginOptions(emailOrMatricula: emailOrMatricula);
+
+  Future<ApiResponse<Map<String, dynamic>>> verifyWebAuthnLogin(String challengeKey, Map<String, dynamic> responsePayload) =>
+      _authApi.verifyWebAuthnLogin(challengeKey, responsePayload);
+
+  Future<ApiResponse<List<dynamic>>> getWebAuthnDevices(String token) =>
+      _authApi.getWebAuthnDevices(token);
+
+  Future<ApiResponse<void>> deleteWebAuthnDevice(String token, int deviceId) =>
+      _authApi.deleteWebAuthnDevice(token, deviceId);
+
   Future<ApiResponse<Map<String, dynamic>>> loginSso({
     required String provider,
     required String email,

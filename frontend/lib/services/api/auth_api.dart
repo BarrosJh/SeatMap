@@ -362,4 +362,123 @@ class AuthApi extends ApiClientBase {
       return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
     }
   }
+
+  // ==========================================
+  // WEBAUTHN / BIOMETRIA / FIDO2 / PASSKEYS
+  // ==========================================
+  Future<ApiResponse<Map<String, dynamic>>> getWebAuthnRegisterOptions(String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/webauthn/register/options'),
+        headers: headers(token),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: body, statusCode: 200);
+      }
+      return ApiResponse(success: false, error: body['error'] ?? 'Erro ao obter desafio biométrico.', statusCode: response.statusCode);
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> verifyWebAuthnRegister(String token, Map<String, dynamic> responsePayload, {String? deviceName}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/webauthn/register/verify'),
+        headers: headers(token),
+        body: jsonEncode({
+          'response': responsePayload,
+          'deviceName': deviceName ?? 'Dispositivo Móvel'
+        }),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: body, message: body['message'], statusCode: 200);
+      }
+      return ApiResponse(success: false, error: body['error'] ?? 'Falha ao registrar biometria.', statusCode: response.statusCode);
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> getWebAuthnLoginOptions({String? emailOrMatricula}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/webauthn/login/options'),
+        headers: headers(null),
+        body: jsonEncode({
+          if (emailOrMatricula != null && emailOrMatricula.isNotEmpty) 'emailOrMatricula': emailOrMatricula,
+        }),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: body, statusCode: 200);
+      }
+      return ApiResponse(success: false, error: body['error'] ?? 'Erro ao obter opções biométricas.', statusCode: response.statusCode);
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> verifyWebAuthnLogin(String challengeKey, Map<String, dynamic> responsePayload) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}/auth/webauthn/login/verify'),
+        headers: headers(null),
+        body: jsonEncode({
+          'challengeKey': challengeKey,
+          'response': responsePayload
+        }),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(
+          success: true,
+          data: {
+            'token': body['token'],
+            'refreshToken': body['refreshToken'],
+            'user': UserModel.fromJson(body['user']),
+          },
+          statusCode: 200,
+        );
+      }
+      return ApiResponse(success: false, error: body['error'] ?? 'Falha na autenticação biométrica.', statusCode: response.statusCode);
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<List<dynamic>>> getWebAuthnDevices(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConstants.baseUrl}/auth/webauthn/devices'),
+        headers: headers(token),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: body as List<dynamic>, statusCode: 200);
+      }
+      return ApiResponse(success: false, error: body['error'] ?? 'Erro ao listar dispositivos.', statusCode: response.statusCode);
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
+
+  Future<ApiResponse<void>> deleteWebAuthnDevice(String token, int deviceId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('${AppConstants.baseUrl}/auth/webauthn/devices/$deviceId'),
+        headers: headers(token),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, message: body['message'], statusCode: 200);
+      }
+      return ApiResponse(success: false, error: body['error'] ?? 'Erro ao remover dispositivo.', statusCode: response.statusCode);
+    } catch (e) {
+      return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
+    }
+  }
 }
+
