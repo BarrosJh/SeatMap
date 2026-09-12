@@ -13,6 +13,7 @@ Bem-vindo ao repositório central de documentação técnica, governança de seg
 * [**Política de Sessão e Armazenamento Seguro (`frontend/POLITICA_SESSAO.md`)**](frontend/POLITICA_SESSAO.md): Ciclo de vida de tokens no cliente, cofre `FlutterSecureStorage` e *single-flight refresh*.
 
 ### ⚙️ 2. Operações, Continuidade (DR) e SRE
+* [**Guia de Geração e Implantação de QR Codes para Mesas (`QRCODE_CHECKIN_GUIDE.md`)**](QRCODE_CHECKIN_GUIDE.md): Padrões de payload, métodos de geração em lote, extração de IDs e especificações físicas de etiquetas.
 * [**Política de Backup, Restore e Continuidade (`BACKUP_RESTORE.md`)**](BACKUP_RESTORE.md): RPO/RTO, retenção de 30 dias, validação de integridade SHA-256 e plano de Disaster Recovery.
 * [**Guia Operacional de Scripts de Automação (`operations/SCRIPTS.md`)**](operations/SCRIPTS.md): Manual dos scripts Bash e PowerShell para rotinas agendadas (Cron e Windows Task Scheduler).
 * [**Observabilidade e Resposta a Incidentes (`backend/OBSERVABILIDADE.md`)**](backend/OBSERVABILIDADE.md): Logs estruturados JSON, `X-Correlation-Id`, alertas, sondas de saúde e runbook de triagem.
