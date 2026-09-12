@@ -254,6 +254,14 @@ export class ReservaCheckinService {
         }
       });
 
+      wsManager.broadcastReservaAlterada({
+        escritorioId: reserva.escritorio_id,
+        data: dataReservaIso,
+        tipo: 'CHECKIN',
+        usuarioId: reserva.usuario_id,
+        cadeiraId: reserva.cadeira_id
+      });
+
       return {
         success: true,
         code: 200,

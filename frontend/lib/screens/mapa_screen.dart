@@ -312,6 +312,7 @@ class _MapaScreenState extends State<MapaScreen> {
   }
 
   // Cache de Memoização de Alta Performance para evitar alocações de 102 desks por frame
+  int _cachedMapaVersion = -1;
   MapaDataModel? _cachedMapaDataRef;
   String? _cachedDateIso;
   String? _cachedOfficeName;
@@ -339,7 +340,8 @@ class _MapaScreenState extends State<MapaScreen> {
         currentMapaData.data == dateIso;
 
     // Se os dados não mudaram, reutiliza o mapa de cadeiras e a lista de desks em memória
-    if (_cachedMapaDataRef != currentMapaData ||
+    if (_cachedMapaVersion != seatProvider.mapaVersion ||
+        _cachedMapaDataRef != currentMapaData ||
         _cachedDateIso != dateIso ||
         _cachedOfficeName != officeName ||
         _cachedUserRef != currentUser) {
@@ -403,6 +405,7 @@ class _MapaScreenState extends State<MapaScreen> {
         );
       }).toList(growable: false);
 
+      _cachedMapaVersion = seatProvider.mapaVersion;
       _cachedMapaDataRef = currentMapaData;
       _cachedDateIso = dateIso;
       _cachedOfficeName = officeName;

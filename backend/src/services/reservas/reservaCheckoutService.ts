@@ -103,6 +103,14 @@ export class ReservaCheckoutService {
         ocupante: null
       });
 
+      wsManager.broadcastReservaAlterada({
+        escritorioId: reserva.escritorio_id,
+        data: dataReservaIso,
+        tipo: 'CHECKOUT',
+        usuarioId: reserva.usuario_id,
+        cadeiraId: reserva.cadeira_id
+      });
+
       return {
         success: true,
         code: 200,

@@ -26,12 +26,14 @@ class SeatMapProvider extends ChangeNotifier {
   String? _errorMessage;
   StreamSubscription? _wsSubscription;
   String? _lastToken;
+  int _mapaVersion = 0;
 
   List<EscritorioModel> get escritorios => _escritorios;
   EscritorioModel? get selectedEscritorio => _selectedEscritorio;
   DateTime get selectedDate => _selectedDate;
   String get selectedDateIso => DateFormat('yyyy-MM-dd').format(_selectedDate);
   MapaDataModel? get mapaData => _mapaData;
+  int get mapaVersion => _mapaVersion;
   List<ReservaModel> get minhasReservas => _minhasReservas;
   ReservaModel? get reservaHoje => _reservaHoje;
   ReservaFiltro get filtroReservas => _filtroReservas;
@@ -181,6 +183,7 @@ class SeatMapProvider extends ChangeNotifier {
             }
           }
         }
+        _mapaVersion++;
         notifyListeners();
       }
       return;
@@ -188,8 +191,9 @@ class SeatMapProvider extends ChangeNotifier {
 
     if (msg['evento'] == 'reserva_alterada') {
       if (_lastToken != null) {
-        // Atualiza a ocupação semanal do Dashboard imediatamente
+        // Atualiza a ocupação semanal do Dashboard e reservas ativas imediatamente
         carregarOcupacaoSemanal(_lastToken!);
+        carregarMinhasReservas(_lastToken!);
         
         final msgEscritorioId = int.tryParse(msg['escritorioId']?.toString() ?? '') ?? msg['escritorioId'];
         final msgDataRaw = msg['data']?.toString() ?? '';
@@ -250,6 +254,7 @@ class SeatMapProvider extends ChangeNotifier {
     }
 
     if (assentoAlterado) {
+      _mapaVersion++;
       _recalcularResumosBaias();
       notifyListeners();
     }
@@ -284,6 +289,7 @@ class SeatMapProvider extends ChangeNotifier {
   }
 
   Future<void> carregarInicial(String token, UserModel user) async {
+    _lastToken = token;
     if (_isLoading) return;
     _isLoading = true;
     _errorMessage = null;
@@ -314,6 +320,7 @@ class SeatMapProvider extends ChangeNotifier {
   }
 
   Future<void> carregarAvisoGlobal(String token) async {
+    _lastToken = token;
     final res = await _apiService.getAvisoGlobal(token);
     if (res.success && res.data != null) {
       _avisoGlobal = res.data;
@@ -322,6 +329,7 @@ class SeatMapProvider extends ChangeNotifier {
   }
 
   Future<void> carregarOcupacaoSemanal(String token) async {
+    _lastToken = token;
     _carregandoOcupacao = true;
     notifyListeners();
 
@@ -334,27 +342,33 @@ class SeatMapProvider extends ChangeNotifier {
   }
 
   Future<void> selecionarEscritorio(String token, EscritorioModel escritorio) async {
+    _lastToken = token;
     if (_selectedEscritorio?.id == escritorio.id && _mapaData != null) return;
     _selectedEscritorio = escritorio;
     _mapaData = null; // Zera imediatamente para evitar flash de marcações de outro escritório
+    _mapaVersion++;
     notifyListeners(); // Invalida visualmente no mesmo frame
     _wsService.switchEscritorio(escritorio.id);
     await carregarMapa(token);
   }
 
   Future<void> selecionarData(String token, DateTime data) async {
+    _lastToken = token;
     final novaDataIso = DateFormat('yyyy-MM-dd').format(data);
     if (selectedDateIso == novaDataIso && _mapaData != null) return;
     _selectedDate = data;
     _mapaData = null; // Zera imediatamente para evitar flash de reservas de outra data
+    _mapaVersion++;
     notifyListeners(); // Invalida visualmente no mesmo frame
     await carregarMapa(token);
   }
 
   Future<void> selecionarEscritorioEData(String token, EscritorioModel escritorio, DateTime data) async {
+    _lastToken = token;
     _selectedEscritorio = escritorio;
     _selectedDate = data;
     _mapaData = null; // Zera imediatamente
+    _mapaVersion++;
     notifyListeners(); // Invalida visualmente no mesmo frame
     _wsService.switchEscritorio(escritorio.id);
     await carregarMapa(token);
@@ -363,6 +377,7 @@ class SeatMapProvider extends ChangeNotifier {
   int _mapaRequestId = 0;
 
   Future<void> carregarMapa(String token) async {
+    _lastToken = token;
     if (_selectedEscritorio == null) return;
     final reqId = ++_mapaRequestId;
     _isLoading = true;
@@ -379,6 +394,7 @@ class SeatMapProvider extends ChangeNotifier {
       // Valida se a resposta corresponde estritamente ao escritório e data atualmente selecionados
       if (res.data!.escritorio.id == _selectedEscritorio!.id && res.data!.data == selectedDateIso) {
         _mapaData = res.data;
+        _mapaVersion++;
       }
     } else {
       _errorMessage = res.error ?? 'Erro ao carregar mapa de assentos.';
@@ -388,6 +404,7 @@ class SeatMapProvider extends ChangeNotifier {
 
   /// Recarrega o mapa em background sem disparar spinners de carregamento na UI
   Future<void> carregarMapaSilencioso(String token) async {
+    _lastToken = token;
     if (_selectedEscritorio == null) return;
     final reqId = ++_mapaRequestId;
     final res = await _apiService.getMapa(token, _selectedEscritorio!.id, selectedDateIso);
@@ -395,12 +412,14 @@ class SeatMapProvider extends ChangeNotifier {
     if (res.success && res.data != null) {
       if (res.data!.escritorio.id == _selectedEscritorio!.id && res.data!.data == selectedDateIso) {
         _mapaData = res.data;
+        _mapaVersion++;
         notifyListeners();
       }
     }
   }
 
   Future<void> carregarMinhasReservas(String token) async {
+    _lastToken = token;
     final res = await _apiService.getMinhasReservas(token);
     if (res.success && res.data != null) {
       _minhasReservas = res.data!;
