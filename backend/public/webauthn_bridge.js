@@ -22,7 +22,20 @@
   }
 
   window.SeatMapWebAuthn = {
+    isPwaStandalone: function () {
+      var isStandalone = (window.matchMedia && (
+                            window.matchMedia('(display-mode: standalone)').matches ||
+                            window.matchMedia('(display-mode: fullscreen)').matches ||
+                            window.matchMedia('(display-mode: minimal-ui)').matches
+                          )) ||
+                         navigator.standalone === true ||
+                         (document.referrer && document.referrer.startsWith('android-app://'));
+      return Boolean(isStandalone);
+    },
+
     isAvailable: async function () {
+      // Biometria autorizada exclusivamente no app PWA instalado
+      if (!this.isPwaStandalone()) return false;
       if (!window.PublicKeyCredential) return false;
       try {
         if (PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
