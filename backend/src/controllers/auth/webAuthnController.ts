@@ -10,7 +10,6 @@ import { env } from '../../config/env';
 import { toUserResponseDto } from '../../utils/userDtoMapper';
 import { JwtCryptoUtils } from '../../config/jwtCryptoUtils';
 
-const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
 
 export class WebAuthnController {

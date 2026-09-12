@@ -5,7 +5,7 @@ import { SsoController } from '../controllers/auth/ssoController';
 import { PasswordResetController } from '../controllers/auth/passwordResetController';
 import { WebAuthnController } from '../controllers/auth/webAuthnController';
 import { authenticateToken } from '../middleware/auth';
-import { authLimiter, authUserLimiter } from '../middleware/rateLimiter';
+import { authLimiter, authUserLimiter, userActionLimiter } from '../middleware/rateLimiter';
 import { validateRequest } from '../middleware/validateRequest';
 import {
 	loginSchema,
@@ -47,6 +47,10 @@ router.delete('/webauthn/devices/:id', authenticateToken, validateRequest({ para
 // 3. Validação de Login com TOTP ou E-mail (Passo 2 do 2FA)
 router.post('/totp/validar-login', validateRequest({ body: validarTotpSchema }), MfaController.validarLoginTotp);
 router.post('/mfa/validar-login-email', validateRequest({ body: validarMfaEmailSchema }), MfaController.validarLoginEmailMfa);
+
+// 3.1. Step-Up MFA para Acesso Administrativo (Emissão de admin_token para /api/admin)
+router.post('/mfa/solicitar', authenticateToken, userActionLimiter, MfaController.solicitarMfa);
+router.post('/mfa/validar', authenticateToken, userActionLimiter, validateRequest({ body: codigoMfaSchema }), MfaController.validarMfa);
 
 // 4. Gestão de TOTP pelo próprio Usuário Logado
 router.get('/totp/setup', authenticateToken, MfaController.setupTotp);

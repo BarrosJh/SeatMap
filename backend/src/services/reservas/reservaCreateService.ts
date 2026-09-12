@@ -177,13 +177,17 @@ export class ReservaCreateService {
       }
 
       if (!isTroca) {
+        const inicioSemanaAlvo = dataLuxon.startOf('week').toISODate()!;
+        const fimSemanaAlvo = dataLuxon.endOf('week').toISODate()!;
+
         const contagemAtivasRes = await client.query(`
           SELECT COUNT(*) AS total
           FROM reservas
           WHERE usuario_id = $1
             AND status = 'ATIVA'
             AND data_reserva >= $2
-        `, [usuarioId, hoje]);
+            AND data_reserva <= $3
+        `, [usuarioId, inicioSemanaAlvo, fimSemanaAlvo]);
 
         const totalAtivas = parseInt(contagemAtivasRes.rows[0].total, 10);
         if (totalAtivas >= limiteAtivas) {
@@ -191,7 +195,7 @@ export class ReservaCreateService {
           return {
             success: false,
             code: 400,
-            error: `Limite de ${limiteAtivas} reservas ativas atingido.`
+            error: `Limite semanal de ${limiteAtivas} reservas ativas atingido para a semana selecionada.`
           };
         }
       }

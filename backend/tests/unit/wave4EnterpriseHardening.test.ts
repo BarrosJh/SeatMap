@@ -9,8 +9,8 @@ import { AdminParametrosController } from '../../src/controllers/admin/adminPara
 import { ParametrosService } from '../../src/services/admin/parametrosService';
 import { escapeSqlWildcards } from '../../src/utils/sanitizer';
 import { parseIdParam, normalizeIsoDate } from '../../src/utils/workWeekUtils';
-import { validateBody } from '../../src/middleware/validate';
-import { loginSchema, colocarManutencaoSchema } from '../../src/validation/schemas';
+import { validateRequest } from '../../src/middleware/validateRequest';
+import { loginSchema, colocarManutencaoSchema } from '../../src/schemas';
 import { requirePermission, getUserPermissions } from '../../src/middleware/auth';
 import pool from '../../src/config/db';
 import { DateTime } from 'luxon';
@@ -250,9 +250,9 @@ describe('Onda 4: Remediação dos 14 Apontamentos Enterprise (SEC, REL, TEC)', 
     });
   });
 
-  describe('8. SEC-03: Validação Declarativa Zod (validateBody)', () => {
-    it('deve barrar requisição com payload que viole o schema', () => {
-      const middleware = validateBody(loginSchema);
+  describe('8. SEC-03: Validação Declarativa Zod (validateRequest)', () => {
+    it('deve barrar requisição com payload que viole o schema', async () => {
+      const middleware = validateRequest({ body: loginSchema });
       const req: any = { body: { login: '' } }; // Sem senha e login vazio
       const res: any = {
         status: jest.fn().mockReturnThis(),
@@ -260,19 +260,19 @@ describe('Onda 4: Remediação dos 14 Apontamentos Enterprise (SEC, REL, TEC)', 
       };
       const next = jest.fn();
 
-      middleware(req, res, next);
+      await middleware(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('deve permitir requisição com payload válido', () => {
-      const middleware = validateBody(loginSchema);
+    it('deve permitir requisição com payload válido', async () => {
+      const middleware = validateRequest({ body: loginSchema });
       const req: any = { body: { login: 'usuario@empresa.com', senha: 'SenhaValida@123' } };
       const res: any = { status: jest.fn().mockReturnThis(), json: jest.fn() };
       const next = jest.fn();
 
-      middleware(req, res, next);
+      await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
     });

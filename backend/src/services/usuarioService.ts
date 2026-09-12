@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db';
+import { getDbClient } from '../utils/dbClient';
 import { validatePasswordPolicy } from '../utils/passwordValidator';
 import { TokenService } from './tokenService';
 import { escapeSqlWildcards } from '../utils/sanitizer';
@@ -423,13 +424,13 @@ export class UsuarioService {
       return { success: false, code: 400, error: `Senha padrão inválida: ${defaultPwCheck.message}` };
     }
 
-    const client = await pool.connect();
+    const client = await getDbClient();
     try {
       await client.query('BEGIN');
 
       const depRes = await client.query('SELECT id, nome FROM departamentos');
       const depMap = new Map<string, number>();
-      depRes.rows.forEach(d => depMap.set(d.nome.toLowerCase().trim(), d.id));
+      depRes.rows.forEach((d: any) => depMap.set(d.nome.toLowerCase().trim(), d.id));
 
       const hashPadrao = await bcrypt.hash(defaultSenha, BCRYPT_SALT_ROUNDS);
 
@@ -484,6 +485,7 @@ export class UsuarioService {
             SET nome = $1, departamento_id = COALESCE($2, departamento_id), perfil = $3, permissao_rh = $4, permissao_ti = $5
             WHERE id = $6
           `, [nome, deptoId, perfil, hasRh, hasTi, existingId]);
+          await TokenService.incrementarTokenVersion(existingId);
           atualizados++;
         } else {
           await client.query(`

@@ -37,9 +37,6 @@ export interface AuthenticatedRequest extends Request {
   isAdminMfaValidated?: boolean;
 }
 
-const JWT_SECRET = env.JWT_SECRET;
-const JWT_ADMIN_SECRET = env.JWT_ADMIN_SECRET;
-
 export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   COLABORADOR: ['reservas:read'],
   GESTAO: ['reservas:read'],

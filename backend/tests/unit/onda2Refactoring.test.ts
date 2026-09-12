@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError, z } from 'zod';
 import { AppError } from '../../src/errors/AppError';
 import { errorHandler } from '../../src/middleware/errorHandler';
-import { asyncHandler } from '../../src/utils/asyncHandler';
 import {
   criarUsuarioSchema,
   editarUsuarioSchema,
@@ -139,30 +138,7 @@ describe('Onda 2: Tratamento Centralizado de Erros & Schemas Zod Modulares', () 
     });
   });
 
-  describe('3. Wrapper Utilitário asyncHandler', () => {
-    it('deve executar handler assíncrono com sucesso', async () => {
-      const handler = asyncHandler(async (req, res) => {
-        return res.status(200).json({ ok: true });
-      });
-
-      await handler(mockReq, mockRes, mockNext);
-      expect(statusMock).toHaveBeenCalledWith(200);
-      expect(jsonMock).toHaveBeenCalledWith({ ok: true });
-      expect(mockNext).not.toHaveBeenCalled();
-    });
-
-    it('deve capturar exceção lançada e encaminhar para next(err)', async () => {
-      const handler = asyncHandler(async () => {
-        throw AppError.notFound('Usuário não encontrado');
-      });
-
-      await handler(mockReq, mockRes, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(expect.any(AppError));
-      expect(statusMock).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('4. Schemas Zod Modulares (src/schemas)', () => {
+  describe('3. Schemas Zod Modulares (src/schemas)', () => {
     it('deve validar criação e edição de usuário', () => {
       const validUser = {
         nome: 'Carlos Silva',

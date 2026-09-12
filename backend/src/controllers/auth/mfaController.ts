@@ -16,11 +16,8 @@ import { env } from '../../config/env';
 import { toUserResponseDto } from '../../utils/userDtoMapper';
 import { JwtCryptoUtils } from '../../config/jwtCryptoUtils';
 
-const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
-const JWT_ADMIN_SECRET = env.JWT_ADMIN_SECRET;
 const JWT_ADMIN_EXPIRATION = env.JWT_ADMIN_EXPIRATION;
-const JWT_MFA_TEMP_SECRET = env.JWT_MFA_TEMP_SECRET;
 
 export class MfaController {
   public static async setupTotp(req: AuthenticatedRequest, res: Response) {

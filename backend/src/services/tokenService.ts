@@ -9,7 +9,6 @@ import { toUserResponseDto } from '../utils/userDtoMapper';
 import { logger } from '../utils/logger';
 import { JwtCryptoUtils } from '../config/jwtCryptoUtils';
 
-const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
 const REFRESH_TOKEN_DAYS = 7;
 const MAX_ABSOLUTE_SESSION_SECONDS = 3600; // 60 minutos
