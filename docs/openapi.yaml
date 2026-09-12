@@ -1,0 +1,821 @@
+openapi: 3.0.3
+info:
+  title: SeatMap Enterprise API
+  description: >-
+    Especificação formal de API RESTful para o Sistema Corporativo de Gestão de Assentos e Escritórios SeatMap.
+    Adere às diretrizes bancárias do BACEN / Resolução CMN 4.893 e princípios de arquitetura Zero Trust.
+  version: 1.0.0
+  contact:
+    name: Equipe de Engenharia e Segurança SeatMap
+    email: seguranca@seatmap.local
+
+servers:
+  - url: https://api.seatmap.empresa.com
+    description: Ambiente de Produção Oficial
+  - url: https://staging-api.seatmap.empresa.com
+    description: Ambiente de Homologação / Staging
+  - url: http://localhost:3000
+    description: Ambiente de Desenvolvimento Local
+
+tags:
+  - name: Autenticação & Sessão
+    description: Gerenciamento de credenciais, refresh tokens, timeouts de sessão e auto-bloqueio.
+  - name: Single Sign-On (SSO)
+    description: Integração de identidade corporativa via Microsoft Entra ID, Google Workspace e Okta.
+  - name: Multi-Factor Authentication (MFA)
+    description: Autenticação em duas etapas via TOTP (App Authenticator) e E-mail Corporativo.
+  - name: Escritórios & Plantas
+    description: Consulta de localidades físicas, plantas baixas de assentos e taxas de ocupação.
+  - name: Reservas & Check-in
+    description: Ciclo de vida de reserva de postos de trabalho, confirmação de presença e liberação.
+  - name: Administração de Usuários
+    description: Gestão centralizada de colaboradores, perfis de acesso e provisionamento.
+  - name: Governança & Parâmetros
+    description: Configuração de regras de negócio, limites de agendamento e políticas de segurança.
+  - name: Trilha de Auditoria
+    description: Logs imutáveis de eventos de segurança, acessos e operações críticas.
+  - name: Facilities & Manutenção
+    description: Bloqueio temporário de estações de trabalho para reparos técnicos ou ergonomia.
+  - name: Relatórios & BI
+    description: Métricas agregadas de frequência, taxa de no-show e exportação em Excel/PDF.
+  - name: SCIM 2.0 (Identity Provisioning)
+    description: Protocolo padronizado RFC 7644 para sincronização de contas com IdPs corporativos.
+  - name: Observabilidade & Health Probes
+    description: Sondas Liveness, Readiness e exportação de métricas operacionais Prometheus.
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [Autenticação & Sessão]
+      summary: Autenticação primária por credenciais
+      description: Valida login/senha com proteção contra força bruta (bloqueio progressivo em 5 tentativas).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, senha]
+              properties:
+                login:
+                  type: string
+                  example: "colaborador@seatmap.local"
+                senha:
+                  type: string
+                  format: password
+                  example: "SenhaForte@2026!"
+      responses:
+        '200':
+          description: Login realizado com sucesso ou desafio MFA disparado
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AuthSuccessResponse'
+                  - $ref: '#/components/schemas/MfaChallengeResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+
+  /api/auth/refresh:
+    post:
+      tags: [Autenticação & Sessão]
+      summary: Rotação de Refresh Token
+      description: Emite novo Access Token (TTL 15m) e rotaciona o Refresh Token com detecção de replay attack e timeout absoluto de 60 minutos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+                  example: "7f8b9a12c4..."
+      responses:
+        '200':
+          description: Sessão renovada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/auth/logout:
+    post:
+      tags: [Autenticação & Sessão]
+      summary: Encerramento de sessão local
+      description: Revoga o Refresh Token informado e encerra a sessão ativa do usuário.
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Sessão finalizada com sucesso
+
+  /api/auth/logout-global:
+    post:
+      tags: [Autenticação & Sessão]
+      summary: Encerramento global de todas as sessões ativas (Kill-switch)
+      description: Incrementa a token_version do usuário e revoga todos os Refresh Tokens emitidos em qualquer dispositivo.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Todas as sessões foram revogadas com sucesso
+
+  /api/auth/me:
+    get:
+      tags: [Autenticação & Sessão]
+      summary: Dados do perfil autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil do usuário atual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+
+  /api/auth/config-seguranca:
+    get:
+      tags: [Autenticação & Sessão]
+      summary: Consulta pública de políticas ativas de segurança
+      responses:
+        '200':
+          description: Políticas de auto-bloqueio, MFA e SSO
+
+  /api/auth/sso/config:
+    get:
+      tags: [Single Sign-On (SSO)]
+      summary: Provedores de identidade corporativos habilitados
+      responses:
+        '200':
+          description: Configuração de provedores SSO ativos
+
+  /api/auth/sso/login:
+    post:
+      tags: [Single Sign-On (SSO)]
+      summary: Autenticação via Token SSO
+      description: Validação criptográfica do idToken via JWKS do provedor (Azure AD, Google, Okta) com provisionamento JIT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, idToken]
+              properties:
+                provider:
+                  type: string
+                  enum: [google, azure, okta]
+                idToken:
+                  type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/auth/mfa/solicitar:
+    post:
+      tags: [Multi-Factor Authentication (MFA)]
+      summary: Solicitar envio de código Step-Up MFA para ações administrativas
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Código PIN de 6 dígitos enviado por e-mail corporativo
+
+  /api/auth/mfa/validar:
+    post:
+      tags: [Multi-Factor Authentication (MFA)]
+      summary: Validar código Step-Up MFA e emitir x-admin-token
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codigo]
+              properties:
+                codigo:
+                  type: string
+                  example: "582910"
+      responses:
+        '200':
+          description: Retorna token de step-up x-admin-token com validade de 15m
+
+  /api/auth/mfa/totp/setup:
+    post:
+      tags: [Multi-Factor Authentication (MFA)]
+      summary: Iniciar configuração de Authenticator TOTP
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Retorna URI otpauth e códigos de backup cifrados
+
+  /api/auth/mfa/totp/ativar:
+    post:
+      tags: [Multi-Factor Authentication (MFA)]
+      summary: Confirmar e ativar TOTP com código de 6 dígitos
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codigo]
+              properties:
+                codigo:
+                  type: string
+
+  /api/auth/mfa/totp/validar:
+    post:
+      tags: [Multi-Factor Authentication (MFA)]
+      summary: Concluir autenticação com código TOTP ou código de backup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tempToken, codigo]
+              properties:
+                tempToken:
+                  type: string
+                codigo:
+                  type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+
+  /api/auth/mfa/email/validar:
+    post:
+      tags: [Multi-Factor Authentication (MFA)]
+      summary: Concluir autenticação com código PIN enviado por e-mail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tempToken, codigo]
+              properties:
+                tempToken:
+                  type: string
+                codigo:
+                  type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+
+  /api/escritorios:
+    get:
+      tags: [Escritórios & Plantas]
+      summary: Listar escritórios corporativos ativos
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de escritórios cadastrados
+
+  /api/escritorios/{id}/mapa:
+    get:
+      tags: [Escritórios & Plantas]
+      summary: Carregar mapa de baias e assentos para data informada
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: data
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Mapa detalhado com distribuição departamental e status de assentos
+
+  /api/escritorios/ocupacao-semanal:
+    get:
+      tags: [Escritórios & Plantas]
+      summary: Percentual de ocupação semanal (Semana Vigente e Próxima Semana)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Métricas diárias de ocupação por escritório
+
+  /api/escritorios/aviso-global:
+    get:
+      tags: [Escritórios & Plantas]
+      summary: Obter aviso institucional em tempo real
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Texto do aviso global ativo
+
+  /api/reservas:
+    post:
+      tags: [Reservas & Check-in]
+      summary: Criar reserva de assento de trabalho
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cadeiraId, dataReserva]
+              properties:
+                cadeiraId:
+                  type: integer
+                dataReserva:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Reserva confirmada
+
+  /api/reservas/minhas:
+    get:
+      tags: [Reservas & Check-in]
+      summary: Listar reservas do colaborador autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de agendamentos
+
+  /api/reservas/{id}/checkin:
+    post:
+      tags: [Reservas & Check-in]
+      summary: Realizar check-in presencial no assento
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Check-in confirmado com sucesso
+
+  /api/reservas/{id}/checkout:
+    post:
+      tags: [Reservas & Check-in]
+      summary: Realizar check-out antecipado liberando a cadeira
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Assento liberado para novos agendamentos
+
+  /api/reservas/{id}/cancelar:
+    post:
+      tags: [Reservas & Check-in]
+      summary: Cancelar reserva futura
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Reserva cancelada
+
+  /api/reservas/checkin-gestao:
+    post:
+      tags: [Reservas & Check-in]
+      summary: Check-in delegado executado por Gestão
+      description: Permite ao gestor confirmar presença de liderados do seu departamento (protegido contra BOLA).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reservaId]
+              properties:
+                reservaId:
+                  type: integer
+
+  /api/admin/usuarios:
+    get:
+      tags: [Administração de Usuários]
+      summary: Listar usuários com filtros de perfil e busca
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista paginada de colaboradores
+    post:
+      tags: [Administração de Usuários]
+      summary: Cadastrar novo colaborador
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+
+  /api/admin/usuarios/{id}:
+    put:
+      tags: [Administração de Usuários]
+      summary: Atualizar dados de colaborador
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+
+  /api/admin/usuarios/{id}/toggle-status:
+    patch:
+      tags: [Administração de Usuários]
+      summary: Ativar ou inativar conta de usuário
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+
+  /api/admin/usuarios/{id}/reset-senha:
+    post:
+      tags: [Administração de Usuários]
+      summary: Redefinir senha temporária de colaborador
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+
+  /api/admin/usuarios/importar:
+    post:
+      tags: [Administração de Usuários]
+      summary: Importação em lote de colaboradores via CSV / Excel
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+
+  /api/admin/departamentos:
+    get:
+      tags: [Administração de Usuários]
+      summary: Listar departamentos corporativos
+      security:
+        - BearerAuth: []
+    post:
+      tags: [Administração de Usuários]
+      summary: Criar novo departamento
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+
+  /api/admin/parametros:
+    get:
+      tags: [Governança & Parâmetros]
+      summary: Consultar parâmetros de configuração do sistema
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+    put:
+      tags: [Governança & Parâmetros]
+      summary: Atualizar parâmetros operacionais e de segurança
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+
+  /api/admin/auditoria:
+    get:
+      tags: [Trilha de Auditoria]
+      summary: Consultar trilha de auditoria imutável
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+      parameters:
+        - name: tipoEvento
+          in: query
+          schema:
+            type: string
+        - name: dataInicio
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dataFim
+          in: query
+          schema:
+            type: string
+            format: date
+
+  /api/admin/manutencao/colocar:
+    post:
+      tags: [Facilities & Manutenção]
+      summary: Bloquear cadeira para manutenção
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+
+  /api/admin/manutencao/finalizar:
+    post:
+      tags: [Facilities & Manutenção]
+      summary: Finalizar manutenção e liberar cadeira
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+
+  /api/relatorios/ocupacao:
+    get:
+      tags: [Relatórios & BI]
+      summary: Relatório consolidado de ocupação e no-show
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+
+  /api/relatorios/exportar:
+    get:
+      tags: [Relatórios & BI]
+      summary: Exportar relatório em formato PDF ou Excel (.xlsx)
+      security:
+        - BearerAuth: []
+        - AdminStepUpAuth: []
+
+  /api/scim/v2/Users:
+    get:
+      tags: [SCIM 2.0 (Identity Provisioning)]
+      summary: Listar usuários via protocolo SCIM RFC 7644
+      security:
+        - ScimBearerAuth: []
+    post:
+      tags: [SCIM 2.0 (Identity Provisioning)]
+      summary: Provisionar usuário via SCIM
+      security:
+        - ScimBearerAuth: []
+
+  /api/scim/v2/Users/{id}:
+    get:
+      tags: [SCIM 2.0 (Identity Provisioning)]
+      summary: Obter usuário por ID SCIM
+      security:
+        - ScimBearerAuth: []
+    put:
+      tags: [SCIM 2.0 (Identity Provisioning)]
+      summary: Atualizar usuário SCIM
+      security:
+        - ScimBearerAuth: []
+    patch:
+      tags: [SCIM 2.0 (Identity Provisioning)]
+      summary: Modificação parcial SCIM
+      security:
+        - ScimBearerAuth: []
+    delete:
+      tags: [SCIM 2.0 (Identity Provisioning)]
+      summary: Desprovisionar usuário SCIM
+      security:
+        - ScimBearerAuth: []
+
+  /api/health/live:
+    get:
+      tags: [Observabilidade & Health Probes]
+      summary: Sonda de Liveness (Kubernetes/Container Health)
+      responses:
+        '200':
+          description: Aplicação em execução
+
+  /api/health/ready:
+    get:
+      tags: [Observabilidade & Health Probes]
+      summary: Sonda de Readiness com checagem de banco de dados
+      security:
+        - InternalHealthAuth: []
+      responses:
+        '200':
+          description: Banco e serviços operacionais
+
+  /api/health/metrics:
+    get:
+      tags: [Observabilidade & Health Probes]
+      summary: Métricas operacionais em formato Prometheus
+      security:
+        - InternalHealthAuth: []
+      responses:
+        '200':
+          description: Métricas de latência, taxa de erros e saturação
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access Token JWT padrão (TTL 15 minutos).
+    AdminStepUpAuth:
+      type: apiKey
+      in: header
+      name: x-admin-token
+      description: Token MFA Step-Up obrigatório para operações administrativas privilegiadas.
+    InternalHealthAuth:
+      type: apiKey
+      in: header
+      name: x-health-token
+      description: Token de autenticação para sondas internas de infraestrutura.
+    ScimBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token estático ou JWT dedicado à integração SCIM 2.0.
+
+  schemas:
+    AuthSuccessResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Access Token JWT com validade de 15m.
+        refreshToken:
+          type: string
+          description: Refresh Token com validade de 7 dias e rotação contínua.
+        user:
+          $ref: '#/components/schemas/UserProfile'
+
+    MfaChallengeResponse:
+      type: object
+      properties:
+        requiresMfa:
+          type: boolean
+          example: true
+        mfaType:
+          type: string
+          enum: [TOTP, EMAIL]
+        tempToken:
+          type: string
+        emailMascarado:
+          type: string
+        message:
+          type: string
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        email:
+          type: string
+        matricula:
+          type: string
+        perfil:
+          type: string
+          enum: [COLABORADOR, GESTAO, ADMIN_RH, ADMIN_TI]
+        permissaoRh:
+          type: boolean
+        permissaoTi:
+          type: boolean
+        departamentoId:
+          type: integer
+          nullable: true
+        departamentoNome:
+          type: string
+          nullable: true
+
+    CreateUserRequest:
+      type: object
+      required: [nome, email, matricula, senha, perfil]
+      properties:
+        nome:
+          type: string
+        email:
+          type: string
+        matricula:
+          type: string
+        senha:
+          type: string
+        perfil:
+          type: string
+          enum: [COLABORADOR, GESTAO, ADMIN_RH, ADMIN_TI]
+        departamentoId:
+          type: integer
+          nullable: true
+        permissaoRh:
+          type: boolean
+        permissaoTi:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+
+  responses:
+    UnauthorizedError:
+      description: Não autenticado ou token expirado/revogado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ForbiddenError:
+      description: Permissão insuficiente ou MFA obrigatório não fornecido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimitedError:
+      description: Limite de requisições excedido.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Segundos restantes até a liberação de novas requisições.
+        RateLimit-Limit:
+          schema:
+            type: integer
+        RateLimit-Remaining:
+          schema:
+            type: integer
+        RateLimit-Reset:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+

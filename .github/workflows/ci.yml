@@ -147,20 +147,90 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  sast-analysis:
+    name: SAST Analysis (CodeQL & Semgrep Security Scan)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL Analysis (JavaScript/TypeScript)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+      - name: Run Semgrep SAST Security Rules
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/typescript
+            p/secrets
+        env:
+          SEMGREP_RULES: p/security-audit
+
+  sbom-generation:
+    name: SBOM Generation (CycloneDX / SPDX Standard)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Generate Backend SBOM (CycloneDX / Syft)
+        uses: anchore/sbom-action@v0.17.9
+        with:
+          path: ./backend
+          format: 'cyclonedx-json'
+          output-file: 'sbom-backend-cyclonedx.json'
+
+      - name: Generate Frontend SBOM (CycloneDX / Syft)
+        uses: anchore/sbom-action@v0.17.9
+        with:
+          path: ./frontend
+          format: 'cyclonedx-json'
+          output-file: 'sbom-frontend-cyclonedx.json'
+
+      - name: Archive SBOM Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: software-bill-of-materials
+          path: |
+            sbom-backend-cyclonedx.json
+            sbom-frontend-cyclonedx.json
+          retention-days: 90
+
   quality-gate:
     name: Release Quality Gate
-    needs: [backend-ci, frontend-ci, dependency-review, secret-scan]
+    needs: [backend-ci, frontend-ci, dependency-review, secret-scan, sast-analysis, sbom-generation]
     runs-on: ubuntu-latest
     if: ${{ always() }}
     steps:
       - name: Reject Failed Required Jobs
-        if: needs.backend-ci.result != 'success' || needs.frontend-ci.result != 'success' || needs.dependency-review.result != 'success' || needs.secret-scan.result != 'success'
+        if: >
+          needs.backend-ci.result != 'success' ||
+          needs.frontend-ci.result != 'success' ||
+          needs.dependency-review.result != 'success' ||
+          needs.secret-scan.result != 'success' ||
+          needs.sast-analysis.result != 'success' ||
+          needs.sbom-generation.result != 'success'
         run: |
-          echo "Quality gate rejected: backend=${{ needs.backend-ci.result }}, frontend=${{ needs.frontend-ci.result }}, dependencies=${{ needs.dependency-review.result }}, secrets=${{ needs.secret-scan.result }}"
+          echo "Quality gate rejected: backend=${{ needs.backend-ci.result }}, frontend=${{ needs.frontend-ci.result }}, dependencies=${{ needs.dependency-review.result }}, secrets=${{ needs.secret-scan.result }}, sast=${{ needs.sast-analysis.result }}, sbom=${{ needs.sbom-generation.result }}"
           exit 1
 
       - name: Approve Quality Gate
-        run: echo "Backend and frontend quality gates passed."
+        run: echo "Enterprise security quality gate successfully approved (SAST, SCA, SBOM, Secrets, Tests passed)."
 
   staging-smoke:
     name: Staging Smoke Test (Manual Promotion)
@@ -188,4 +258,21 @@ jobs:
           curl --fail --silent --show-error \
             -H "x-health-token: $INTERNAL_HEALTH_TOKEN" \
             "$STAGING_HEALTH_URL/api/health/metrics"
+
+  dast-scan:
+    name: Dynamic Application Security Testing (DAST / OWASP ZAP)
+    needs: quality-gate
+    if: github.event_name == 'workflow_dispatch' && inputs.run_staging_smoke == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run OWASP ZAP Baseline DAST Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ vars.STAGING_HEALTH_URL || 'http://localhost:3000' }}
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+          fail_action: false
 
