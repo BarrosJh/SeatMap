@@ -40,9 +40,9 @@ services:
       DB_USER: ${DB_USER:-seatmap_user}
       DB_PASSWORD: ${DB_PASSWORD:-seatmap_password}
       JWT_SECRET: ${JWT_SECRET:-dev_local_secret_key_for_jwt_secret_32chars_len}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-1d}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
       JWT_ADMIN_SECRET: ${JWT_ADMIN_SECRET:-dev_local_secret_key_for_admin_secret_32chars_len}
-      JWT_ADMIN_EXPIRATION: ${JWT_ADMIN_EXPIRATION:-2h}
+      JWT_ADMIN_EXPIRATION: ${JWT_ADMIN_EXPIRATION:-15m}
       JWT_MFA_TEMP_SECRET: ${JWT_MFA_TEMP_SECRET:-dev_local_secret_key_for_mfa_32chars_len}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev_local_secret_key_for_encryption_32chars_len}
       INTERNAL_HEALTH_TOKEN: ${INTERNAL_HEALTH_TOKEN:-}

@@ -184,6 +184,11 @@ export class SsoController {
         [provider, ssoId || null, user.id]
       );
 
+      // Hardening de Sessão: Invalidação de sessões ativas anteriores (Single Active Session Enforcement)
+      await TokenService.incrementarTokenVersion(user.id);
+      const activeTokenVersion = (user.token_version || 1) + 1;
+      const authTime = Math.floor(Date.now() / 1000);
+
       // Emitir token JWT definitivo
       const token = jwt.sign({
         userId: user.id,
@@ -195,7 +200,8 @@ export class SsoController {
         permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
         departamentoId: user.departamento_id,
         departamentoNome: user.departamento_nome,
-        tokenVersion: user.token_version || 1
+        tokenVersion: activeTokenVersion,
+        authTime
       }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
 
       AuditService.log({

@@ -33,22 +33,25 @@ app.set('trust proxy', Number.isFinite(trustProxyHops) && trustProxyHops > 0 ? t
 // Injeção de X-Correlation-ID em todas as requisições antes de qualquer outro middleware
 app.use(correlationIdMiddleware);
 
-// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP para Flutter Web)
+// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP Estrita para Flutter Web)
 app.use(helmet({
   frameguard: { action: 'deny' },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'blob:', 'https:'],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
-      imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
-      connectSrc: ["'self'", 'ws:', 'wss:', 'https:', 'http:', 'data:', 'blob:'],
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+      styleSrc: ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", 'wss:', 'https:'],
       workerSrc: ["'self'", 'blob:'],
-      objectSrc: ["'none'"]
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: []
     }
   },
   crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: 'same-origin' },
+  crossOriginResourcePolicy: { policy: 'same-origin' },
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
@@ -59,23 +62,22 @@ app.disable('x-powered-by');
 
 const server = http.createServer(app);
 
-// Configuração segura de CORS
+// Configuração segura de CORS (Sem wildcard em produção/staging)
+const isProduction = ['production', 'staging'].includes((process.env.NODE_ENV || 'development').toLowerCase());
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-  : ['*'];
+  : (isProduction ? [] : ['*']);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permite chamadas sem origin (mobile apps, curl, server-to-server)
+    // Permite chamadas sem origin (mobile apps nativos, curl, health probes internos)
     if (!origin) return callback(null, true);
 
     if (
-      allowedOrigins.includes('*') ||
+      (!isProduction && allowedOrigins.includes('*')) ||
       allowedOrigins.includes(origin) ||
       origin.endsWith('.onrender.com') ||
-      origin.includes('localhost') ||
-      origin.includes('127.0.0.1') ||
-      process.env.NODE_ENV !== 'production'
+      (!isProduction && (origin.includes('localhost') || origin.includes('127.0.0.1')))
     ) {
       return callback(null, true);
     }
@@ -85,7 +87,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token', 'x-correlation-id', 'x-request-id'],
-  exposedHeaders: ['X-Correlation-Id']
+  exposedHeaders: ['X-Correlation-Id', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'Retry-After']
 }));
 app.use(express.json({
   limit: '256kb',
@@ -94,6 +96,15 @@ app.use(express.json({
 
 // Logger Estruturado de Requisições HTTP (SIEM / SOC)
 app.use(requestLoggerMiddleware);
+
+// Headers de Segurança, Anti-Cache e Permissions-Policy para todas as rotas de API
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+  next();
+});
 
 // Servir Aplicação Flutter Web (Frontend Monolith) se a pasta public existir
 const publicPath = path.join(__dirname, '../public');
@@ -111,8 +122,8 @@ if (fs.existsSync(publicPath)) {
   });
 }
 
-// Rotas da API
-app.use('/api', routes);
+// Rotas da API com Rate Limiter Global Ativo
+app.use('/api', globalLimiter, routes);
 
 // Fallback SPA para navegação do Flutter Web
 if (fs.existsSync(publicPath)) {

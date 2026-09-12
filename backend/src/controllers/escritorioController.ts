@@ -40,8 +40,8 @@ export class EscritorioController {
 
   public static async getOcupacaoSemanal(req: AuthenticatedRequest, res: Response) {
     try {
-      const perfilUser = req.user?.perfil || 'COLABORADOR';
-      const ocupacao = await EscritorioService.getOcupacaoSemanal(perfilUser);
+      const user = req.user || 'COLABORADOR';
+      const ocupacao = await EscritorioService.getOcupacaoSemanal(user);
       return res.status(200).json(ocupacao);
     } catch (error) {
       logger.error('[EscritorioController.getOcupacaoSemanal] Erro:', { correlationId: req.correlationId, error });

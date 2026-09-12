@@ -28,6 +28,7 @@ export interface AuthUser {
   departamentoId: number | null;
   departamentoNome?: string;
   tokenVersion?: number;
+  authTime?: number;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -160,6 +161,15 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
         return res.status(401).json({ error: 'Sessão revogada ou credenciais alteradas. Faça login novamente.' });
       }
 
+      // Timeout Absoluto Server-Side de 60 minutos (3600 segundos) a partir do login inicial
+      const nowInSeconds = Math.floor(Date.now() / 1000);
+      if (decoded.authTime && (nowInSeconds - decoded.authTime) > 3600) {
+        return res.status(401).json({
+          error: 'Sessão expirada pelo tempo limite absoluto de 60 minutos. Por favor, autentique-se novamente.',
+          code: 'SESSION_ABSOLUTE_TIMEOUT'
+        });
+      }
+
       req.user = decoded as AuthUser;
       next();
     } catch (dbErr) {
@@ -194,7 +204,7 @@ export const requireAdminOrTi = (req: AuthenticatedRequest, res: Response, next:
 
 export const authenticateAdminMfa = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const mfaPolicy = await ConfigService.get('MFA_POLICY', 'DESATIVADO');
+    const mfaPolicy = await ConfigService.get('MFA_POLICY', 'OBRIGATORIO_RH');
     const isMfaEnforcedForRh = mfaPolicy === 'OBRIGATORIO_RH' || mfaPolicy === 'OBRIGATORIO_TODOS';
 
     if (!isMfaEnforcedForRh) {

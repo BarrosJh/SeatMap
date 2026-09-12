@@ -172,7 +172,7 @@ export class LoginController {
       }
 
       // Avaliação de Exigência e Políticas de MFA (2FA)
-      const mfaPolicy = await ConfigService.get('MFA_POLICY', 'DESATIVADO');
+      const mfaPolicy = await ConfigService.get('MFA_POLICY', 'OBRIGATORIO_RH');
       const mfaTotpEnabled = (await ConfigService.get('MFA_TOTP_ENABLED', 'true')) === 'true';
       const mfaEmailEnabled = (await ConfigService.get('MFA_EMAIL_ENABLED', 'true')) === 'true';
       const mfaExpiracaoMinutos = await ConfigService.getNumber('MFA_EXPIRACAO_MINUTOS', 10);
@@ -266,6 +266,11 @@ export class LoginController {
         }
       }
 
+      // Hardening de Sessão: Invalidação de sessões ativas anteriores (Single Active Session Enforcement)
+      await TokenService.incrementarTokenVersion(user.id);
+      const activeTokenVersion = (user.token_version || 1) + 1;
+      const authTime = Math.floor(Date.now() / 1000);
+
       // Emissão do Token de Sessão JWT
       const token = jwt.sign({
         userId: user.id,
@@ -277,7 +282,8 @@ export class LoginController {
         permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
         departamentoId: user.departamento_id,
         departamentoNome: user.departamento_nome,
-        tokenVersion: user.token_version || 1
+        tokenVersion: activeTokenVersion,
+        authTime
       }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
 
       // Auditoria de Sucesso
@@ -427,7 +433,7 @@ export class LoginController {
     try {
       const autoLockAtivo = (await ConfigService.get('AUTO_LOCK_ATIVO', 'true')) === 'true';
       const autoLockMinutos = await ConfigService.getNumber('AUTO_LOCK_MINUTOS', 15);
-      const mfaPolicy = await ConfigService.get('MFA_POLICY', 'DESATIVADO');
+      const mfaPolicy = await ConfigService.get('MFA_POLICY', 'OBRIGATORIO_RH');
       const ssoEnabled = (await ConfigService.get('SSO_ENABLED', 'false')) === 'true';
 
       return res.status(200).json({

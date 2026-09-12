@@ -75,16 +75,32 @@ export function getWorkWeekDiff(targetDate: DateTime, baseDate: DateTime = DateT
   return Math.round(targetMonday.diff(currentMonday, 'weeks').weeks);
 }
 
+export type UserOrRole = string | {
+  perfil?: string;
+  permissaoRh?: boolean;
+  permissaoTi?: boolean;
+  is_admin?: boolean;
+};
+
 /**
  * Verifica se a agenda da Próxima Semana já foi liberada para o perfil do usuário
  * de acordo com as parametrizações do RH no banco de dados.
  */
 export async function isProximaSemanaLiberada(
-  perfil: string,
+  userOrPerfil: UserOrRole,
   now: DateTime = DateTime.now().setZone('America/Sao_Paulo')
 ): Promise<{ liberada: boolean; mensagemBloqueio?: string }> {
-  // Administradores do RH sempre têm acesso total para planejar
-  if (perfil === 'ADMIN_RH') {
+  const perfil = typeof userOrPerfil === 'string' ? userOrPerfil : (userOrPerfil?.perfil || 'COLABORADOR');
+  const isPrivileged = typeof userOrPerfil === 'object' && (
+    userOrPerfil.permissaoRh === true ||
+    userOrPerfil.permissaoTi === true ||
+    userOrPerfil.is_admin === true ||
+    userOrPerfil.perfil === 'ADMIN_RH' ||
+    userOrPerfil.perfil === 'ADMIN_TI'
+  );
+
+  // Administradores do RH e TI sempre têm acesso total para planejar
+  if (isPrivileged || perfil === 'ADMIN_RH' || perfil === 'ADMIN_TI') {
     return { liberada: true };
   }
 

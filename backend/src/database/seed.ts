@@ -316,7 +316,7 @@ async function runSeed() {
       ('PERMITIR_TROCA_MESMO_DIA', 'true', 'Permite que o colaborador troque de assento para a mesma data já reservada'),
       ('CHECKIN_AUTOMATICO_GESTAO', 'true', 'Realiza o check-in automático ao reservar para usuários com perfil GESTAO'),
       ('AVISO_GLOBAL_SISTEMA', '', 'Mensagem institucional de aviso em tempo real exibida no topo do app'),
-      ('MFA_POLICY', 'DESATIVADO', 'Política de obrigatoriedade de MFA (DESATIVADO, OPCIONAL, OBRIGATORIO_RH, OBRIGATORIO_TODOS)'),
+      ('MFA_POLICY', 'OBRIGATORIO_RH', 'Política de obrigatoriedade de MFA (DESATIVADO, OPCIONAL, OBRIGATORIO_RH, OBRIGATORIO_TODOS)'),
       ('MFA_EMAIL_ENABLED', 'true', 'Habilita envio de código MFA por e-mail corporativo'),
       ('MFA_TOTP_ENABLED', 'true', 'Habilita autenticação em duas etapas via aplicativo TOTP (Google/MS Authenticator)'),
       ('MFA_EXPIRACAO_MINUTOS', '10', 'Tempo de validade do código MFA enviado por e-mail (em minutos)'),

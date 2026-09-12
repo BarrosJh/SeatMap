@@ -157,10 +157,10 @@ export class EscritorioService {
   /**
    * Calcula ocupação semanal dos escritórios para as semanas atual e próxima
    */
-  public static async getOcupacaoSemanal(userPerfil: string = 'COLABORADOR') {
+  public static async getOcupacaoSemanal(userOrPerfil: any = 'COLABORADOR') {
     const now = DateTime.now().setZone('America/Sao_Paulo');
     const mondayCurrent = getMondayOfCurrentWorkWeek(now);
-    const statusAbertura = await isProximaSemanaLiberada(userPerfil, now);
+    const statusAbertura = await isProximaSemanaLiberada(userOrPerfil, now);
 
     const diasSemanaNomes = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
     const diasSemanaCurtos = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];

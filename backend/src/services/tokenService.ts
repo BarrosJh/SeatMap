@@ -8,7 +8,8 @@ import { toUserResponseDto } from '../utils/userDtoMapper';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
-const REFRESH_TOKEN_DAYS = 30;
+const REFRESH_TOKEN_DAYS = 7;
+const MAX_ABSOLUTE_SESSION_SECONDS = 3600; // 60 minutos
 
 export interface TokenPairResult {
   success: boolean;
@@ -27,7 +28,7 @@ export class TokenService {
   }
 
   /**
-   * Gera e persiste um novo Refresh Token com validade de 30 dias
+   * Gera e persiste um novo Refresh Token com validade de 7 dias
    */
   public static async gerarRefreshToken(
     usuarioId: number,
@@ -50,8 +51,8 @@ export class TokenService {
   }
 
   /**
-   * Rotaciona um Refresh Token emitindo um novo par de Access Token e Refresh Token.
-   * Implementa detecção e bloqueio de Replay Attacks (reuso de token já rotacionado).
+   * Rotaciona um Refresh Token emitindo um novo par de Access Token (15m) e Refresh Token (7d).
+   * Implementa detecção e bloqueio de Replay Attacks e Timeout Absoluto de 60 minutos.
    */
   public static async rotacionarRefreshToken(
     rawRefreshToken: string,
@@ -66,7 +67,7 @@ export class TokenService {
 
     try {
       const tokenRes = await pool.query(`
-        SELECT id, usuario_id, family_id, revogado, expira_em
+        SELECT id, usuario_id, family_id, revogado, expira_em, criado_em
         FROM auth_refresh_tokens
         WHERE token_hash = $1
       `, [tokenHash]);
@@ -101,12 +102,47 @@ export class TokenService {
         };
       }
 
-      // 2. Validação de Expiração
+      // 2. Validação de Expiração do Refresh Token
       if (new Date(tokenRecord.expira_em) < new Date()) {
         return { success: false, error: 'Refresh token expirado. Faça login novamente.' };
       }
 
-      // 3. Buscar dados atualizados do usuário
+      // 3. Timeout Absoluto Server-Side de 60 minutos (Baseado na criação da família de sessão)
+      const familyFirstTokenRes = await pool.query(`
+        SELECT MIN(criado_em) AS session_start
+        FROM auth_refresh_tokens
+        WHERE family_id = $1
+      `, [tokenRecord.family_id]);
+
+      const sessionStart = familyFirstTokenRes.rows[0]?.session_start
+        ? new Date(familyFirstTokenRes.rows[0].session_start).getTime()
+        : new Date(tokenRecord.criado_em).getTime();
+
+      const sessionAgeSeconds = Math.floor((Date.now() - sessionStart) / 1000);
+
+      if (sessionAgeSeconds > MAX_ABSOLUTE_SESSION_SECONDS) {
+        await pool.query(`
+          UPDATE auth_refresh_tokens
+          SET revogado = true
+          WHERE family_id = $1
+        `, [tokenRecord.family_id]);
+
+        AuditService.log({
+          usuarioId: tokenRecord.usuario_id,
+          tipoEvento: 'LOGOUT',
+          sucesso: false,
+          ip,
+          userAgent,
+          detalhes: { familyId: tokenRecord.family_id, motivo: 'Timeout absoluto de sessão de 60 minutos atingido' }
+        });
+
+        return {
+          success: false,
+          error: 'Sessão expirada pelo limite máximo de tempo absoluto (60 minutos). Por favor, faça login novamente.'
+        };
+      }
+
+      // 4. Buscar dados atualizados do usuário
       const userRes = await pool.query(`
         SELECT u.id, u.nome, u.email, u.matricula, u.perfil,
                COALESCE(u.permissao_rh, false) AS permissao_rh,
@@ -124,14 +160,14 @@ export class TokenService {
 
       const user = userRes.rows[0];
 
-      // 4. Revogar o token atual
+      // 5. Revogar o refresh token atual
       await pool.query(`
         UPDATE auth_refresh_tokens
         SET revogado = true
         WHERE id = $1
       `, [tokenRecord.id]);
 
-      // 5. Emitir novo Refresh Token na mesma família (Rotação)
+      // 6. Emitir novo Refresh Token na mesma família (Rotação)
       const novoRefreshToken = await this.gerarRefreshToken(
         user.id,
         ip,
@@ -139,7 +175,9 @@ export class TokenService {
         tokenRecord.family_id
       );
 
-      // 6. Emitir novo Access Token JWT
+      const authTime = Math.floor(sessionStart / 1000);
+
+      // 7. Emitir novo Access Token JWT com authTime persistido
       const novoAccessToken = jwt.sign(
         {
           userId: user.id,
@@ -151,7 +189,8 @@ export class TokenService {
           permissaoTi: user.permissao_ti,
           departamentoId: user.departamento_id,
           departamentoNome: user.departamento_nome,
-          tokenVersion: user.token_version || 1
+          tokenVersion: user.token_version || 1,
+          authTime
         },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRATION as any }

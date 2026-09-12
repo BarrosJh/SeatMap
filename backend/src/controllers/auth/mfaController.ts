@@ -224,6 +224,11 @@ export class MfaController {
       // Atualizar último login
       await pool.query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [user.id]);
 
+      // Hardening de Sessão: Invalidação de sessões ativas anteriores (Single Active Session Enforcement)
+      await TokenService.incrementarTokenVersion(user.id);
+      const activeTokenVersion = (user.token_version || 1) + 1;
+      const authTime = Math.floor(Date.now() / 1000);
+
       // Emitir token JWT definitivo
       const token = jwt.sign({
         userId: user.id,
@@ -235,7 +240,8 @@ export class MfaController {
         permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
         departamentoId: user.departamento_id,
         departamentoNome: user.departamento_nome,
-        tokenVersion: user.token_version || 1
+        tokenVersion: activeTokenVersion,
+        authTime
       }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
 
       AuditService.log({
@@ -280,11 +286,12 @@ export class MfaController {
       const userId = decoded.userId;
       const userRes = await pool.query(`
         SELECT u.id, u.nome, u.email, u.matricula, u.perfil, 
-               COALESCE(u.permissao_rh, false) AS permissao_rh,
-               COALESCE(u.permissao_ti, false) AS permissao_ti,
-               u.ativo,
-               COALESCE(u.totp_ativo, false) AS totp_ativo,
-               u.departamento_id, d.nome AS departamento_nome
+                COALESCE(u.permissao_rh, false) AS permissao_rh,
+                COALESCE(u.permissao_ti, false) AS permissao_ti,
+                COALESCE(u.token_version, 1) AS token_version,
+                u.ativo,
+                COALESCE(u.totp_ativo, false) AS totp_ativo,
+                u.departamento_id, d.nome AS departamento_nome
         FROM usuarios u
         LEFT JOIN departamentos d ON u.departamento_id = d.id
         WHERE u.id = $1 AND u.ativo = true
@@ -334,6 +341,11 @@ export class MfaController {
       // Atualizar último login
       await pool.query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [user.id]);
 
+      // Hardening de Sessão: Invalidação de sessões ativas anteriores (Single Active Session Enforcement)
+      await TokenService.incrementarTokenVersion(user.id);
+      const activeTokenVersion = (user.token_version || 1) + 1;
+      const authTime = Math.floor(Date.now() / 1000);
+
       // Emitir Token de Sessão JWT definitivo
       const token = jwt.sign({
         userId: user.id,
@@ -345,7 +357,8 @@ export class MfaController {
         permissaoTi: user.permissao_ti === true || user.perfil === 'ADMIN_TI',
         departamentoId: user.departamento_id,
         departamentoNome: user.departamento_nome,
-        tokenVersion: user.token_version || 1
+        tokenVersion: activeTokenVersion,
+        authTime
       }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
 
       AuditService.log({
