@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/seat_map_provider.dart';
+import '../services/camera/camera_permission_service.dart';
 import '../widgets/comprovante_dialog.dart';
 import 'checkin/widgets/checkin_feedback_dialog.dart';
 import 'checkin/widgets/checkin_scanner_view.dart';
@@ -21,7 +22,8 @@ class CheckinScreen extends StatefulWidget {
 }
 
 class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  late MobileScannerController _scannerController;
+  MobileScannerController? _scannerController;
+  Key _scannerKey = UniqueKey();
   bool _isProcessing = false;
   bool _isTorchOn = false;
   late AnimationController _scanLineAnim;
@@ -30,7 +32,9 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initScanner();
+    if (widget.isActive) {
+      _initScanner();
+    }
     _scanLineAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -41,6 +45,9 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
   }
 
   void _initScanner() {
+    try {
+      _scannerController?.dispose();
+    } catch (_) {}
     _scannerController = MobileScannerController(
       autoStart: true,
       detectionSpeed: DetectionSpeed.normal,
@@ -48,19 +55,37 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
       torchEnabled: false,
       returnImage: false,
     );
+    _scannerKey = UniqueKey();
+  }
+
+  Future<void> _restartCamera() async {
+    // 1. Tentar solicitar permissão explicitamente via bridge nativo no Web
+    try {
+      await CameraPermissionService.requestCameraPermission();
+    } catch (_) {}
+
+    // 2. Recriar o scanner controller com novo Key para remontagem limpa
+    if (mounted) {
+      setState(() {
+        _isTorchOn = false;
+        _initScanner();
+      });
+    }
   }
 
   @override
   void didUpdateWidget(CheckinScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
-      try {
-        _scannerController.start();
-      } catch (_) {}
+      // Ao ativar a aba, recriar o scanner de forma limpa para evitar controllerAlreadyInitialized
+      _initScanner();
       _scanLineAnim.repeat(reverse: true);
+      setState(() {});
     } else if (!widget.isActive && oldWidget.isActive) {
       try {
-        _scannerController.stop();
+        _scannerController?.stop();
+        _scannerController?.dispose();
+        _scannerController = null;
       } catch (_) {}
       _scanLineAnim.stop();
       _scanLineAnim.reset();
@@ -71,14 +96,13 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       try {
-        _scannerController.stop();
+        _scannerController?.stop();
       } catch (_) {}
       _scanLineAnim.stop();
     } else if (state == AppLifecycleState.resumed && widget.isActive) {
-      try {
-        _scannerController.start();
-      } catch (_) {}
+      _initScanner();
       _scanLineAnim.repeat(reverse: true);
+      setState(() {});
     }
   }
 
@@ -86,7 +110,10 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scanLineAnim.dispose();
-    _scannerController.dispose();
+    try {
+      _scannerController?.dispose();
+    } catch (_) {}
+    _scannerController = null;
     super.dispose();
   }
 
@@ -196,20 +223,52 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
     final reservaHoje = seatProvider.reservaHoje;
     final hojeStr = DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(DateTime.now());
 
-    final scannerWidget = CheckinScannerView(
-      scannerController: _scannerController,
-      isActive: widget.isActive,
-      isProcessing: _isProcessing,
-      isTorchOn: _isTorchOn,
-      scanLineAnim: _scanLineAnim,
-      onQrDetected: _handleQrDetected,
-      onToggleTorch: () async {
-        await _scannerController.toggleTorch();
-        setState(() => _isTorchOn = !_isTorchOn);
-      },
-      onSwitchCamera: () => _scannerController.switchCamera(),
-      onManualInput: _abrirModalSimulacaoQr,
-    );
+    final scannerWidget = _scannerController != null && widget.isActive
+        ? CheckinScannerView(
+            key: _scannerKey,
+            scannerController: _scannerController!,
+            isActive: widget.isActive,
+            isProcessing: _isProcessing,
+            isTorchOn: _isTorchOn,
+            scanLineAnim: _scanLineAnim,
+            onQrDetected: _handleQrDetected,
+            onToggleTorch: () async {
+              if (_scannerController != null) {
+                try {
+                  await _scannerController!.toggleTorch();
+                  setState(() => _isTorchOn = !_isTorchOn);
+                } catch (_) {}
+              }
+            },
+            onSwitchCamera: () {
+              if (_scannerController != null) {
+                try {
+                  _scannerController!.switchCamera();
+                } catch (_) {}
+              }
+            },
+            onManualInput: _abrirModalSimulacaoQr,
+            onRestartCamera: _restartCamera,
+          )
+        : Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.videocam_outlined, color: Colors.white38, size: 44),
+                  SizedBox(height: 10),
+                  Text(
+                    'Câmera em pausa',
+                    style: TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          );
 
     return Container(
       color: const Color(0xFFF8FAFC),
@@ -277,3 +336,4 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
     );
   }
 }
+

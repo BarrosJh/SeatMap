@@ -11,6 +11,7 @@ class CheckinScannerView extends StatelessWidget {
   final VoidCallback onToggleTorch;
   final VoidCallback onSwitchCamera;
   final VoidCallback onManualInput;
+  final VoidCallback onRestartCamera;
 
   const CheckinScannerView({
     super.key,
@@ -23,6 +24,7 @@ class CheckinScannerView extends StatelessWidget {
     required this.onToggleTorch,
     required this.onSwitchCamera,
     required this.onManualInput,
+    required this.onRestartCamera,
   });
 
   @override
@@ -43,7 +45,7 @@ class CheckinScannerView extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Feed da Câmera
+          // 1. Feed da Câmera
           if (isActive)
             MobileScanner(
               controller: scannerController,
@@ -58,42 +60,62 @@ class CheckinScannerView extends StatelessWidget {
                 }
               },
               errorBuilder: (context, error, child) {
+                final isAlreadyInit = error.errorCode == MobileScannerErrorCode.controllerAlreadyInitialized;
+                
+                String errorTitle = 'Acesso à Câmera';
+                String errorDesc = 'Por favor, autorize o acesso à câmera no seu navegador ou dispositivo para validar sua presença por QR Code.';
+                
+                if (isAlreadyInit) {
+                  errorTitle = 'Reiniciando Leitor';
+                  errorDesc = 'Clique no botão abaixo para reativar o feed da câmera.';
+                } else if (error.errorCode == MobileScannerErrorCode.unsupported) {
+                  errorTitle = 'Câmera Não Encontrada';
+                  errorDesc = 'Seu navegador ou dispositivo não possui câmera disponível ou suportada.';
+                }
+
                 return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.videocam_off_rounded, color: Colors.white70, size: 48),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Acesso à Câmera: ${error.errorCode}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Certifique-se de permitir o uso da câmera no navegador do celular.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.videocam_off_rounded, color: Color(0xFFF87171), size: 40),
                         ),
                         const SizedBox(height: 16),
+                        Text(
+                          errorTitle,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          errorDesc,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
+                        ),
+                        const SizedBox(height: 20),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 4,
                           ),
-                          onPressed: () async {
-                            try {
-                              await scannerController.start();
-                            } catch (_) {}
-                          },
-                          icon: const Icon(Icons.refresh_rounded, size: 18),
-                          label: const Text('Permitir / Iniciar Câmera'),
+                          onPressed: onRestartCamera,
+                          icon: const Icon(Icons.videocam_rounded, size: 20),
+                          label: const Text('Permitir / Iniciar Câmera', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         TextButton.icon(
-                          style: TextButton.styleFrom(foregroundColor: Colors.white70),
+                          style: TextButton.styleFrom(foregroundColor: const Color(0xFFCBD5E1)),
                           onPressed: onManualInput,
                           icon: const Icon(Icons.keyboard_outlined, size: 18),
                           label: const Text('Digitar Código Manualmente'),
@@ -119,10 +141,13 @@ class CheckinScannerView extends StatelessWidget {
               ),
             ),
 
-          // Overlay do Visor de Escaneamento
-          _buildScannerOverlay(),
+          // 2. Overlay do Visor de Escaneamento (Envolvido em IgnorePointer para NÃO bloquear cliques)
+          IgnorePointer(
+            ignoring: true,
+            child: _buildScannerOverlay(),
+          ),
 
-          // Barra Superior com Controles da Câmera
+          // 3. Barra Superior com Controles da Câmera
           Positioned(
             top: 16,
             left: 16,
@@ -178,7 +203,7 @@ class CheckinScannerView extends StatelessWidget {
             ),
           ),
 
-          // Barra Inferior com Entrada Manual / Teste
+          // 4. Barra Inferior com Entrada Manual / Teste
           Positioned(
             bottom: 16,
             left: 16,
@@ -202,7 +227,7 @@ class CheckinScannerView extends StatelessWidget {
             ),
           ),
 
-          // Indicador de Carregamento ao Processar
+          // 5. Indicador de Carregamento ao Processar
           if (isProcessing)
             Container(
               color: Colors.black.withValues(alpha: 0.7),
@@ -279,4 +304,5 @@ class CheckinScannerView extends StatelessWidget {
     );
   }
 }
+
 

@@ -46,6 +46,7 @@ app.use(helmet({
       styleSrc: ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
       fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
       imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+      mediaSrc: ["'self'", 'blob:', 'data:'],
       connectSrc: ["'self'", 'wss:', 'https:'],
       workerSrc: ["'self'", 'blob:'],
       objectSrc: ["'none'"],
@@ -139,10 +140,11 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Permissions-Policy e Headers para o PWA (Câmera liberada para QR Code scanner)
+// Permissions-Policy e Headers para o PWA (Câmera liberada para QR Code scanner na própria aplicação)
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api')) {
-    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+    res.setHeader('Permissions-Policy', 'camera=(self "https://seatmap-api-tvy9.onrender.com"), microphone=(), geolocation=(), payment=(), usb=()');
+    res.setHeader('Feature-Policy', "camera 'self' https://seatmap-api-tvy9.onrender.com; microphone 'none'; geolocation 'none'");
   }
   next();
 });

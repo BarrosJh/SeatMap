@@ -106,5 +106,29 @@
       return JSON.stringify(response);
     }
   };
+
+  window.SeatMapCamera = {
+    requestCameraPermission: async function () {
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+        try {
+          var stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: 'environment' }
+            }
+          });
+          // Para as tracks imediatamente após o consentimento do usuário
+          stream.getTracks().forEach(function (track) {
+            track.stop();
+          });
+          return true;
+        } catch (err) {
+          console.warn('[SeatMapCamera] Permissão de câmera não concedida pelo usuário:', err);
+          return false;
+        }
+      }
+      return false;
+    }
+  };
 })();
+
 
