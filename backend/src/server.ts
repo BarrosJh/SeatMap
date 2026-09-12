@@ -36,6 +36,8 @@ app.use(correlationIdMiddleware);
 // Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP Estrita para Flutter Web)
 app.use(helmet({
   frameguard: { action: 'deny' },
+  referrerPolicy: { policy: 'no-referrer' },
+  xssFilter: false, // Desativado no helmet para usar o header estrito explícito abaixo
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -60,6 +62,15 @@ app.use(helmet({
   }
 }));
 app.disable('x-powered-by');
+
+// Cabeçalhos HTTP Mandatórios - Manual de Segurança Caixa Consórcio v03
+app.use((req, res, next) => {
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.removeHeader('Server');
+  res.removeHeader('X-Powered-By');
+  next();
+});
 
 const server = http.createServer(app);
 
