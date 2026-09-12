@@ -366,11 +366,17 @@ class AuthApi extends ApiClientBase {
   // ==========================================
   // WEBAUTHN / BIOMETRIA / FIDO2 / PASSKEYS
   // ==========================================
+  Map<String, String> _webAuthnHeaders(String? token) {
+    final h = headers(token);
+    h['x-client-mode'] = 'pwa-standalone';
+    return h;
+  }
+
   Future<ApiResponse<Map<String, dynamic>>> getWebAuthnRegisterOptions(String token) async {
     try {
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/auth/webauthn/register/options'),
-        headers: headers(token),
+        headers: _webAuthnHeaders(token),
       );
       final body = jsonDecode(response.body);
       if (response.statusCode == 200) {
@@ -386,7 +392,7 @@ class AuthApi extends ApiClientBase {
     try {
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/auth/webauthn/register/verify'),
-        headers: headers(token),
+        headers: _webAuthnHeaders(token),
         body: jsonEncode({
           'response': responsePayload,
           'deviceName': deviceName ?? 'Dispositivo Móvel'
@@ -406,7 +412,7 @@ class AuthApi extends ApiClientBase {
     try {
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/auth/webauthn/login/options'),
-        headers: headers(null),
+        headers: _webAuthnHeaders(null),
         body: jsonEncode({
           if (emailOrMatricula != null && emailOrMatricula.isNotEmpty) 'emailOrMatricula': emailOrMatricula,
         }),
@@ -425,7 +431,7 @@ class AuthApi extends ApiClientBase {
     try {
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/auth/webauthn/login/verify'),
-        headers: headers(null),
+        headers: _webAuthnHeaders(null),
         body: jsonEncode({
           'challengeKey': challengeKey,
           'response': responsePayload
@@ -443,7 +449,7 @@ class AuthApi extends ApiClientBase {
           statusCode: 200,
         );
       }
-      return ApiResponse(success: false, error: body['error'] ?? 'Falha na autenticação biométrica.', statusCode: response.statusCode);
+      return ApiResponse(success: false, error: body['error'] ?? 'Falha na validação biométrica.', statusCode: response.statusCode);
     } catch (e) {
       return ApiResponse(success: false, error: 'Erro de conexão: $e', statusCode: 0);
     }
@@ -453,7 +459,7 @@ class AuthApi extends ApiClientBase {
     try {
       final response = await http.get(
         Uri.parse('${AppConstants.baseUrl}/auth/webauthn/devices'),
-        headers: headers(token),
+        headers: _webAuthnHeaders(token),
       );
       final body = jsonDecode(response.body);
       if (response.statusCode == 200) {
@@ -469,7 +475,7 @@ class AuthApi extends ApiClientBase {
     try {
       final response = await http.delete(
         Uri.parse('${AppConstants.baseUrl}/auth/webauthn/devices/$deviceId'),
-        headers: headers(token),
+        headers: _webAuthnHeaders(token),
       );
       final body = jsonDecode(response.body);
       if (response.statusCode == 200) {

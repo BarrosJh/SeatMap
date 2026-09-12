@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { WebAuthnService } from '../../services/webAuthnService';
 import { TokenService } from '../../services/tokenService';
+import { ConfigService } from '../../services/configService';
 import { AuditService } from '../../services/auditService';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
@@ -12,8 +13,26 @@ const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
 
 export class WebAuthnController {
+  private static async validatePwaExclusive(req: Request): Promise<boolean> {
+    const isPwaExclusiva = (await ConfigService.get('BIOMETRIA_PWA_EXCLUSIVA', 'true')) === 'true';
+    if (!isPwaExclusiva) return true;
+
+    const clientMode = req.headers['x-client-mode'] as string | undefined;
+    const isPwaHeader = clientMode === 'pwa-standalone' || clientMode === 'standalone';
+    const referrer = req.headers['referrer'] || req.headers['referer'];
+    const isAndroidApp = typeof referrer === 'string' && referrer.startsWith('android-app://');
+
+    return isPwaHeader || Boolean(isAndroidApp);
+  }
+
   public static async registerOptions(req: AuthenticatedRequest, res: Response) {
     try {
+      if (!(await WebAuthnController.validatePwaExclusive(req))) {
+        return res.status(403).json({
+          error: 'A autenticação biométrica é autorizada exclusivamente no aplicativo PWA corporativo instalado.'
+        });
+      }
+
       const user = req.user;
       if (!user) {
         return res.status(401).json({ error: 'Não autenticado.' });
@@ -37,6 +56,12 @@ export class WebAuthnController {
     const userAgent = AuditService.getUserAgent(req);
 
     try {
+      if (!(await WebAuthnController.validatePwaExclusive(req))) {
+        return res.status(403).json({
+          error: 'A autenticação biométrica é autorizada exclusivamente no aplicativo PWA corporativo instalado.'
+        });
+      }
+
       const user = req.user;
       if (!user) {
         return res.status(401).json({ error: 'Não autenticado.' });
@@ -79,6 +104,12 @@ export class WebAuthnController {
 
   public static async loginOptions(req: Request, res: Response) {
     try {
+      if (!(await WebAuthnController.validatePwaExclusive(req))) {
+        return res.status(403).json({
+          error: 'A autenticação biométrica é autorizada exclusivamente no aplicativo PWA corporativo instalado.'
+        });
+      }
+
       const { emailOrMatricula } = req.body || {};
       const rpId = WebAuthnService.getRpId(req.headers.origin as string, req.headers.host);
 
@@ -104,6 +135,12 @@ export class WebAuthnController {
     }
 
     try {
+      if (!(await WebAuthnController.validatePwaExclusive(req))) {
+        return res.status(403).json({
+          error: 'A autenticação biométrica é autorizada exclusivamente no aplicativo PWA corporativo instalado.'
+        });
+      }
+
       const rpId = WebAuthnService.getRpId(req.headers.origin as string, req.headers.host);
       const expectedOrigin = WebAuthnService.getExpectedOrigin(req.headers.origin as string, req.headers.host);
 

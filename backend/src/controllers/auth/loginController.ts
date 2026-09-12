@@ -435,6 +435,8 @@ export class LoginController {
       const autoLockMinutos = await ConfigService.getNumber('AUTO_LOCK_MINUTOS', 15);
       const mfaPolicy = await ConfigService.get('MFA_POLICY', 'OBRIGATORIO_RH');
       const ssoEnabled = (await ConfigService.get('SSO_ENABLED', 'false')) === 'true';
+      const biometriaHabilitada = (await ConfigService.get('BIOMETRIA_HABILITADA', 'true')) === 'true';
+      const biometriaPwaExclusiva = (await ConfigService.get('BIOMETRIA_PWA_EXCLUSIVA', 'true')) === 'true';
 
       return res.status(200).json({
         autoLock: {
@@ -446,6 +448,10 @@ export class LoginController {
         },
         sso: {
           enabled: ssoEnabled
+        },
+        biometria: {
+          habilitada: biometriaHabilitada,
+          pwaExclusiva: biometriaPwaExclusiva
         }
       });
     } catch (error) {
