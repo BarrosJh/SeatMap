@@ -19,6 +19,9 @@
 
   <title>SeatMap - Reserva de Assentos</title>
   <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
   <link rel="manifest" href="manifest.json">
   <style>
     body {
@@ -34,6 +37,13 @@
 </head>
 <body>
   <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js').catch(function(err) {
+          console.debug('PWA Service Worker registration skipped:', err);
+        });
+      });
+    }
     window._flutter = {
       config: {
         useLocalCanvasKit: true,
