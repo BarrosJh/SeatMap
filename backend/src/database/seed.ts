@@ -333,13 +333,9 @@ async function runSeed() {
       ('SSO_AUTO_PROVISION', 'true', 'Auto-provisionamento de colaboradores via SSO'),
       ('SSO_DEFAULT_ROLE', 'COLABORADOR', 'Perfil padrão atribuído a novos usuários via SSO'),
       ('SSO_ENFORCE_FOR_DOMAINS', 'false', 'Forçar uso exclusivo de SSO para domínios corporativos'),
-      ('SSO_GOOGLE_ENABLED', 'false', 'Google Workspace SSO ativo/inativo'),
-      ('SSO_GOOGLE_CLIENT_ID', '', 'Google OAuth2 Client ID'),
       ('SSO_AZURE_ENABLED', 'false', 'Microsoft Entra ID / Azure AD SSO ativo/inativo'),
       ('SSO_AZURE_CLIENT_ID', '', 'Azure AD Application (client) ID'),
-      ('SSO_AZURE_TENANT_ID', '', 'Azure AD Directory (tenant) ID'),
-      ('SSO_OKTA_ENABLED', 'false', 'Okta Enterprise SSO ativo/inativo'),
-      ('SSO_OKTA_CLIENT_ID', '', 'Okta Client ID')
+      ('SSO_AZURE_TENANT_ID', '', 'Azure AD Directory (tenant) ID')
       ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, descricao = EXCLUDED.descricao;
     `);
 

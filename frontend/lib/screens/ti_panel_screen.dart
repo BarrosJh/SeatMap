@@ -77,23 +77,6 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
   final _ssoAzureSecurityGroupController = TextEditingController();
   final _ssoAzureRedirectUriController = TextEditingController();
 
-  // Google Workspace
-  bool _ssoGoogleEnabled = false;
-  final _ssoGoogleClientIdController = TextEditingController();
-  final _ssoGoogleSecretController = TextEditingController();
-  bool _ssoGoogleSecretObscure = true;
-  bool _ssoGoogleSecretConfigured = false;
-  final _ssoGoogleHdController = TextEditingController();
-  final _ssoGoogleRedirectUriController = TextEditingController();
-
-  // SAML 2.0 / Okta Enterprise
-  bool _ssoOktaEnabled = false;
-  final _ssoOktaDomainController = TextEditingController();
-  final _ssoOktaClientIdController = TextEditingController();
-  final _ssoOktaSecretController = TextEditingController();
-  bool _ssoOktaSecretObscure = true;
-  bool _ssoOktaSecretConfigured = false;
-
   // TAB 3: Gestão de Usuários (T.I.)
   List<AdminUsuarioModel> _usuarios = [];
   List<DepartamentoModel> _departamentos = [];
@@ -154,13 +137,6 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
     _ssoAzureScopesController.dispose();
     _ssoAzureSecurityGroupController.dispose();
     _ssoAzureRedirectUriController.dispose();
-    _ssoGoogleClientIdController.dispose();
-    _ssoGoogleSecretController.dispose();
-    _ssoGoogleHdController.dispose();
-    _ssoGoogleRedirectUriController.dispose();
-    _ssoOktaDomainController.dispose();
-    _ssoOktaClientIdController.dispose();
-    _ssoOktaSecretController.dispose();
     _searchUsuarioController.dispose();
     _loteTextController.dispose();
     _loteDefaultSenhaController.dispose();
@@ -393,9 +369,7 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
       final mfa = data['mfa'] ?? {};
       final autoLock = data['autoLock'] ?? {};
       final sso = data['sso'] ?? {};
-      final google = sso['google'] ?? {};
       final azure = sso['azure'] ?? {};
-      final okta = sso['okta'] ?? {};
 
       setState(() {
         _emailProvider = email['provider'] ?? 'RESEND';
@@ -438,23 +412,6 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
         _ssoAzureRedirectUriController.text = (azure['redirectUri'] != null && (azure['redirectUri'] as String).isNotEmpty)
             ? azure['redirectUri']
             : 'https://sistema.suaempresa.com.br/api/auth/sso/callback/azure';
-
-        // Google Workspace
-        _ssoGoogleEnabled = google['enabled'] == true;
-        _ssoGoogleClientIdController.text = google['clientId'] ?? '';
-        _ssoGoogleSecretConfigured = google['secretConfigured'] == true;
-        _ssoGoogleSecretController.text = _ssoGoogleSecretConfigured ? '••••••••••••' : '';
-        _ssoGoogleHdController.text = google['hd'] ?? '';
-        _ssoGoogleRedirectUriController.text = (google['redirectUri'] != null && (google['redirectUri'] as String).isNotEmpty)
-            ? google['redirectUri']
-            : 'https://sistema.suaempresa.com.br/api/auth/sso/callback/google';
-
-        // Okta / SAML 2.0
-        _ssoOktaEnabled = okta['enabled'] == true;
-        _ssoOktaDomainController.text = okta['domain'] ?? '';
-        _ssoOktaClientIdController.text = okta['clientId'] ?? '';
-        _ssoOktaSecretConfigured = okta['secretConfigured'] == true;
-        _ssoOktaSecretController.text = _ssoOktaSecretConfigured ? '••••••••••••' : '';
       });
     }
   }
@@ -595,25 +552,10 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
       'ssoAzureScopes': _ssoAzureScopesController.text.trim(),
       'ssoAzureSecurityGroup': _ssoAzureSecurityGroupController.text.trim(),
       'ssoAzureRedirectUri': _ssoAzureRedirectUriController.text.trim(),
-      // Google Workspace
-      'ssoGoogleEnabled': _ssoGoogleEnabled,
-      'ssoGoogleClientId': _ssoGoogleClientIdController.text.trim(),
-      'ssoGoogleHd': _ssoGoogleHdController.text.trim(),
-      'ssoGoogleRedirectUri': _ssoGoogleRedirectUriController.text.trim(),
-      // Okta / SAML 2.0
-      'ssoOktaEnabled': _ssoOktaEnabled,
-      'ssoOktaDomain': _ssoOktaDomainController.text.trim(),
-      'ssoOktaClientId': _ssoOktaClientIdController.text.trim(),
     };
 
     final azSec = _ssoAzureSecretController.text.trim();
     if (azSec.isNotEmpty && azSec != '••••••••••••') payload['ssoAzureClientSecret'] = azSec;
-
-    final gSec = _ssoGoogleSecretController.text.trim();
-    if (gSec.isNotEmpty && gSec != '••••••••••••') payload['ssoGoogleClientSecret'] = gSec;
-
-    final okSec = _ssoOktaSecretController.text.trim();
-    if (okSec.isNotEmpty && okSec != '••••••••••••') payload['ssoOktaClientSecret'] = okSec;
 
     final res = await _apiService.updateConfiguracoesTi(auth.token!, payload);
     setState(() => _isSavingSecurity = false);
@@ -769,23 +711,6 @@ class _TiPanelScreenState extends State<TiPanelScreen> with SingleTickerProvider
                   ssoAzureRedirectUriController: _ssoAzureRedirectUriController,
                   ssoAzureScopesController: _ssoAzureScopesController,
                   ssoAzureSecurityGroupController: _ssoAzureSecurityGroupController,
-                  ssoGoogleEnabled: _ssoGoogleEnabled,
-                  onSsoGoogleEnabledChanged: (v) => setState(() => _ssoGoogleEnabled = v),
-                  ssoGoogleClientIdController: _ssoGoogleClientIdController,
-                  ssoGoogleSecretController: _ssoGoogleSecretController,
-                  ssoGoogleSecretObscure: _ssoGoogleSecretObscure,
-                  ssoGoogleSecretConfigured: _ssoGoogleSecretConfigured,
-                  onToggleGoogleSecretObscure: () => setState(() => _ssoGoogleSecretObscure = !_ssoGoogleSecretObscure),
-                  ssoGoogleHdController: _ssoGoogleHdController,
-                  ssoGoogleRedirectUriController: _ssoGoogleRedirectUriController,
-                  ssoOktaEnabled: _ssoOktaEnabled,
-                  onSsoOktaEnabledChanged: (v) => setState(() => _ssoOktaEnabled = v),
-                  ssoOktaDomainController: _ssoOktaDomainController,
-                  ssoOktaClientIdController: _ssoOktaClientIdController,
-                  ssoOktaSecretController: _ssoOktaSecretController,
-                  ssoOktaSecretObscure: _ssoOktaSecretObscure,
-                  ssoOktaSecretConfigured: _ssoOktaSecretConfigured,
-                  onToggleOktaSecretObscure: () => setState(() => _ssoOktaSecretObscure = !_ssoOktaSecretObscure),
                   isSaving: _isSavingSecurity,
                   onSalvar: _salvarSegurancaESso,
                 ),

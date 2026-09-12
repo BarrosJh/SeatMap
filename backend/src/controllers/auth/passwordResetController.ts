@@ -23,7 +23,7 @@ export class PasswordResetController {
       const userRes = await pool.query(`
         SELECT id, nome, email, matricula, ativo
         FROM usuarios
-        WHERE (email = $1 OR matricula = $1) AND ativo = true
+        WHERE (LOWER(email) = LOWER($1) OR LOWER(matricula) = LOWER($1)) AND ativo = true
       `, [login.trim()]);
 
       if (userRes.rowCount === 0) {
@@ -102,7 +102,7 @@ export class PasswordResetController {
       const userRes = await pool.query(`
         SELECT id, nome, email
         FROM usuarios
-        WHERE (email = $1 OR matricula = $1) AND ativo = true
+        WHERE (LOWER(email) = LOWER($1) OR LOWER(matricula) = LOWER($1)) AND ativo = true
       `, [String(login).trim()]);
 
       if (userRes.rowCount === 0) {

@@ -27,7 +27,7 @@ class TabTiSegurancaSso extends StatelessWidget {
   final bool ssoEnforceForDomains;
   final ValueChanged<bool> onSsoEnforceChanged;
 
-  // Azure AD
+  // Azure AD / Microsoft Entra ID
   final bool ssoAzureEnabled;
   final ValueChanged<bool> onSsoAzureEnabledChanged;
   final String ssoAzureTenantType;
@@ -41,27 +41,6 @@ class TabTiSegurancaSso extends StatelessWidget {
   final TextEditingController ssoAzureRedirectUriController;
   final TextEditingController ssoAzureScopesController;
   final TextEditingController ssoAzureSecurityGroupController;
-
-  // Google
-  final bool ssoGoogleEnabled;
-  final ValueChanged<bool> onSsoGoogleEnabledChanged;
-  final TextEditingController ssoGoogleClientIdController;
-  final TextEditingController ssoGoogleSecretController;
-  final bool ssoGoogleSecretObscure;
-  final bool ssoGoogleSecretConfigured;
-  final VoidCallback onToggleGoogleSecretObscure;
-  final TextEditingController ssoGoogleHdController;
-  final TextEditingController ssoGoogleRedirectUriController;
-
-  // Okta
-  final bool ssoOktaEnabled;
-  final ValueChanged<bool> onSsoOktaEnabledChanged;
-  final TextEditingController ssoOktaDomainController;
-  final TextEditingController ssoOktaClientIdController;
-  final TextEditingController ssoOktaSecretController;
-  final bool ssoOktaSecretObscure;
-  final bool ssoOktaSecretConfigured;
-  final VoidCallback onToggleOktaSecretObscure;
 
   // Salvar
   final bool isSaving;
@@ -101,23 +80,6 @@ class TabTiSegurancaSso extends StatelessWidget {
     required this.ssoAzureRedirectUriController,
     required this.ssoAzureScopesController,
     required this.ssoAzureSecurityGroupController,
-    required this.ssoGoogleEnabled,
-    required this.onSsoGoogleEnabledChanged,
-    required this.ssoGoogleClientIdController,
-    required this.ssoGoogleSecretController,
-    required this.ssoGoogleSecretObscure,
-    required this.ssoGoogleSecretConfigured,
-    required this.onToggleGoogleSecretObscure,
-    required this.ssoGoogleHdController,
-    required this.ssoGoogleRedirectUriController,
-    required this.ssoOktaEnabled,
-    required this.onSsoOktaEnabledChanged,
-    required this.ssoOktaDomainController,
-    required this.ssoOktaClientIdController,
-    required this.ssoOktaSecretController,
-    required this.ssoOktaSecretObscure,
-    required this.ssoOktaSecretConfigured,
-    required this.onToggleOktaSecretObscure,
     required this.isSaving,
     required this.onSalvar,
   });
@@ -465,211 +427,6 @@ class TabTiSegurancaSso extends StatelessWidget {
                                   hintText: 'Opcional (ex: GUID do Grupo no Entra)',
                                   helperText: 'Se informado, apenas membros deste grupo poderão logar.',
                                   border: OutlineInputBorder(),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // 4. Google Workspace
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: ssoGoogleEnabled ? const Color(0xFFEA4335) : const Color(0xFFE2E8F0), width: ssoGoogleEnabled ? 1.5 : 1.0),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEA4335).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.g_mobiledata_rounded, color: Color(0xFFEA4335), size: 24),
-                              ),
-                              const SizedBox(width: 12),
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Google Workspace & Cloud Identity', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                  Text('Single Sign-On com Contas Corporativas Google Workspace', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Switch(
-                            value: ssoGoogleEnabled,
-                            activeThumbColor: const Color(0xFFEA4335),
-                            onChanged: onSsoGoogleEnabledChanged,
-                          ),
-                        ],
-                      ),
-                      if (ssoGoogleEnabled) ...[
-                        const Divider(height: 32),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: ssoGoogleClientIdController,
-                                decoration: const InputDecoration(
-                                  labelText: 'ID do Cliente OAuth 2.0 (Client ID) *',
-                                  hintText: '000000000000-xxxx.apps.googleusercontent.com',
-                                  border: OutlineInputBorder(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextFormField(
-                                controller: ssoGoogleSecretController,
-                                obscureText: ssoGoogleSecretObscure,
-                                decoration: InputDecoration(
-                                  labelText: ssoGoogleSecretConfigured ? 'Segredo do Cliente (Criptografado AES-256)' : 'Segredo do Cliente (Client Secret) *',
-                                  helperText: 'Criptografado at-rest com AES-256-GCM.',
-                                  border: const OutlineInputBorder(),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(ssoGoogleSecretObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                                    onPressed: onToggleGoogleSecretObscure,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: ssoGoogleHdController,
-                          decoration: const InputDecoration(
-                            labelText: 'Restrição de Domínio Hospedado (Hosted Domain - hd)',
-                            hintText: 'empresa.com.br',
-                            helperText: 'Impede login com contas Gmail pessoais (@gmail.com).',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: ssoGoogleRedirectUriController,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText: 'URI de Redirecionamento Autorizada (Google Cloud Console)',
-                            border: const OutlineInputBorder(),
-                            filled: true,
-                            fillColor: const Color(0xFFF1F5F9),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.copy_rounded, color: Color(0xFFEA4335)),
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: ssoGoogleRedirectUriController.text));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('URI copiada!'), duration: Duration(seconds: 2)),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // 5. Okta Enterprise / SAML 2.0
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: ssoOktaEnabled ? const Color(0xFF00297A) : const Color(0xFFE2E8F0), width: ssoOktaEnabled ? 1.5 : 1.0),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF00297A).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.security_rounded, color: Color(0xFF00297A), size: 22),
-                              ),
-                              const SizedBox(width: 12),
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Okta Identity Cloud & SAML 2.0', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                  Text('Integração corporativa para SSO federado via Okta OIDC/SAML', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Switch(
-                            value: ssoOktaEnabled,
-                            activeThumbColor: const Color(0xFF00297A),
-                            onChanged: onSsoOktaEnabledChanged,
-                          ),
-                        ],
-                      ),
-                      if (ssoOktaEnabled) ...[
-                        const Divider(height: 32),
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: ssoOktaDomainController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Domínio Okta (Okta Domain URL) *',
-                                  hintText: 'https://sua-empresa.okta.com',
-                                  border: OutlineInputBorder(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: ssoOktaClientIdController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Client ID Okta *',
-                                  border: OutlineInputBorder(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: ssoOktaSecretController,
-                                obscureText: ssoOktaSecretObscure,
-                                decoration: InputDecoration(
-                                  labelText: ssoOktaSecretConfigured ? 'Client Secret (Criptografado AES-256)' : 'Client Secret / Token *',
-                                  helperText: 'Criptografado com AES-256-GCM.',
-                                  border: const OutlineInputBorder(),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(ssoOktaSecretObscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                                    onPressed: onToggleOktaSecretObscure,
-                                  ),
                                 ),
                               ),
                             ),

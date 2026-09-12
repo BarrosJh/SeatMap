@@ -6,7 +6,7 @@ export const loginSchema = z.object({
 }).strict();
 
 export const ssoLoginSchema = z.object({
-  provider: z.enum(['GOOGLE', 'AZURE', 'OKTA']),
+  provider: z.enum(['AZURE', 'MICROSOFT', 'azure', 'microsoft']),
   idToken: z.string().min(1, 'Token SSO é obrigatório').max(10000),
   email: z.string().email('E-mail inválido').max(255).optional(),
   name: z.string().max(255).optional(),

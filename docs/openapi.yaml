@@ -170,7 +170,7 @@ paths:
     post:
       tags: [Single Sign-On (SSO)]
       summary: Autenticação via Token SSO
-      description: Validação criptográfica do idToken via JWKS do provedor (Azure AD, Google, Okta) com provisionamento JIT.
+      description: Validação criptográfica do idToken via JWKS da Microsoft (Microsoft Entra ID / Azure AD) com provisionamento JIT.
       requestBody:
         required: true
         content:
@@ -181,7 +181,7 @@ paths:
               properties:
                 provider:
                   type: string
-                  enum: [google, azure, okta]
+                  enum: [azure, microsoft]
                 idToken:
                   type: string
       responses:

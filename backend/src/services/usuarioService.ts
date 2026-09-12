@@ -169,7 +169,7 @@ export class UsuarioService {
     }
 
     const checkExists = await pool.query(`
-      SELECT id FROM usuarios WHERE email = $1 OR matricula = $2
+      SELECT id FROM usuarios WHERE LOWER(email) = LOWER($1) OR LOWER(matricula) = LOWER($2)
     `, [email.trim().toLowerCase(), matricula.trim()]);
 
     if (checkExists.rowCount! > 0) {
@@ -246,7 +246,7 @@ export class UsuarioService {
     if (cleanEmail || cleanMatricula) {
       const checkDuplicate = await pool.query(`
         SELECT id FROM usuarios 
-        WHERE ((email = $1 AND $1 IS NOT NULL) OR (matricula = $2 AND $2 IS NOT NULL)) 
+        WHERE ((LOWER(email) = LOWER($1) AND $1 IS NOT NULL) OR (LOWER(matricula) = LOWER($2) AND $2 IS NOT NULL)) 
           AND id != $3
       `, [cleanEmail, cleanMatricula, id]);
 
@@ -474,7 +474,7 @@ export class UsuarioService {
         const hasRh = u.permissao_rh === true || u.permissaoRh === true || perfil === 'ADMIN_RH';
         const hasTi = wantsTi;
 
-        const checkRes = await client.query('SELECT id FROM usuarios WHERE email = $1 OR matricula = $2', [email, matricula]);
+        const checkRes = await client.query('SELECT id FROM usuarios WHERE LOWER(email) = LOWER($1) OR LOWER(matricula) = LOWER($2)', [email, matricula]);
 
         if (checkRes.rowCount! > 0) {
           const existingId = checkRes.rows[0].id;

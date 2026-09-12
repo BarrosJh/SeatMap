@@ -70,9 +70,9 @@ class _LoginScreenState extends State<LoginScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: Row(
                 children: [
-                  Icon(
-                    providerId == 'azure' ? Icons.window_rounded : (providerId == 'google' ? Icons.g_mobiledata_rounded : Icons.shield_rounded),
-                    color: providerId == 'azure' ? const Color(0xFF0078D4) : (providerId == 'google' ? const Color(0xFFEA4335) : const Color(0xFF38BDF8)),
+                  const Icon(
+                    Icons.window_rounded,
+                    color: Color(0xFF0078D4),
                     size: 24,
                   ),
                   const SizedBox(width: 10),
@@ -143,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: providerId == 'azure' ? const Color(0xFF0078D4) : (providerId == 'google' ? const Color(0xFFEA4335) : const Color(0xFF2563EB)),
+                    backgroundColor: const Color(0xFF0078D4),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
@@ -745,21 +745,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 16),
                         ..._ssoProviders.map((prov) {
                           final String id = prov['id'] ?? '';
-                          final String nome = prov['nome'] ?? 'SSO Corporativo';
-                          final bool isAzure = id == 'azure';
-                          final bool isGoogle = id == 'google';
+                          final String nome = prov['nome'] ?? 'Microsoft 365 / Entra ID';
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                backgroundColor: isAzure
-                                    ? const Color(0xFF0078D4).withValues(alpha: 0.12)
-                                    : (isGoogle ? const Color(0xFFEA4335).withValues(alpha: 0.12) : const Color(0xFF334155)),
-                                side: BorderSide(
-                                  color: isAzure
-                                      ? const Color(0xFF0078D4)
-                                      : (isGoogle ? const Color(0xFFEA4335) : const Color(0xFF475569)),
+                                backgroundColor: const Color(0xFF0078D4).withValues(alpha: 0.12),
+                                side: const BorderSide(
+                                  color: Color(0xFF0078D4),
                                   width: 1.2,
                                 ),
                                 padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
@@ -769,10 +763,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    isAzure ? Icons.window_rounded : (isGoogle ? Icons.g_mobiledata_rounded : Icons.lock_outline),
-                                    color: isAzure ? const Color(0xFF0078D4) : (isGoogle ? const Color(0xFFEA4335) : Colors.white),
-                                    size: isGoogle ? 24 : 20,
+                                  const Icon(
+                                    Icons.window_rounded,
+                                    color: Color(0xFF0078D4),
+                                    size: 20,
                                   ),
                                   const SizedBox(width: 10),
                                   Text(

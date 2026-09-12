@@ -4,7 +4,7 @@ import jwt, { JwtHeader } from 'jsonwebtoken';
 import { ConfigService } from './configService';
 
 export interface SsoProviderConfig {
-  id: 'google' | 'azure' | 'okta';
+  id: 'azure' | 'microsoft';
   nome: string;
   ativo: boolean;
   clientId: string;
@@ -85,36 +85,14 @@ export class SsoService {
 
     const providers: Array<{ id: string; nome: string; icon: string; loginUrl?: string }> = [];
 
-    // 1. Google Workspace
-    const googleEnabled = (await ConfigService.get('SSO_GOOGLE_ENABLED', 'false')) === 'true';
-    const googleClientId = (await ConfigService.get('SSO_GOOGLE_CLIENT_ID', '')).trim();
-    if (googleEnabled && googleClientId) {
-      providers.push({
-        id: 'google',
-        nome: 'Google Workspace',
-        icon: 'google'
-      });
-    }
-
-    // 2. Microsoft Azure AD / Entra ID
+    // Microsoft Entra ID / Azure AD
     const azureEnabled = (await ConfigService.get('SSO_AZURE_ENABLED', 'false')) === 'true';
     const azureClientId = (await ConfigService.get('SSO_AZURE_CLIENT_ID', '')).trim();
     if (azureEnabled && azureClientId) {
       providers.push({
         id: 'azure',
-        nome: 'Microsoft 365 / Azure AD',
+        nome: 'Microsoft 365 / Entra ID',
         icon: 'microsoft'
-      });
-    }
-
-    // 3. Okta
-    const oktaEnabled = (await ConfigService.get('SSO_OKTA_ENABLED', 'false')) === 'true';
-    const oktaClientId = (await ConfigService.get('SSO_OKTA_CLIENT_ID', '')).trim();
-    if (oktaEnabled && oktaClientId) {
-      providers.push({
-        id: 'okta',
-        nome: 'Okta Enterprise SSO',
-        icon: 'okta'
       });
     }
 
@@ -142,16 +120,16 @@ export class SsoService {
   }
 
   /**
-   * Valida o idToken emitido pelo provedor de identidade via JWKS
+   * Valida o idToken emitido pelo provedor Microsoft (Entra ID / Azure AD) via JWKS
    */
   public static async verifyIdToken(provider: string, idToken: string): Promise<SsoVerifiedUser> {
     if (!idToken || typeof idToken !== 'string') {
       throw new Error('idToken não fornecido ou inválido.');
     }
 
-    const supportedProviders = ['google', 'azure', 'okta'];
-    if (!supportedProviders.includes(provider)) {
-      throw new Error(`Provedor de SSO '${provider}' não suportado.`);
+    const normalizedProvider = (provider || '').trim().toLowerCase();
+    if (normalizedProvider !== 'azure' && normalizedProvider !== 'microsoft') {
+      throw new Error(`Provedor de SSO '${provider}' não suportado. Apenas autenticação Microsoft (Azure AD / Entra ID) está habilitada.`);
     }
 
     // Decodificar o header sem verificar para obter o `kid`
@@ -166,24 +144,9 @@ export class SsoService {
       throw new Error('O cabeçalho do token JWT não possui Key ID (kid).');
     }
 
-    let jwksUrl = '';
-    let expectedAudience = '';
-
-    if (provider === 'google') {
-      jwksUrl = 'https://www.googleapis.com/oauth2/v3/certs';
-      expectedAudience = (await ConfigService.get('SSO_GOOGLE_CLIENT_ID', '')).trim();
-    } else if (provider === 'azure') {
-      const tenantId = (await ConfigService.get('SSO_AZURE_TENANT_ID', '')).trim() || 'common';
-      jwksUrl = `https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`;
-      expectedAudience = (await ConfigService.get('SSO_AZURE_CLIENT_ID', '')).trim();
-    } else if (provider === 'okta') {
-      const oktaDomain = (await ConfigService.get('SSO_OKTA_DOMAIN', '')).trim();
-      if (!oktaDomain) throw new Error('Domínio Okta não configurado.');
-      jwksUrl = `https://${oktaDomain}/oauth2/v1/keys`;
-      expectedAudience = (await ConfigService.get('SSO_OKTA_CLIENT_ID', '')).trim();
-    } else {
-      throw new Error(`Provedor de SSO '${provider}' não suportado.`);
-    }
+    const tenantId = (await ConfigService.get('SSO_AZURE_TENANT_ID', '')).trim() || 'common';
+    const jwksUrl = `https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`;
+    const expectedAudience = (await ConfigService.get('SSO_AZURE_CLIENT_ID', '')).trim();
 
     const keys = await this.fetchJwks(jwksUrl);
     const jwk = keys.find(k => k.kid === kid);

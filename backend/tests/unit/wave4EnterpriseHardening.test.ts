@@ -324,8 +324,7 @@ describe('Onda 4: Remediação dos 14 Apontamentos Enterprise (SEC, REL, TEC)', 
       const logSpy = jest.spyOn(AuditService, 'log').mockImplementation(() => undefined);
       const querySpy = jest.spyOn(pool, 'query').mockImplementation(async (q: any) => {
         const text = String(q);
-
-        if (text.includes('SELECT id FROM usuarios WHERE email = $1 OR matricula = $2')) {
+        if (text.includes('SELECT id FROM usuarios WHERE') || text.includes('LOWER(email) = LOWER($1)')) {
           return { rowCount: 0, rows: [] } as any;
         }
 

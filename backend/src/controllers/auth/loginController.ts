@@ -49,7 +49,7 @@ export class LoginController {
                u.departamento_id, d.nome AS departamento_nome
         FROM usuarios u
         LEFT JOIN departamentos d ON u.departamento_id = d.id
-        WHERE (u.email = $1 OR u.matricula = $1)
+        WHERE (LOWER(u.email) = LOWER($1) OR LOWER(u.matricula) = LOWER($1))
       `, [login.trim()]);
 
       if (userRes.rowCount === 0) {
@@ -166,7 +166,7 @@ export class LoginController {
             detalhes: { motivo: 'Política de SSO Enforcement ativa' }
           });
           return res.status(403).json({
-            error: 'Sua conta corporativa exige autenticação via Single Sign-On (Microsoft 365 / Google Workspace). Utilize o botão de login SSO.'
+            error: 'Sua conta corporativa exige autenticação via Single Sign-On (Microsoft 365 / Entra ID). Utilize o botão de login SSO.'
           });
         }
       }

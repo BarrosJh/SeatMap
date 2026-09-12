@@ -17,9 +17,7 @@ export const WHITELIST_PARAMETROS = [
   'AUTO_LOCK_MINUTOS',
   'TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS',
   'AUTO_LOCK_ATIVO',
-  'SSO_GOOGLE_ATIVO',
   'SSO_AZURE_ATIVO',
-  'SSO_OKTA_ATIVO',
   'EXIGIR_MFA_ADMINS',
   'EXIGIR_MFA_GLOBAL',
   'SCIM_PROVISIONING_ATIVO',
@@ -30,9 +28,7 @@ export const WHITELIST_PARAMETROS = [
   'SSO_ENABLED',
   'SSO_AUTO_PROVISION',
   'SSO_ENFORCE_FOR_DOMAINS',
-  'SSO_GOOGLE_ENABLED',
   'SSO_AZURE_ENABLED',
-  'SSO_OKTA_ENABLED',
   'SMTP_SECURE',
   'AVISO_GLOBAL_SISTEMA',
   'SMTP_PORT',
@@ -83,9 +79,7 @@ export function validateSingleParam(chave: string, valor: string): { valid: bool
       return { valid: true };
     }
     case 'AUTO_LOCK_ATIVO':
-    case 'SSO_GOOGLE_ATIVO':
     case 'SSO_AZURE_ATIVO':
-    case 'SSO_OKTA_ATIVO':
     case 'EXIGIR_MFA_ADMINS':
     case 'EXIGIR_MFA_GLOBAL':
     case 'SCIM_PROVISIONING_ATIVO':
@@ -96,9 +90,7 @@ export function validateSingleParam(chave: string, valor: string): { valid: bool
     case 'SSO_ENABLED':
     case 'SSO_AUTO_PROVISION':
     case 'SSO_ENFORCE_FOR_DOMAINS':
-    case 'SSO_GOOGLE_ENABLED':
     case 'SSO_AZURE_ENABLED':
-    case 'SSO_OKTA_ENABLED':
     case 'SMTP_SECURE': {
       if (val !== 'true' && val !== 'false') {
         return { valid: false, error: `${chave} deve ser um valor booleano ('true' ou 'false').` };

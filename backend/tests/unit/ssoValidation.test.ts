@@ -5,16 +5,19 @@ describe('Validação de Segurança SSO & Configuração', () => {
   describe('SsoService.verifyIdToken', () => {
     it('deve rejeitar tokens vazios ou nulos com erro explícito', async () => {
       // @ts-ignore
-      await expect(SsoService.verifyIdToken('google', null)).rejects.toThrow('idToken não fornecido');
-      await expect(SsoService.verifyIdToken('azure', '')).rejects.toThrow('idToken não fornecido');
+      await expect(SsoService.verifyIdToken('azure', null)).rejects.toThrow('idToken não fornecido');
+      await expect(SsoService.verifyIdToken('microsoft', '')).rejects.toThrow('idToken não fornecido');
     });
 
-    it('deve rejeitar provedor não suportado', async () => {
+    it('deve rejeitar provedor não suportado (ex: google, okta, facebook)', async () => {
+      await expect(SsoService.verifyIdToken('google', 'dummy.jwt.token')).rejects.toThrow('não suportado');
+      await expect(SsoService.verifyIdToken('okta', 'dummy.jwt.token')).rejects.toThrow('não suportado');
       await expect(SsoService.verifyIdToken('facebook', 'dummy.jwt.token')).rejects.toThrow('não suportado');
     });
 
     it('deve rejeitar tokens malformados que não são JWTs válidos', async () => {
-      await expect(SsoService.verifyIdToken('google', 'invalid_jwt_format')).rejects.toThrow();
+      await expect(SsoService.verifyIdToken('azure', 'invalid_jwt_format')).rejects.toThrow();
+      await expect(SsoService.verifyIdToken('microsoft', 'invalid_jwt_format')).rejects.toThrow();
     });
   });
 
