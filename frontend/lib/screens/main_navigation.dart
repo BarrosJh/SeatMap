@@ -15,6 +15,7 @@ import 'navigation/widgets/corporate_top_bar.dart';
 import 'navigation/widgets/mobile_app_bar.dart';
 import 'navigation/widgets/mobile_bottom_bar.dart';
 import 'navigation/widgets/office_selector_sheet.dart';
+import '../widgets/biometria_dialog.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -31,11 +32,15 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
       if (auth.token != null && auth.user != null) {
         seatProvider.carregarInicial(auth.token!, auth.user!);
+      }
+      if (auth.shouldSuggestBiometrics && mounted) {
+        auth.clearShouldSuggestBiometrics();
+        await BiometriaDialog.showSugestao(context, auth);
       }
     });
   }

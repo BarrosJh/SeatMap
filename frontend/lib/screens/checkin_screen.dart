@@ -42,7 +42,7 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
 
   void _initScanner() {
     _scannerController = MobileScannerController(
-      autoStart: widget.isActive,
+      autoStart: true,
       detectionSpeed: DetectionSpeed.normal,
       facing: CameraFacing.back,
       torchEnabled: false,
@@ -54,10 +54,14 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
   void didUpdateWidget(CheckinScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
-      _scannerController.start();
+      try {
+        _scannerController.start();
+      } catch (_) {}
       _scanLineAnim.repeat(reverse: true);
     } else if (!widget.isActive && oldWidget.isActive) {
-      _scannerController.stop();
+      try {
+        _scannerController.stop();
+      } catch (_) {}
       _scanLineAnim.stop();
       _scanLineAnim.reset();
     }
@@ -66,10 +70,14 @@ class _CheckinScreenState extends State<CheckinScreen> with SingleTickerProvider
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
-      _scannerController.stop();
+      try {
+        _scannerController.stop();
+      } catch (_) {}
       _scanLineAnim.stop();
     } else if (state == AppLifecycleState.resumed && widget.isActive) {
-      _scannerController.start();
+      try {
+        _scannerController.start();
+      } catch (_) {}
       _scanLineAnim.repeat(reverse: true);
     }
   }

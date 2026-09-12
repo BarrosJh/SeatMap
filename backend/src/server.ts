@@ -110,6 +110,14 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+// Permissions-Policy e Headers para o PWA (Câmera liberada para QR Code scanner)
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api')) {
+    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+  }
+  next();
+});
+
 // Servir Aplicação Flutter Web (Frontend Monolith) se a pasta public existir
 const publicPath = path.join(__dirname, '../public');
 if (fs.existsSync(publicPath)) {

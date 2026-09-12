@@ -27,6 +27,7 @@ class AuthProvider extends ChangeNotifier {
   bool _autoLockAtivo = true;
   int _autoLockMinutos = 15;
   bool _isSessionLocked = false;
+  bool _shouldSuggestBiometrics = false;
 
   UserModel? get user => _user;
   String? get token => _token;
@@ -38,6 +39,11 @@ class AuthProvider extends ChangeNotifier {
   bool get requiresMfaStep => _mfaTempToken != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get shouldSuggestBiometrics => _shouldSuggestBiometrics;
+
+  void clearShouldSuggestBiometrics() {
+    _shouldSuggestBiometrics = false;
+  }
   bool get isAuthenticated =>
       _token != null && _user != null && _isTokenUsable(_token!);
   bool get isAdminStepUpAuthenticated =>
@@ -182,6 +188,13 @@ class AuthProvider extends ChangeNotifier {
         await _secureStorage.saveRefreshToken(_refreshToken!);
       }
       await _secureStorage.saveUserData(_user!.toJsonString());
+
+      try {
+        final bioSupported = await isBiometricsAvailable();
+        if (bioSupported) {
+          _shouldSuggestBiometrics = true;
+        }
+      } catch (_) {}
 
       notifyListeners();
       return true;

@@ -67,14 +67,35 @@ class CheckinScannerView extends StatelessWidget {
                         const Icon(Icons.videocam_off_rounded, color: Colors.white70, size: 48),
                         const SizedBox(height: 12),
                         Text(
-                          'Câmera não disponível: ${error.errorCode}',
+                          'Acesso à Câmera: ${error.errorCode}',
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.white, fontSize: 14),
                         ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Certifique-se de permitir o uso da câmera no navegador do celular.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                        ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () async {
+                            try {
+                              await scannerController.start();
+                            } catch (_) {}
+                          },
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Permitir / Iniciar Câmera'),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(foregroundColor: Colors.white70),
                           onPressed: onManualInput,
-                          icon: const Icon(Icons.keyboard_outlined),
+                          icon: const Icon(Icons.keyboard_outlined, size: 18),
                           label: const Text('Digitar Código Manualmente'),
                         ),
                       ],
