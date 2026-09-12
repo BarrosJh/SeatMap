@@ -55,7 +55,6 @@ router.get('/usuarios', heavyQueryLimiter, requirePermission('usuarios:read'), v
 router.post('/usuarios', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ body: criarUsuarioSchema }), AdminUsuariosController.criarUsuario);
 router.put('/usuarios/:id', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ params: idParamSchema, body: editarUsuarioSchema }), AdminUsuariosController.updateUsuario);
 router.patch('/usuarios/:id/status', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ params: idParamSchema, body: alterarStatusUsuarioSchema }), AdminUsuariosController.toggleStatusUsuario);
-router.put('/usuarios/:id/status', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ params: idParamSchema, body: alterarStatusUsuarioSchema }), AdminUsuariosController.toggleStatusUsuario);
 router.post('/usuarios/:id/reset-senha', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ params: idParamSchema, body: resetSenhaUsuarioSchema }), AdminUsuariosController.resetSenhaUsuario);
 router.post('/usuarios/importar-lote', batchLimiter, requirePermission('usuarios:write'), validateRequest({ body: importarLoteUsuariosSchema }), AdminUsuariosController.importarLoteUsuarios);
 

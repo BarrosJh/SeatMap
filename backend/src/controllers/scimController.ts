@@ -204,11 +204,13 @@ export class ScimController {
       const nome = (displayName || (name && name.formatted) || (name ? `${name.givenName || ''} ${name.familyName || ''}`.trim() : '') || email.split('@')[0]).trim();
       const matricula = (externalId || email.split('@')[0] || `SCIM_${Date.now()}`).trim();
 
-      if (!email) {
+      const RFC5322_EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+      if (!email || !RFC5322_EMAIL_REGEX.test(email)) {
         return res.status(400).json({
           schemas: [SCIM_ERROR_SCHEMA],
+          scimType: 'invalidValue',
           status: '400',
-          detail: 'O campo userName ou emails é obrigatório para provisionamento SCIM.'
+          detail: 'O campo userName ou emails deve conter um endereço de e-mail válido (RFC 5322).'
         });
       }
 
@@ -292,7 +294,7 @@ export class ScimController {
         });
       }
 
-      if (active === false || active !== undefined) {
+      if (active === false) {
         await TokenService.incrementarTokenVersion(numericId);
       }
 
@@ -371,7 +373,7 @@ export class ScimController {
         });
       }
 
-      if (novoAtivo === false || novoAtivo !== null) {
+      if (novoAtivo === false) {
         await TokenService.incrementarTokenVersion(numericId);
       }
 

@@ -55,6 +55,15 @@ export class TiController {
       const autoLockAtivo = (await ConfigService.get('AUTO_LOCK_ATIVO', 'true')) === 'true';
       const autoLockMinutos = await ConfigService.getNumber('AUTO_LOCK_MINUTOS', 15);
 
+      const smtpPayload = {
+        host: smtpHost,
+        port: parseInt(smtpPort, 10),
+        secure: smtpSecure === 'true',
+        user: smtpUser,
+        passConfigured: rawPass.length > 0 && !rawPass.startsWith('re_'),
+        emailFrom
+      };
+
       res.status(200).json({
         email: {
           provider: activeProvider,
@@ -62,22 +71,9 @@ export class TiController {
           resend: {
             apiKeyConfigured: resendApiKeyRaw.length > 0 || rawPass.startsWith('re_')
           },
-          smtp: {
-            host: smtpHost,
-            port: parseInt(smtpPort, 10),
-            secure: smtpSecure === 'true',
-            user: smtpUser,
-            passConfigured: rawPass.length > 0 && !rawPass.startsWith('re_')
-          }
+          smtp: smtpPayload
         },
-        smtp: {
-          host: smtpHost,
-          port: parseInt(smtpPort, 10),
-          secure: smtpSecure === 'true',
-          user: smtpUser,
-          passConfigured: rawPass.length > 0,
-          emailFrom
-        },
+        smtp: smtpPayload,
         mfa: {
           expiracaoMinutos: mfaExpiracao,
           maxTentativas: mfaMaxTentativas,
@@ -100,12 +96,13 @@ export class TiController {
             tenantType: ssoAzureTenantType,
             tenantId: ssoAzureTenantId,
             clientId: ssoAzureClientId,
+            clientSecretConfigured: azureSecretRaw.length > 0,
             scopes: ssoAzureScopes,
             securityGroup: ssoAzureSecurityGroup,
-            redirectUri: ssoAzureRedirectUri,
-            secretConfigured: azureSecretRaw.length > 0
+            redirectUri: ssoAzureRedirectUri
           }
-        }
+        },
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
       logger.error('[TiController.getConfiguracoesTi Error]:', { correlationId: (req as any).correlationId, error });
@@ -114,7 +111,7 @@ export class TiController {
   }
 
   /**
-   * Atualiza as configurações de TI (SMTP, MFA e SSO)
+   * Salva configurações de TI com validação e criptografia AES-256-GCM
    */
   public static async updateConfiguracoesTi(req: Request, res: Response): Promise<void> {
     try {
@@ -196,6 +193,7 @@ export class TiController {
       if (ssoAzureSecurityGroup !== undefined) await ConfigService.set('SSO_AZURE_SECURITY_GROUP', String(ssoAzureSecurityGroup).trim(), 'Azure Security Group');
       if (ssoAzureRedirectUri !== undefined) await ConfigService.set('SSO_AZURE_REDIRECT_URI', String(ssoAzureRedirectUri).trim(), 'Azure Redirect URI');
 
+      ConfigService.invalidateCache();
       EmailService.resetTransporter();
 
       res.status(200).json({
@@ -214,8 +212,9 @@ export class TiController {
   public static async testarConexaoEmail(req: Request, res: Response): Promise<void> {
     try {
       const { emailDestino } = req.body;
-      if (!emailDestino || !emailDestino.includes('@')) {
-        res.status(400).json({ error: 'E-mail de destino válido é obrigatório para o teste.' });
+      const RFC5322_EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+      if (!emailDestino || typeof emailDestino !== 'string' || !RFC5322_EMAIL_REGEX.test(emailDestino.trim()) || emailDestino.includes('\n') || emailDestino.includes('\r')) {
+        res.status(400).json({ error: 'E-mail de destino válido (RFC 5322) é obrigatório para o teste.' });
         return;
       }
 

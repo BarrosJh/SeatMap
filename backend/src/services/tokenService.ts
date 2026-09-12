@@ -5,6 +5,7 @@ import pool from '../config/db';
 import { AuditService } from './auditService';
 import { env } from '../config/env';
 import { toUserResponseDto } from '../utils/userDtoMapper';
+import { logger } from '../utils/logger';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -38,28 +39,26 @@ export class TokenService {
   ): Promise<string> {
     const rawRefreshToken = crypto.randomBytes(40).toString('hex');
     const tokenHash = this.hashToken(rawRefreshToken);
-    const famId = familyId || crypto.randomUUID();
-    const expiraEm = DateTime.now().setZone('America/Sao_Paulo').plus({ days: REFRESH_TOKEN_DAYS }).toJSDate();
+    const finalFamilyId = familyId || crypto.randomUUID();
+    const expiraEm = DateTime.now().plus({ days: REFRESH_TOKEN_DAYS }).toJSDate();
 
     await pool.query(`
-      INSERT INTO auth_refresh_tokens (
-        usuario_id, token_hash, family_id, expira_em, ip, user_agent, revogado, criado_em
-      ) VALUES ($1, $2, $3, $4, $5, $6, false, NOW())
-    `, [usuarioId, tokenHash, famId, expiraEm, ip, userAgent]);
+      INSERT INTO auth_refresh_tokens (usuario_id, token_hash, family_id, expira_em, ip, user_agent)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [usuarioId, tokenHash, finalFamilyId, expiraEm, ip, userAgent]);
 
     return rawRefreshToken;
   }
 
   /**
-   * Rotaciona um Refresh Token emitindo um novo par de Access Token (15m) e Refresh Token (7d).
-   * Implementa detecção e bloqueio de Replay Attacks e Timeout Absoluto de 60 minutos.
+   * Valida o refresh token, detecta reuso (replay attack), aplica timeout de 60m e rotaciona
    */
   public static async rotacionarRefreshToken(
     rawRefreshToken: string,
     ip: string,
     userAgent: string
   ): Promise<TokenPairResult> {
-    if (!rawRefreshToken || typeof rawRefreshToken !== 'string') {
+    if (!rawRefreshToken) {
       return { success: false, error: 'Refresh token não fornecido.' };
     }
 
@@ -80,7 +79,11 @@ export class TokenService {
 
       // 1. Detecção de Ataque de Repetição (Token Replay)
       if (tokenRecord.revogado) {
-        console.warn(`[TokenService] Tentativa de reuso de Refresh Token detectada! Revogando família ${tokenRecord.family_id}`);
+        logger.warn(`[TokenService] Tentativa de reuso de Refresh Token detectada! Revogando família ${tokenRecord.family_id}`, {
+          familyId: tokenRecord.family_id,
+          usuarioId: tokenRecord.usuario_id,
+          ip
+        });
         await pool.query(`
           UPDATE auth_refresh_tokens
           SET revogado = true
@@ -212,7 +215,7 @@ export class TokenService {
         user: toUserResponseDto(user)
       };
     } catch (error) {
-      console.error('[TokenService.rotacionarRefreshToken Error]:', error);
+      logger.error('[TokenService.rotacionarRefreshToken Error]:', { error });
       return { success: false, error: 'Erro interno ao renovar sessão.' };
     }
   }
@@ -233,7 +236,7 @@ export class TokenService {
         `, [res.rows[0].family_id]);
       }
     } catch (e) {
-      console.error('[TokenService.revogarToken Error]:', e);
+      logger.error('[TokenService.revogarToken Error]:', { error: e });
     }
   }
 
@@ -246,7 +249,7 @@ export class TokenService {
         UPDATE auth_refresh_tokens SET revogado = true WHERE usuario_id = $1
       `, [usuarioId]);
     } catch (e) {
-      console.error('[TokenService.revogarPorUsuario Error]:', e);
+      logger.error('[TokenService.revogarPorUsuario Error]:', { error: e });
     }
   }
 
@@ -267,7 +270,7 @@ export class TokenService {
 
       return res.rows[0]?.token_version || 1;
     } catch (err) {
-      console.error('[TokenService.incrementarTokenVersion Error]:', err);
+      logger.error('[TokenService.incrementarTokenVersion Error]:', { error: err });
       return 1;
     }
   }

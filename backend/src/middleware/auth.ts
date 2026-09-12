@@ -115,6 +115,13 @@ export const userHasPermission = (
   return getUserPermissions(user).includes(permission);
 };
 
+export const isRhGlobal = (
+  user: Pick<AuthUser, 'perfil' | 'permissaoRh' | 'permissaoTi' | 'is_admin'> | undefined
+): boolean => {
+  if (!user) return false;
+  return user.perfil === 'ADMIN_RH' || user.permissaoRh === true || user.is_admin === true;
+};
+
 export const requirePermission = (permission: Permission) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     if (!req.user) {

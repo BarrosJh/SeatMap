@@ -1,6 +1,7 @@
-import { DateTime } from 'luxon';
 import crypto from 'crypto';
+import { DateTime } from 'luxon';
 import pool from '../../config/db';
+import { getDbClient } from '../../utils/dbClient';
 import { ConfigService } from '../configService';
 import { ReservaHistoryService } from '../reservaHistoryService';
 import { wsManager } from '../../websocket/wsServer';
@@ -9,13 +10,13 @@ import { ReservaToleranceUtils } from './reservaToleranceUtils';
 import { logger } from '../../utils/logger';
 
 export interface CriarReservaInput {
+  cadeiraId: number;
   usuarioId: number;
   usuarioNome: string;
   usuarioEmail: string;
   usuarioPerfil: string;
   departamentoId?: number | null;
-  departamentoNome?: string | null;
-  cadeiraId: number;
+  departamentoNome?: string;
   dataReserva: string;
   idempotencyKey?: string;
   correlationId?: string;
@@ -23,29 +24,26 @@ export interface CriarReservaInput {
 
 export class ReservaCreateService {
   /**
-   * Processa a criação ou troca atômica de reserva com locks, idempotência e notificações
+   * Cria ou troca atomicamente uma reserva de assento com concorrência serializada
    */
   public static async criarReserva(input: CriarReservaInput) {
     const {
+      cadeiraId,
       usuarioId,
       usuarioNome,
       usuarioPerfil,
       departamentoId,
       departamentoNome,
-      cadeiraId,
       dataReserva,
       idempotencyKey,
       correlationId
     } = input;
 
-    const dataLuxon = DateTime.fromISO(dataReserva, { zone: 'America/Sao_Paulo' });
-    if (!dataLuxon.isValid) {
-      return { success: false, code: 400, error: 'Data de reserva inválida. Utilize o formato YYYY-MM-DD.' };
-    }
-
-    const hoje = DateTime.now().setZone('America/Sao_Paulo').startOf('day');
-    const dataAlvo = dataLuxon.startOf('day');
-    const dataAlvoIso = dataAlvo.toISODate()!;
+    const dataAlvoIso = dataReserva;
+    const dataLuxon = DateTime.fromISO(dataAlvoIso, { zone: 'America/Sao_Paulo' }).startOf('day');
+    const hojeLuxon = DateTime.now().setZone('America/Sao_Paulo').startOf('day');
+    const dataAlvo = dataLuxon.toISODate()!;
+    const hoje = hojeLuxon.toISODate()!;
 
     if (dataAlvo < hoje) {
       return { success: false, code: 400, error: 'Não é permitido realizar reservas para datas passadas.' };
@@ -56,7 +54,7 @@ export class ReservaCreateService {
       return { success: false, code: 400, error: 'Não há expediente aos finais de semana. Selecione um dia útil (Segunda a Sexta).' };
     }
 
-    const diffSemanas = getWorkWeekDiff(dataAlvo, hoje);
+    const diffSemanas = getWorkWeekDiff(dataLuxon, hojeLuxon);
     if (diffSemanas > 1) {
       return { success: false, code: 400, error: 'Só é permitido reservar assentos para a semana corrente ou a semana seguinte.' };
     }
@@ -72,8 +70,27 @@ export class ReservaCreateService {
       }
     }
 
-    const limiteAtivas = await ConfigService.getNumber('LIMITE_SEMANAL_RESERVAS', 2);
-    const client = await pool.connect();
+    const [
+      limiteAtivasStr,
+      permitirTrocaStr,
+      checkinAutoGestaoStr,
+      horarioCortePadrao,
+      horarioInicioTardia,
+      toleranciaMinutosStr
+    ] = await Promise.all([
+      ConfigService.get('LIMITE_SEMANAL_RESERVAS', '2'),
+      ConfigService.get('PERMITIR_TROCA_MESMO_DIA', 'true'),
+      ConfigService.get('CHECKIN_AUTOMATICO_GESTAO', 'true'),
+      ConfigService.get('HORARIO_LIMITE_CHECKIN', '11:00'),
+      ConfigService.get('HORARIO_INICIO_RESERVA_TARDIA', '10:00'),
+      ConfigService.get('TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS', '120')
+    ]);
+    const limiteAtivas = parseInt(limiteAtivasStr, 10) || 2;
+    const permitirTroca = permitirTrocaStr === 'true';
+    const checkinAutoGestao = checkinAutoGestaoStr === 'true';
+    const toleranciaMinutos = parseInt(toleranciaMinutosStr, 10) || 120;
+
+    const client = await getDbClient();
 
     try {
       await client.query('BEGIN');
@@ -107,6 +124,7 @@ export class ReservaCreateService {
       const cadeiraOcupadaRes = await client.query(`
         SELECT id, usuario_id FROM reservas
         WHERE cadeira_id = $1 AND data_reserva = $2 AND status = 'ATIVA'
+        FOR UPDATE
       `, [cadeiraId, dataAlvoIso]);
 
       if (cadeiraOcupadaRes.rowCount! > 0 && cadeiraOcupadaRes.rows[0].usuario_id !== usuarioId) {
@@ -137,7 +155,6 @@ export class ReservaCreateService {
       }
 
       if (isTroca) {
-        const permitirTroca = (await ConfigService.get('PERMITIR_TROCA_MESMO_DIA', 'true')) === 'true';
         if (!permitirTroca) {
           await client.query('ROLLBACK');
           return { success: false, code: 400, error: 'A troca de assento no mesmo dia está desabilitada pela política de RH.' };
@@ -145,6 +162,9 @@ export class ReservaCreateService {
       }
 
       if (!isTroca) {
+        // Lock no registro do usuário para evitar concorrência bypassando o limite semanal
+        await client.query('SELECT id FROM usuarios WHERE id = $1 FOR UPDATE', [usuarioId]);
+
         const contagemAtivasRes = await client.query(`
           SELECT COUNT(*) AS total
           FROM reservas
@@ -168,7 +188,6 @@ export class ReservaCreateService {
       const rawPayload = `${usuarioId}-${cadeiraId}-${dataAlvoIso}-${timestampIso}-${idempotencyKey || ''}`;
       const codigoComprovante = 'RES-' + crypto.createHash('sha256').update(rawPayload).digest('hex').substring(0, 16).toUpperCase();
 
-      const checkinAutoGestao = (await ConfigService.get('CHECKIN_AUTOMATICO_GESTAO', 'true')) === 'true';
       const isGestao = usuarioPerfil === 'GESTAO';
       const checkinRealizado = isGestao && checkinAutoGestao;
       const checkinEm = checkinRealizado ? new Date() : null;
@@ -210,6 +229,7 @@ export class ReservaCreateService {
 
       await client.query('COMMIT');
 
+      // Emissão segura via WebSocket estritamente após o COMMIT bem-sucedido
       wsManager.broadcastSeatUpdate({
         evento: 'assento_atualizado',
         escritorioId: cadeira.escritorio_id,
@@ -234,9 +254,6 @@ export class ReservaCreateService {
         });
       }
 
-      const horarioCortePadrao = await ConfigService.get('HORARIO_LIMITE_CHECKIN', '11:00');
-      const horarioInicioTardia = await ConfigService.get('HORARIO_INICIO_RESERVA_TARDIA', '10:00');
-      const toleranciaMinutos = await ConfigService.getNumber('TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS', 120);
       const calculoLimite = ReservaToleranceUtils.calcularLimiteCheckin(
         dataAlvoIso,
         novaReserva.criado_em,
@@ -267,20 +284,28 @@ export class ReservaCreateService {
       }
 
       if (error.code === '23505') {
-        if (error.constraint === 'unq_cadeira_data' || error.constraint === 'unq_cadeira_data_ativa') {
+        const constraintName = (error.constraint || '').toLowerCase();
+        const detail = (error.detail || '').toLowerCase();
+
+        if (constraintName.includes('cadeira') || detail.includes('cadeira')) {
           return {
             success: false,
             code: 409,
             error: 'Conflito de Concorrência: Este assento acabou de ser reservado por outro usuário para a mesma data.'
           };
         }
-        if (error.constraint === 'unq_usuario_data' || error.constraint === 'unq_usuario_data_ativa') {
+        if (constraintName.includes('usuario') || detail.includes('usuario')) {
           return {
             success: false,
             code: 409,
             error: 'Conflito: Você já possui uma reserva ativa para esta mesma data.'
           };
         }
+        return {
+          success: false,
+          code: 409,
+          error: 'Conflito de Concorrência: Registro duplicado detectado para esta data.'
+        };
       }
 
       throw error;

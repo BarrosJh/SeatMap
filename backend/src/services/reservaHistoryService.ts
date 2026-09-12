@@ -29,7 +29,7 @@ export class ReservaHistoryService {
    */
   public static async registrarEvento(
     params: RegistrarEventoReservaParams,
-    client?: PoolClient
+    client?: PoolClient | { query: (sql: string, params?: any[]) => Promise<any> }
   ): Promise<number | null> {
     const db = client || pool;
 

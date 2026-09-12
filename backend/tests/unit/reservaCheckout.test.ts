@@ -68,7 +68,8 @@ describe('Fluxo de Liberação de Mesa (Checkout) e Bloqueio de Cancelamento Pó
         expect.objectContaining({
           tipoEvento: 'CANCELADA_USUARIO',
           usuarioId: 5
-        })
+        }),
+        expect.anything()
       );
     });
   });
@@ -160,7 +161,8 @@ describe('Fluxo de Liberação de Mesa (Checkout) e Bloqueio de Cancelamento Pó
           usuarioId: 5,
           reservaId: 105,
           cadeiraId: 12
-        })
+        }),
+        expect.anything()
       );
 
       expect(wsManager.broadcastSeatUpdate).toHaveBeenCalledWith(

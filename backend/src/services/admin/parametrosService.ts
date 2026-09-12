@@ -75,6 +75,8 @@ export class ParametrosService {
       });
     }
 
+    ConfigService.invalidateCache();
+
     const atualizadas = await ConfigService.getAll();
     const avisoAtualizado = await ConfigService.get('AVISO_GLOBAL_SISTEMA', '');
     wsManager.broadcastToAll({

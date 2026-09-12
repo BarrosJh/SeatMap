@@ -241,5 +241,13 @@ CREATE TABLE IF NOT EXISTS usuarios_biometria_passkeys (
 CREATE INDEX IF NOT EXISTS idx_biometria_usuario_id ON usuarios_biometria_passkeys(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_biometria_credential_id ON usuarios_biometria_passkeys(credential_id);
 
+-- Tabela: webauthn_challenges (Persistência multi-instância de challenges WebAuthn)
+CREATE TABLE IF NOT EXISTS webauthn_challenges (
+    key VARCHAR(255) PRIMARY KEY,
+    challenge TEXT NOT NULL,
+    user_id INT REFERENCES usuarios(id) ON DELETE CASCADE,
+    expires_at BIGINT NOT NULL,
+    criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-
+CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_exp ON webauthn_challenges(expires_at);

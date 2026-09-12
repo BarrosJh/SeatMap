@@ -14,8 +14,6 @@ interface PendingChallenge {
 }
 
 export class WebAuthnService {
-  private static challenges = new Map<string, PendingChallenge>();
-
   public static getRpId(originHeader?: string, hostHeader?: string): string {
     if (process.env.RP_ID) {
       return process.env.RP_ID;
@@ -36,38 +34,73 @@ export class WebAuthnService {
     if (process.env.RP_ORIGIN) {
       return process.env.RP_ORIGIN;
     }
-    if (originHeader) {
-      return originHeader;
+    const isProduction = ['production', 'staging'].includes((process.env.NODE_ENV || 'development').toLowerCase());
+    if (process.env.ALLOWED_ORIGINS) {
+      const allowed = process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim());
+      if (originHeader && allowed.includes(originHeader)) {
+        return originHeader;
+      }
+      if (allowed.length > 0 && allowed[0] !== '*') {
+        return allowed[0];
+      }
     }
-    return 'http://localhost:3000';
+    if (!isProduction) {
+      if (originHeader && (originHeader.startsWith('http://') || originHeader.startsWith('https://'))) {
+        return originHeader;
+      }
+      return 'http://localhost:3000';
+    }
+    throw new Error('Configuração de segurança RP_ORIGIN ou ALLOWED_ORIGINS obrigatória em ambiente de produção.');
   }
 
-  public static saveChallenge(key: string, challenge: string, userId?: number): void {
+  public static async saveChallenge(key: string, challenge: string, userId?: number): Promise<void> {
     const expiresAt = Date.now() + 5 * 60 * 1000;
-    this.challenges.set(key, { challenge, userId, expiresAt });
-    this.cleanExpiredChallenges();
+    try {
+      await pool.query(
+        `INSERT INTO webauthn_challenges (key, challenge, user_id, expires_at, criado_em)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (key) DO UPDATE SET challenge = $2, user_id = $3, expires_at = $4, criado_em = NOW()`,
+        [key, challenge, userId || null, expiresAt]
+      );
+      const cleanup = pool.query('DELETE FROM webauthn_challenges WHERE expires_at < $1', [Date.now()]);
+      if (cleanup && typeof cleanup.catch === 'function') {
+        cleanup.catch(() => {});
+      }
+    } catch (error) {
+      logger.error('[WebAuthnService.saveChallenge] Erro ao salvar challenge no banco:', { key, error });
+      throw error;
+    }
   }
 
-  public static getChallenge(key: string): PendingChallenge | null {
-    const data = this.challenges.get(key);
-    if (!data) return null;
-    if (Date.now() > data.expiresAt) {
-      this.challenges.delete(key);
+  public static async getChallenge(key: string): Promise<PendingChallenge | null> {
+    try {
+      const res = await pool.query(
+        'SELECT challenge, user_id, expires_at FROM webauthn_challenges WHERE key = $1',
+        [key]
+      );
+      if (res.rowCount === 0) return null;
+      const row = res.rows[0];
+      const expiresAt = Number(row.expires_at);
+      if (Date.now() > expiresAt) {
+        await this.removeChallenge(key);
+        return null;
+      }
+      return {
+        challenge: row.challenge,
+        userId: row.user_id ? Number(row.user_id) : undefined,
+        expiresAt
+      };
+    } catch (error) {
+      logger.error('[WebAuthnService.getChallenge] Erro ao buscar challenge:', { key, error });
       return null;
     }
-    return data;
   }
 
-  public static removeChallenge(key: string): void {
-    this.challenges.delete(key);
-  }
-
-  private static cleanExpiredChallenges(): void {
-    const now = Date.now();
-    for (const [key, val] of this.challenges.entries()) {
-      if (now > val.expiresAt) {
-        this.challenges.delete(key);
-      }
+  public static async removeChallenge(key: string): Promise<void> {
+    try {
+      await pool.query('DELETE FROM webauthn_challenges WHERE key = $1', [key]);
+    } catch (error) {
+      logger.error('[WebAuthnService.removeChallenge] Erro ao remover challenge:', { key, error });
     }
   }
 
@@ -93,7 +126,7 @@ export class WebAuthnService {
       }
     });
 
-    this.saveChallenge(`reg_${user.id}`, options.challenge, user.id);
+    await this.saveChallenge(`reg_${user.id}`, options.challenge, user.id);
     return options;
   }
 
@@ -104,7 +137,7 @@ export class WebAuthnService {
     expectedRpId: string,
     deviceName: string = 'Dispositivo Móvel'
   ) {
-    const pending = this.getChallenge(`reg_${userId}`);
+    const pending = await this.getChallenge(`reg_${userId}`);
     if (!pending) {
       throw new Error('Desafio biométrico expirado ou inexistente. Tente novamente.');
     }
@@ -121,7 +154,7 @@ export class WebAuthnService {
       throw new Error('Falha na validação biométrica do dispositivo.');
     }
 
-    this.removeChallenge(`reg_${userId}`);
+    await this.removeChallenge(`reg_${userId}`);
 
     const info = verification.registrationInfo as any;
     const credentialId = info.credential?.id || info.credentialID || responseBody.id;
@@ -165,7 +198,7 @@ export class WebAuthnService {
     });
 
     const sessionKey = `auth_${options.challenge}`;
-    this.saveChallenge(sessionKey, options.challenge);
+    await this.saveChallenge(sessionKey, options.challenge);
 
     return { options, challengeKey: sessionKey };
   }
@@ -176,7 +209,7 @@ export class WebAuthnService {
     expectedOrigin: string,
     expectedRpId: string
   ) {
-    const pending = this.getChallenge(challengeKey);
+    const pending = await this.getChallenge(challengeKey);
     if (!pending) {
       throw new Error('Desafio biométrico expirado. Tente novamente.');
     }
@@ -212,7 +245,7 @@ export class WebAuthnService {
       throw new Error('Assinatura biométrica inválida.');
     }
 
-    this.removeChallenge(challengeKey);
+    await this.removeChallenge(challengeKey);
 
     const newCounter = verification.authenticationInfo.newCounter;
     await pool.query(

@@ -33,27 +33,41 @@ describe('WebAuthn & Biometrics Service (FIDO2 / Passkeys)', () => {
   });
 
   describe('2. Gestão Segura de Desafios (Challenges)', () => {
-    it('deve salvar, recuperar e remover challenge antes da expiração', () => {
+    it('deve salvar, recuperar e remover challenge antes da expiração', async () => {
       const key = 'test_challenge_key_1';
-      WebAuthnService.saveChallenge(key, 'random_nonce_12345', 42);
+      (pool.query as jest.Mock)
+        .mockResolvedValueOnce({ rowCount: 1 }) // saveChallenge INSERT
+        .mockResolvedValueOnce({ rowCount: 0 }) // saveChallenge cleanup DELETE
+        .mockResolvedValueOnce({ // getChallenge SELECT
+          rowCount: 1,
+          rows: [{ challenge: 'random_nonce_12345', user_id: 42, expires_at: Date.now() + 60000 }]
+        })
+        .mockResolvedValueOnce({ rowCount: 1 }) // removeChallenge DELETE
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] }); // getChallenge SELECT after remove
 
-      const challenge = WebAuthnService.getChallenge(key);
+      await WebAuthnService.saveChallenge(key, 'random_nonce_12345', 42);
+
+      const challenge = await WebAuthnService.getChallenge(key);
       expect(challenge).not.toBeNull();
       expect(challenge?.challenge).toBe('random_nonce_12345');
       expect(challenge?.userId).toBe(42);
 
-      WebAuthnService.removeChallenge(key);
-      expect(WebAuthnService.getChallenge(key)).toBeNull();
+      await WebAuthnService.removeChallenge(key);
+      expect(await WebAuthnService.getChallenge(key)).toBeNull();
     });
 
-    it('deve retornar null para challenge inexistente', () => {
-      expect(WebAuthnService.getChallenge('non_existent_key')).toBeNull();
+    it('deve retornar null para challenge inexistente', async () => {
+      (pool.query as jest.Mock).mockResolvedValueOnce({ rowCount: 0, rows: [] });
+      expect(await WebAuthnService.getChallenge('non_existent_key')).toBeNull();
     });
   });
 
   describe('3. Geração de Opções de Registro (Passkey Attestation)', () => {
     it('deve gerar opções de registro WebAuthn válidas', async () => {
-      (pool.query as jest.Mock).mockResolvedValueOnce({ rows: [] });
+      (pool.query as jest.Mock)
+        .mockResolvedValueOnce({ rows: [] }) // listUserPasskeys
+        .mockResolvedValueOnce({ rowCount: 1 }) // saveChallenge INSERT
+        .mockResolvedValueOnce({ rowCount: 0 }); // saveChallenge cleanup DELETE
 
       const options = await WebAuthnService.generateRegisterOptions(
         { id: 10, email: 'colab@empresa.com', nome: 'Colaborador Teste' },
@@ -66,20 +80,21 @@ describe('WebAuthn & Biometrics Service (FIDO2 / Passkeys)', () => {
       expect(options.rp.id).toBe('localhost');
       expect(options.user.name).toBe('colab@empresa.com');
       expect(options.authenticatorSelection?.authenticatorAttachment).toBe('platform');
-
-      const saved = WebAuthnService.getChallenge('reg_10');
-      expect(saved?.challenge).toBe(options.challenge);
     });
   });
 
   describe('4. Geração de Opções de Autenticação (Passkey Assertion)', () => {
     it('deve gerar opções de autenticação biométrica', async () => {
-      (pool.query as jest.Mock).mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ id: 5 }]
-      }).mockResolvedValueOnce({
-        rows: [{ credential_id: 'cred_abc_123', transports: ['internal'] }]
-      });
+      (pool.query as jest.Mock)
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ id: 5 }]
+        })
+        .mockResolvedValueOnce({
+          rows: [{ credential_id: 'cred_abc_123', transports: ['internal'] }]
+        })
+        .mockResolvedValueOnce({ rowCount: 1 }) // saveChallenge INSERT
+        .mockResolvedValueOnce({ rowCount: 0 }); // saveChallenge cleanup DELETE
 
       const { options, challengeKey } = await WebAuthnService.generateAuthOptions(
         'localhost',
@@ -90,28 +105,31 @@ describe('WebAuthn & Biometrics Service (FIDO2 / Passkeys)', () => {
       expect(options.challenge).toBeDefined();
       expect(options.rpId).toBe('localhost');
       expect(challengeKey).toBe(`auth_${options.challenge}`);
-
-      const saved = WebAuthnService.getChallenge(challengeKey);
-      expect(saved?.challenge).toBe(options.challenge);
     });
   });
 
   describe('5. Tratamento de Erros de Verificação', () => {
     it('deve rejeitar validação de registro caso o challenge tenha expirado', async () => {
+      (pool.query as jest.Mock).mockResolvedValueOnce({ rowCount: 0, rows: [] });
       await expect(
         WebAuthnService.verifyRegister(999, {}, 'http://localhost:3000', 'localhost')
       ).rejects.toThrow('Desafio biométrico expirado ou inexistente.');
     });
 
     it('deve rejeitar validação de login caso o challenge seja inválido', async () => {
+      (pool.query as jest.Mock).mockResolvedValueOnce({ rowCount: 0, rows: [] });
       await expect(
         WebAuthnService.verifyAuth('invalid_key', {}, 'http://localhost:3000', 'localhost')
       ).rejects.toThrow('Desafio biométrico expirado.');
     });
 
     it('deve rejeitar autenticação se a credencial não for encontrada no banco', async () => {
-      WebAuthnService.saveChallenge('auth_dummy', 'dummy_challenge');
-      (pool.query as jest.Mock).mockResolvedValueOnce({ rowCount: 0, rows: [] });
+      (pool.query as jest.Mock)
+        .mockResolvedValueOnce({ // getChallenge
+          rowCount: 1,
+          rows: [{ challenge: 'dummy_challenge', expires_at: Date.now() + 60000 }]
+        })
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] }); // passkey lookup
 
       await expect(
         WebAuthnService.verifyAuth('auth_dummy', { id: 'unknown_cred' }, 'http://localhost:3000', 'localhost')

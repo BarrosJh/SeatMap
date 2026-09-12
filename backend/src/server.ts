@@ -63,7 +63,7 @@ app.use(helmet({
 }));
 app.disable('x-powered-by');
 
-// Cabeçalhos HTTP Mandatórios - Manual de Segurança Caixa Consórcio v03
+// Cabeçalhos HTTP Mandatórios 
 app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -88,8 +88,7 @@ app.use(cors({
     if (
       (!isProduction && allowedOrigins.includes('*')) ||
       allowedOrigins.includes(origin) ||
-      origin.endsWith('.onrender.com') ||
-      (!isProduction && (origin.includes('localhost') || origin.includes('127.0.0.1')))
+      (!isProduction && (origin.endsWith('.onrender.com') || origin.includes('localhost') || origin.includes('127.0.0.1')))
     ) {
       return callback(null, true);
     }

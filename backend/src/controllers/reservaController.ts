@@ -1,5 +1,5 @@
-import { Response } from 'express';
-import { AuthenticatedRequest } from '../middleware/auth';
+import { Request, Response } from 'express';
+import { AuthenticatedRequest, userHasPermission, isRhGlobal } from '../middleware/auth';
 import { ReservaService } from '../services/reservaService';
 import { ReservaHistoryService } from '../services/reservaHistoryService';
 import { parseIdParam } from '../utils/workWeekUtils';
@@ -8,24 +8,17 @@ import { logger } from '../utils/logger';
 export class ReservaController {
   public static async criarReserva(req: AuthenticatedRequest, res: Response) {
     const user = req.user!;
-    const { cadeiraId, dataReserva } = req.body;
-    const idempotencyKey = req.headers['x-idempotency-key'] as string | undefined;
-
-    const numericCadeiraId = parseIdParam(cadeiraId);
-
-    if (!numericCadeiraId || !dataReserva) {
-      return res.status(400).json({ error: 'Cadeira e data de reserva são obrigatórios.' });
-    }
+    const { cadeiraId, dataReserva, idempotencyKey } = req.body;
 
     try {
       const result = await ReservaService.criarReserva({
+        cadeiraId: Number(cadeiraId),
         usuarioId: user.userId,
         usuarioNome: user.nome,
         usuarioEmail: user.email,
         usuarioPerfil: user.perfil,
         departamentoId: user.departamentoId,
         departamentoNome: user.departamentoNome,
-        cadeiraId: numericCadeiraId,
         dataReserva,
         idempotencyKey,
         correlationId: req.correlationId
@@ -35,7 +28,7 @@ export class ReservaController {
         return res.status(result.code || 400).json({ error: result.error });
       }
 
-      return res.status(result.code || 200).json({
+      return res.status(result.code || 201).json({
         message: result.message,
         comprovante: result.comprovante,
         reserva: result.reserva,
@@ -57,7 +50,7 @@ export class ReservaController {
 
     const { cadeiraId } = req.body || {};
     const cadeiraIdInformada = cadeiraId ? parseIdParam(cadeiraId) || undefined : undefined;
-    const isRhGlobal = user.permissaoRh === true || user.is_admin === true || user.perfil === 'ADMIN_RH';
+    const isGlobalRh = isRhGlobal(user);
 
     try {
       const result = await ReservaService.fazerCheckin({
@@ -65,7 +58,7 @@ export class ReservaController {
         usuarioId: user.userId,
         usuarioPerfil: user.perfil,
         usuarioDepartamentoId: user.departamentoId,
-        isRhGlobal,
+        isRhGlobal: isGlobalRh,
         cadeiraIdInformada,
         correlationId: req.correlationId
       });
@@ -138,8 +131,10 @@ export class ReservaController {
 
   public static async historicoMinhasReservas(req: AuthenticatedRequest, res: Response) {
     const user = req.user!;
-    const limit = parseInt(req.query.limit as string, 10) || 50;
-    const offset = parseInt(req.query.offset as string, 10) || 0;
+    const rawLimit = parseInt(req.query.limit as string, 10);
+    const rawOffset = parseInt(req.query.offset as string, 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     try {
       const historico = await ReservaHistoryService.getHistoricoUsuario(user.userId, limit, offset);
@@ -152,8 +147,10 @@ export class ReservaController {
 
   public static async minhasReservas(req: AuthenticatedRequest, res: Response) {
     const user = req.user!;
-    const limit = parseInt(req.query.limit as string, 10) || 50;
-    const offset = parseInt(req.query.offset as string, 10) || 0;
+    const rawLimit = parseInt(req.query.limit as string, 10);
+    const rawOffset = parseInt(req.query.offset as string, 10);
+    const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 50 : rawLimit), 100);
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
 
     try {
       const rows = await ReservaService.minhasReservas(user.userId, limit, offset);
@@ -173,7 +170,7 @@ export class ReservaController {
     }
 
     try {
-      const isRh = user.perfil === 'ADMIN_RH' || user.perfil === 'ADMIN_TI' || user.permissaoRh === true || user.permissaoTi === true || user.is_admin === true;
+      const isRh = userHasPermission(user, 'reservas:read');
       const result = await ReservaService.enviarComprovanteEmail(
         reservaId,
         user.userId,

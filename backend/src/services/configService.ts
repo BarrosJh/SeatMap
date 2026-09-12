@@ -4,7 +4,7 @@ import { CryptoService } from './cryptoService';
 export class ConfigService {
   private static cache: Map<string, string> = new Map();
   private static lastFetch: number = 0;
-  private static readonly TTL_MS = 60 * 1000; // 1 minuto de cache
+  private static readonly TTL_MS = 60 * 1000; // 1 minuto de cache padrão
   private static readonly SENSITIVE_KEYS: ReadonlySet<string> = new Set([
     'SMTP_PASS',
     'RESEND_API_KEY',
@@ -12,12 +12,38 @@ export class ConfigService {
   ]);
 
   /**
+   * Invalida imediatamente o cache em memória (ex: após atualização de parâmetros)
+   */
+  public static invalidateCache(): void {
+    this.cache.clear();
+    this.lastFetch = 0;
+  }
+
+  /**
    * Obtém o valor decifrado de uma configuração
    */
   public static async get(key: string, defaultValue: string = ''): Promise<string> {
+    const isSensitive = this.SENSITIVE_KEYS.has(key);
     const now = Date.now();
-    if (this.cache.has(key) && (now - this.lastFetch < this.TTL_MS)) {
+
+    // Segredos sensíveis não são retidos no cache estático por segurança de heap
+    if (!isSensitive && this.cache.has(key) && (now - this.lastFetch < this.TTL_MS)) {
       return this.cache.get(key) || defaultValue;
+    }
+
+    if (isSensitive) {
+      try {
+        const res = await pool.query('SELECT valor FROM configuracoes_sistema WHERE chave = $1', [key]);
+        if (res.rowCount === 0 || !res.rows[0].valor) return defaultValue;
+        let valor = res.rows[0].valor;
+        if (CryptoService.isEncrypted(valor)) {
+          return CryptoService.decrypt(valor);
+        }
+        return valor || defaultValue;
+      } catch (error) {
+        console.error(`[ConfigService] Erro ao carregar chave sensível ${key}:`, error);
+        return defaultValue;
+      }
     }
 
     try {
@@ -29,15 +55,13 @@ export class ConfigService {
         let valor = row.valor || '';
 
         if (this.SENSITIVE_KEYS.has(chave) && valor.length > 0) {
-          if (CryptoService.isEncrypted(valor)) {
-            // Descriptografa para a memória
-            valor = CryptoService.decrypt(valor);
-          } else {
+          if (!CryptoService.isEncrypted(valor)) {
             // Migração transparente de senhas legadas em texto plano para AES-256-GCM no banco
             const encryptedValue = CryptoService.encrypt(valor);
             pool.query('UPDATE configuracoes_sistema SET valor = $1 WHERE chave = $2', [encryptedValue, chave])
               .catch(err => console.error(`[ConfigService] Erro ao auto-migrar chave sensível ${chave}:`, err));
           }
+          continue; // Não salva segredos em texto claro no cache estático
         }
 
         this.cache.set(chave, valor);
@@ -55,6 +79,19 @@ export class ConfigService {
     const val = await this.get(key, defaultValue.toString());
     const parsed = parseInt(val, 10);
     return isNaN(parsed) ? defaultValue : parsed;
+  }
+
+  /**
+   * Obtém múltiplas configurações simultaneamente
+   */
+  public static async getMultiple(keys: string[]): Promise<Record<string, string>> {
+    const results: Record<string, string> = {};
+    await Promise.all(
+      keys.map(async (key) => {
+        results[key] = await this.get(key);
+      })
+    );
+    return results;
   }
 
   /**
@@ -81,8 +118,11 @@ export class ConfigService {
       `, [key, dbValue]);
     }
 
-    // No cache em memória, mantém sempre o valor descriptografado
-    this.cache.set(key, value);
+    if (!this.SENSITIVE_KEYS.has(key)) {
+      this.cache.set(key, value);
+    } else {
+      this.cache.delete(key);
+    }
   }
 
   /**

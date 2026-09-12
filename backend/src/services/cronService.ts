@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import { DateTime } from 'luxon';
 import pool from '../config/db';
+import { getDbClient } from '../utils/dbClient';
 import { ReservaHistoryService } from './reservaHistoryService';
 import { wsManager } from '../websocket/wsServer';
 import { logger } from '../utils/logger';
@@ -10,7 +11,7 @@ import { ReservaToleranceUtils } from './reservas/reservaToleranceUtils';
 
 export class CronService {
   private static task: ScheduledTask | null = null;
-  private static activeExecution: Promise<any> | null = null;
+  private static activeExecutions: Set<Promise<any>> = new Set();
 
   public static init(): void {
     // 1. Executa verificação inicial no boot para limpar no-shows pendentes
@@ -49,40 +50,41 @@ export class CronService {
    */
   public static async waitForCompletion(timeoutMs: number = 5000): Promise<void> {
     this.stop();
-    if (!this.activeExecution) {
+    if (this.activeExecutions.size === 0) {
       return;
     }
 
-    logger.info('[Cron] Aguardando conclusão da rotina de No-Show em andamento...');
+    logger.info('[Cron] Aguardando conclusão de rotinas de No-Show em andamento...');
     let timer: NodeJS.Timeout | null = null;
 
     const timeoutPromise = new Promise<void>((resolve) => {
       timer = setTimeout(() => {
-        logger.warn('[Cron] Timeout atingido aguardando conclusão da rotina ativa.');
+        logger.warn('[Cron] Timeout atingido aguardando conclusão das rotinas ativas.');
         resolve();
       }, timeoutMs);
-      if (typeof timer.unref === 'function') {
+      if (typeof timer && typeof timer.unref === 'function') {
         timer.unref();
       }
     });
 
     try {
-      await Promise.race([this.activeExecution, timeoutPromise]);
+      const allExecutions = Promise.allSettled(Array.from(this.activeExecutions));
+      await Promise.race([allExecutions, timeoutPromise]);
     } catch (_) {
       // Falha capturada no log da própria rotina
     } finally {
       if (timer) clearTimeout(timer);
-      this.activeExecution = null;
+      this.activeExecutions.clear();
     }
   }
 
   public static async cancelExpiredNoShows(forcedDate?: string): Promise<{ totalExpiradas: number; reservas: any[] }> {
     const executionPromise = this.executeCancelExpiredNoShows(forcedDate);
-    this.activeExecution = executionPromise;
+    this.activeExecutions.add(executionPromise);
     try {
       return await executionPromise;
     } finally {
-      this.activeExecution = null;
+      this.activeExecutions.delete(executionPromise);
     }
   }
 
@@ -93,7 +95,7 @@ export class CronService {
     const horarioInicioTardia = await ConfigService.get('HORARIO_INICIO_RESERVA_TARDIA', '10:00');
     const toleranciaMinutos = await ConfigService.getNumber('TOLERANCIA_CHECKIN_RESERVA_TARDIA_MINUTOS', 120);
 
-    const client = await pool.connect();
+    const client = await getDbClient();
 
     try {
       await client.query('BEGIN');
