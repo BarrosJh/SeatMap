@@ -41,13 +41,13 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "'unsafe-inline'"],
-      scriptSrcElem: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "'unsafe-inline'", 'https://unpkg.com'],
+      scriptSrcElem: ["'self'", "'unsafe-inline'", 'https://unpkg.com'],
       styleSrc: ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
       fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
       imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
       mediaSrc: ["'self'", 'blob:', 'data:'],
-      connectSrc: ["'self'", 'wss:', 'https:'],
+      connectSrc: ["'self'", 'wss:', 'https:', 'https://unpkg.com'],
       workerSrc: ["'self'", 'blob:'],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: []
