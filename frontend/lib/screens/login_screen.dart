@@ -57,11 +57,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _prefillUser(String login, String senha) {
-    _loginController.text = login;
-    _senhaController.text = senha;
-  }
-
   Future<void> _realizarLoginSso(String providerId, String providerNome) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final emailCtrl = TextEditingController(text: _loginController.text.contains('@') ? _loginController.text.trim() : '');
@@ -956,48 +951,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           );
                         }),
                       ],
-                      const SizedBox(height: 24),
-
-                      // Botões de Acesso Rápido para Demonstração
-                      const Divider(color: Colors.white24),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Acesso Rápido para Testes:',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: Colors.white54, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          ActionChip(
-                            avatar: const Icon(Icons.badge, size: 16, color: Colors.white),
-                            label: const Text('Colaborador', style: TextStyle(color: Colors.white, fontSize: 12)),
-                            backgroundColor: const Color(0xFF0284C7),
-                            onPressed: () => _prefillUser('colaborador@seatmap.local', '123456'),
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.manage_accounts, size: 16, color: Colors.white),
-                            label: const Text('Gestão', style: TextStyle(color: Colors.white, fontSize: 12)),
-                            backgroundColor: const Color(0xFF0D9488),
-                            onPressed: () => _prefillUser('gestao@seatmap.local', '123456'),
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.admin_panel_settings, size: 16, color: Colors.white),
-                            label: const Text('Admin RH', style: TextStyle(color: Colors.white, fontSize: 12)),
-                            backgroundColor: const Color(0xFF7C3AED),
-                            onPressed: () => _prefillUser('admin@seatmap.local', '123456'),
-                          ),
-                          ActionChip(
-                            avatar: const Icon(Icons.terminal, size: 16, color: Colors.white),
-                            label: const Text('Admin TI', style: TextStyle(color: Colors.white, fontSize: 12)),
-                            backgroundColor: const Color(0xFF0F172A),
-                            onPressed: () => _prefillUser('ti@seatmap.local', '123456'),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
