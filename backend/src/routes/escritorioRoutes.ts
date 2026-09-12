@@ -9,8 +9,8 @@ const router = Router();
 // GET /api/escritorios
 router.get('/', authenticateToken, EscritorioController.listar);
 
-// GET /api/escritorios/ocupacao-semanal
-router.get('/ocupacao-semanal', authenticateToken, EscritorioController.getOcupacaoSemanal);
+// GET /api/escritorios/ocupacao-semanal e alias /api/escritorios/ocupacao/semanal
+router.get(['/ocupacao-semanal', '/ocupacao/semanal'], authenticateToken, EscritorioController.getOcupacaoSemanal);
 
 // GET /api/escritorios/aviso
 router.get('/aviso', authenticateToken, EscritorioController.getAvisoGlobal);
