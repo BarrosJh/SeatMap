@@ -10,6 +10,8 @@ import { TokenService } from '../../services/tokenService';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
 import { toUserResponseDto } from '../../utils/userDtoMapper';
+import { BCRYPT_SALT_ROUNDS } from '../../config/securityConstants';
+import { JwtCryptoUtils } from '../../config/jwtCryptoUtils';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -133,7 +135,7 @@ export class SsoController {
         const defaultRole = await ConfigService.get('SSO_DEFAULT_ROLE', 'COLABORADOR');
         const userName = (name && String(name).trim().length > 0) ? String(name).trim() : email.split('@')[0];
         const generatedMatricula = `SSO-${Date.now().toString().slice(-6)}`;
-        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), BCRYPT_SALT_ROUNDS);
 
         const insertRes = await pool.query(`
           INSERT INTO usuarios (nome, email, matricula, senha_hash, perfil, ativo, token_version, sso_provider, sso_id, ultimo_login)
@@ -185,12 +187,12 @@ export class SsoController {
       );
 
       // Hardening de Sessão: Invalidação de sessões ativas anteriores (Single Active Session Enforcement)
-      await TokenService.incrementarTokenVersion(user.id);
+      await TokenService.incrementarTokenVersion(user.id, { ip, userAgent });
       const activeTokenVersion = (user.token_version || 1) + 1;
       const authTime = Math.floor(Date.now() / 1000);
 
       // Emitir token JWT definitivo
-      const token = jwt.sign({
+      const token = JwtCryptoUtils.signToken({
         userId: user.id,
         nome: user.nome,
         email: user.email,
@@ -202,7 +204,7 @@ export class SsoController {
         departamentoNome: user.departamento_nome,
         tokenVersion: activeTokenVersion,
         authTime
-      }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
+      }, { expiresIn: JWT_EXPIRATION as any });
 
       AuditService.log({
         usuarioId: user.id,

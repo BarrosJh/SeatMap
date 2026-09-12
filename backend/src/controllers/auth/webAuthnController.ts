@@ -8,6 +8,7 @@ import { AuditService } from '../../services/auditService';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
 import { toUserResponseDto } from '../../utils/userDtoMapper';
+import { JwtCryptoUtils } from '../../config/jwtCryptoUtils';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -153,13 +154,13 @@ export class WebAuthnController {
 
       const user = result.user;
 
-      // Invalidação de sessões ativas anteriores
-      await TokenService.incrementarTokenVersion(user.id);
+      // Hardening de Sessão: Invalidação de sessões ativas anteriores (Single Active Session Enforcement)
+      await TokenService.incrementarTokenVersion(user.id, { ip, userAgent });
       const activeTokenVersion = (user.token_version || 1) + 1;
       const authTime = Math.floor(Date.now() / 1000);
 
       // Emissão do Token JWT
-      const token = jwt.sign({
+      const token = JwtCryptoUtils.signToken({
         userId: user.id,
         nome: user.nome,
         email: user.email,
@@ -171,7 +172,7 @@ export class WebAuthnController {
         departamentoNome: user.departamento_nome,
         tokenVersion: activeTokenVersion,
         authTime
-      }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
+      }, { expiresIn: JWT_EXPIRATION as any });
 
       // Emissão de Refresh Token
       const refreshToken = await TokenService.gerarRefreshToken(user.id, ip, userAgent);

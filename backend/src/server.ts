@@ -34,7 +34,7 @@ app.set('trust proxy', Number.isFinite(trustProxyHops) && trustProxyHops > 0 ? t
 // Injeção de X-Correlation-ID em todas as requisições antes de qualquer outro middleware
 app.use(correlationIdMiddleware);
 
-// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP Estrita para Flutter Web)
+// Hardening de Segurança HTTP (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, COEP, CSP Estrita com Report-URI)
 app.use(helmet({
   frameguard: { action: 'deny' },
   referrerPolicy: { policy: 'no-referrer' },
@@ -51,10 +51,11 @@ app.use(helmet({
       connectSrc: ["'self'", 'wss:', 'https:', 'https://unpkg.com'],
       workerSrc: ["'self'", 'blob:'],
       objectSrc: ["'none'"],
-      upgradeInsecureRequests: []
+      upgradeInsecureRequests: [],
+      reportUri: '/api/csp-report'
     }
   },
-  crossOriginEmbedderPolicy: false,
+  crossOriginEmbedderPolicy: { policy: 'credentialless' },
   crossOriginOpenerPolicy: { policy: 'same-origin' },
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   hsts: {
@@ -123,7 +124,7 @@ app.use(cors((req, callback) => {
 }));
 app.use(express.json({
   limit: '256kb',
-  type: ['application/json', 'application/scim+json', 'application/*+json']
+  type: ['application/json', 'application/scim+json', 'application/csp-report', 'application/*+json']
 }));
 
 // Rate Limiter Global para mitigação de DoS e proteção de todas as rotas

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import pool from '../config/db';
 import { TokenService } from '../services/tokenService';
 import { logger } from '../utils/logger';
+import { BCRYPT_SALT_ROUNDS } from '../config/securityConstants';
 
 const SCIM_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCIM_LIST_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
@@ -225,7 +226,7 @@ export class ScimController {
       }
 
       const randomPassword = crypto.randomBytes(16).toString('hex') + 'A1!';
-      const senhaHash = await bcrypt.hash(randomPassword, 10);
+      const senhaHash = await bcrypt.hash(randomPassword, BCRYPT_SALT_ROUNDS);
 
       const insertRes = await pool.query(`
         INSERT INTO usuarios (nome, email, matricula, senha_hash, perfil, ativo, criado_em, atualizado_em)

@@ -6,6 +6,7 @@ import { AuditService } from './auditService';
 import { env } from '../config/env';
 import { toUserResponseDto } from '../utils/userDtoMapper';
 import { logger } from '../utils/logger';
+import { JwtCryptoUtils } from '../config/jwtCryptoUtils';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -181,7 +182,7 @@ export class TokenService {
       const authTime = Math.floor(sessionStart / 1000);
 
       // 7. Emitir novo Access Token JWT com authTime persistido
-      const novoAccessToken = jwt.sign(
+      const novoAccessToken = JwtCryptoUtils.signToken(
         {
           userId: user.id,
           nome: user.nome,
@@ -195,7 +196,6 @@ export class TokenService {
           tokenVersion: user.token_version || 1,
           authTime
         },
-        JWT_SECRET,
         { expiresIn: JWT_EXPIRATION as any }
       );
 
@@ -255,10 +255,22 @@ export class TokenService {
 
   /**
    * Incrementa o token_version do usuário no banco e revoga todas as suas sessões ativas.
-   * Usado em: Desativação de Usuário (TI/RH/SCIM), Mudança de Perfil, Reset de Senha e Logout Global.
+   * Usado em: Desativação de Usuário (TI/RH/SCIM), Mudança de Perfil, Reset de Senha, Logout Global e Login Concorrente.
    */
-  public static async incrementarTokenVersion(usuarioId: number): Promise<number> {
+  public static async incrementarTokenVersion(
+    usuarioId: number,
+    auditContext?: { ip?: string; userAgent?: string; motivo?: string }
+  ): Promise<number> {
     try {
+      // Verifica se o usuário possuía sessões/refresh tokens ativos antes de revogar
+      const activeSessions = await pool.query(`
+        SELECT COUNT(*)::int AS total
+        FROM auth_refresh_tokens
+        WHERE usuario_id = $1 AND revogado = false AND expira_em > NOW()
+      `, [usuarioId]);
+
+      const previousSessionsCount = activeSessions.rows[0]?.total || 0;
+
       const res = await pool.query(`
         UPDATE usuarios
         SET token_version = COALESCE(token_version, 1) + 1
@@ -267,6 +279,20 @@ export class TokenService {
       `, [usuarioId]);
 
       await this.revogarPorUsuario(usuarioId);
+
+      if (previousSessionsCount > 0 && auditContext) {
+        AuditService.log({
+          usuarioId,
+          tipoEvento: 'SESSAO_SIMULTANEA_REVOGADA',
+          sucesso: true,
+          ip: auditContext.ip,
+          userAgent: auditContext.userAgent,
+          detalhes: {
+            sessoesRevogadas: previousSessionsCount,
+            motivo: auditContext.motivo || 'Novo login realizado pelo mesmo usuário (Single Active Session Enforcement)'
+          }
+        });
+      }
 
       return res.rows[0]?.token_version || 1;
     } catch (err) {

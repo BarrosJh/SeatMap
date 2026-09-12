@@ -139,6 +139,8 @@ export const requirePermission = (permission: Permission) => {
   };
 };
 
+import { JwtCryptoUtils } from '../config/jwtCryptoUtils';
+
 export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -147,44 +149,49 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
     return res.status(401).json({ error: 'Token de autenticação não fornecido' });
   }
 
-  jwt.verify(token, JWT_SECRET, async (err, decoded: any) => {
-    if (err || !decoded || !decoded.userId) {
+  try {
+    const decoded: any = JwtCryptoUtils.verifyToken(token);
+    if (!decoded || !decoded.userId) {
       return res.status(403).json({ error: 'Token inválido ou expirado' });
     }
 
-    try {
-      const userCheck = await pool.query(
-        'SELECT ativo, COALESCE(token_version, 1) AS token_version FROM usuarios WHERE id = $1',
-        [decoded.userId]
-      );
+    (async () => {
+      try {
+        const userCheck = await pool.query(
+          'SELECT ativo, COALESCE(token_version, 1) AS token_version FROM usuarios WHERE id = $1',
+          [decoded.userId]
+        );
 
-      if (userCheck.rowCount === 0 || !userCheck.rows[0].ativo) {
-        return res.status(401).json({ error: 'Conta de usuário desativada ou inexistente. Acesso revogado.' });
+        if (userCheck.rowCount === 0 || !userCheck.rows[0].ativo) {
+          return res.status(401).json({ error: 'Conta de usuário desativada ou inexistente. Acesso revogado.' });
+        }
+
+        const dbTokenVersion = userCheck.rows[0].token_version;
+        const tokenPayloadVersion = decoded.tokenVersion || 1;
+
+        if (tokenPayloadVersion < dbTokenVersion) {
+          return res.status(401).json({ error: 'Sessão revogada ou credenciais alteradas. Faça login novamente.' });
+        }
+
+        // Timeout Absoluto Server-Side de 60 minutos (3600 segundos) a partir do login inicial
+        const nowInSeconds = Math.floor(Date.now() / 1000);
+        if (decoded.authTime && (nowInSeconds - decoded.authTime) > 3600) {
+          return res.status(401).json({
+            error: 'Sessão expirada pelo tempo limite absoluto de 60 minutos. Por favor, autentique-se novamente.',
+            code: 'SESSION_ABSOLUTE_TIMEOUT'
+          });
+        }
+
+        req.user = decoded as AuthUser;
+        next();
+      } catch (dbErr) {
+        logger.error('[authenticateToken] Erro ao validar status do usuário no banco:', { correlationId: (req as any).correlationId, error: dbErr });
+        return res.status(503).json({ error: 'Serviço temporariamente indisponível para validação de credenciais.' });
       }
-
-      const dbTokenVersion = userCheck.rows[0].token_version;
-      const tokenPayloadVersion = decoded.tokenVersion || 1;
-
-      if (tokenPayloadVersion < dbTokenVersion) {
-        return res.status(401).json({ error: 'Sessão revogada ou credenciais alteradas. Faça login novamente.' });
-      }
-
-      // Timeout Absoluto Server-Side de 60 minutos (3600 segundos) a partir do login inicial
-      const nowInSeconds = Math.floor(Date.now() / 1000);
-      if (decoded.authTime && (nowInSeconds - decoded.authTime) > 3600) {
-        return res.status(401).json({
-          error: 'Sessão expirada pelo tempo limite absoluto de 60 minutos. Por favor, autentique-se novamente.',
-          code: 'SESSION_ABSOLUTE_TIMEOUT'
-        });
-      }
-
-      req.user = decoded as AuthUser;
-      next();
-    } catch (dbErr) {
-      logger.error('[authenticateToken] Erro ao validar status do usuário no banco:', { correlationId: (req as any).correlationId, error: dbErr });
-      return res.status(503).json({ error: 'Serviço temporariamente indisponível para validação de credenciais.' });
-    }
-  });
+    })();
+  } catch (err) {
+    return res.status(403).json({ error: 'Token inválido ou expirado' });
+  }
 };
 
 export const authMiddleware = authenticateToken;

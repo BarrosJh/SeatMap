@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import pool from '../config/db';
+import { BCRYPT_SALT_ROUNDS } from '../config/securityConstants';
 
 async function runSeed() {
   const client = await pool.connect();
@@ -38,7 +39,7 @@ async function runSeed() {
 
     // 4. Inserir Usuários de Teste (Senha via ambiente ou padrão de alta entropia)
     const rawSeedPassword = process.env.SEED_DEFAULT_PASSWORD || 'Mudar@123456Sec';
-    const defaultPasswordHash = await bcrypt.hash(rawSeedPassword, 10);
+    const defaultPasswordHash = await bcrypt.hash(rawSeedPassword, BCRYPT_SALT_ROUNDS);
     const resUsers = await client.query(`
       INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, permissao_ti, ativo) VALUES
       ('Carlos Silva', 'colaborador@seatmap.local', 'COLAB001', $1, $2, 'COLABORADOR', false, false, true),

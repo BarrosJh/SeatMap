@@ -13,6 +13,7 @@ import { TokenService } from '../../services/tokenService';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
 import { toUserResponseDto } from '../../utils/userDtoMapper';
+import { JwtCryptoUtils } from '../../config/jwtCryptoUtils';
 
 const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRATION = env.JWT_EXPIRATION;
@@ -267,12 +268,12 @@ export class LoginController {
       }
 
       // Hardening de Sessão: Invalidação de sessões ativas anteriores (Single Active Session Enforcement)
-      await TokenService.incrementarTokenVersion(user.id);
+      await TokenService.incrementarTokenVersion(user.id, { ip, userAgent });
       const activeTokenVersion = (user.token_version || 1) + 1;
       const authTime = Math.floor(Date.now() / 1000);
 
       // Emissão do Token de Sessão JWT
-      const token = jwt.sign({
+      const token = JwtCryptoUtils.signToken({
         userId: user.id,
         nome: user.nome,
         email: user.email,
@@ -284,7 +285,7 @@ export class LoginController {
         departamentoNome: user.departamento_nome,
         tokenVersion: activeTokenVersion,
         authTime
-      }, JWT_SECRET, { expiresIn: JWT_EXPIRATION as any });
+      }, { expiresIn: JWT_EXPIRATION as any });
 
       // Auditoria de Sucesso
       AuditService.log({

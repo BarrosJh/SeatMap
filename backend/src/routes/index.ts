@@ -6,9 +6,11 @@ import adminRoutes from './adminRoutes';
 import tiRoutes from './tiRoutes';
 import scimRoutes from './scimRoutes';
 import healthRoutes from './healthRoutes';
+import { CspReportController } from '../controllers/cspReportController';
 
 const router = Router();
 
+router.post('/csp-report', CspReportController.handleReport);
 router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/escritorios', escritorioRoutes);

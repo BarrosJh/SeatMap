@@ -8,6 +8,7 @@ import { AuditService } from '../../services/auditService';
 import { validatePasswordPolicy } from '../../utils/passwordValidator';
 import { TokenService } from '../../services/tokenService';
 import { logger } from '../../utils/logger';
+import { BCRYPT_SALT_ROUNDS } from '../../config/securityConstants';
 
 export class PasswordResetController {
   public static async solicitarRecuperacaoSenha(req: Request, res: Response) {
@@ -143,8 +144,7 @@ export class PasswordResetController {
         });
       }
 
-      const saltRounds = 10;
-      const novaSenhaHash = await bcrypt.hash(String(novaSenha), saltRounds);
+      const novaSenhaHash = await bcrypt.hash(String(novaSenha), BCRYPT_SALT_ROUNDS);
 
       await pool.query('UPDATE usuarios SET senha_hash = $1, tentativas_login_falhas = 0, bloqueado_ate = NULL WHERE id = $2', [novaSenhaHash, user.id]);
       await pool.query('UPDATE auth_password_resets SET utilizado = true WHERE id = $1', [resetRecord.id]);

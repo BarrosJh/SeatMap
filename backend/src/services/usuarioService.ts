@@ -5,6 +5,7 @@ import { validatePasswordPolicy } from '../utils/passwordValidator';
 import { TokenService } from './tokenService';
 import { escapeSqlWildcards } from '../utils/sanitizer';
 import { AuditService } from './auditService';
+import { BCRYPT_SALT_ROUNDS } from '../config/securityConstants';
 
 export interface ListarUsuariosOptions {
   busca?: string;
@@ -176,7 +177,7 @@ export class UsuarioService {
       return { success: false, code: 400, error: 'Já existe um usuário com este e-mail ou matrícula.' };
     }
 
-    const senhaHash = await bcrypt.hash(senha, 10);
+    const senhaHash = await bcrypt.hash(senha, BCRYPT_SALT_ROUNDS);
 
     const insertRes = await pool.query(`
       INSERT INTO usuarios (nome, email, matricula, senha_hash, departamento_id, perfil, permissao_rh, permissao_ti, exigir_mfa, ativo)
@@ -377,7 +378,7 @@ export class UsuarioService {
       return { success: false, code: 400, error: pwCheck.message };
     }
 
-    const senhaHash = await bcrypt.hash(novaSenha.trim(), 10);
+    const senhaHash = await bcrypt.hash(novaSenha.trim(), BCRYPT_SALT_ROUNDS);
 
     const result = await pool.query(`
       UPDATE usuarios
@@ -430,7 +431,7 @@ export class UsuarioService {
       const depMap = new Map<string, number>();
       depRes.rows.forEach(d => depMap.set(d.nome.toLowerCase().trim(), d.id));
 
-      const hashPadrao = await bcrypt.hash(defaultSenha, 10);
+      const hashPadrao = await bcrypt.hash(defaultSenha, BCRYPT_SALT_ROUNDS);
 
       let criados = 0;
       let atualizados = 0;
