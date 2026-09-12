@@ -87,8 +87,8 @@ export class WebAuthnService {
       attestationType: 'none',
       excludeCredentials,
       authenticatorSelection: {
-        residentKey: 'preferred',
-        userVerification: 'preferred',
+        residentKey: 'required',
+        userVerification: 'required',
         authenticatorAttachment: 'platform'
       }
     });
@@ -114,7 +114,7 @@ export class WebAuthnService {
       expectedChallenge: pending.challenge,
       expectedOrigin,
       expectedRPID: expectedRpId,
-      requireUserVerification: false
+      requireUserVerification: true
     });
 
     if (!verification.verified || !verification.registrationInfo) {
@@ -160,7 +160,7 @@ export class WebAuthnService {
 
     const options = await generateAuthenticationOptions({
       rpID: rpId,
-      userVerification: 'preferred',
+      userVerification: 'required',
       allowCredentials
     });
 
@@ -205,7 +205,7 @@ export class WebAuthnService {
         counter: Number(passkey.counter),
         transports: passkey.transports
       },
-      requireUserVerification: false
+      requireUserVerification: true
     });
 
     if (!verification.verified) {
