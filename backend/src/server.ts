@@ -94,6 +94,9 @@ app.use(express.json({
   type: ['application/json', 'application/scim+json', 'application/*+json']
 }));
 
+// Rate Limiter Global para mitigação de DoS e proteção de todas as rotas
+app.use(globalLimiter);
+
 // Logger Estruturado de Requisições HTTP (SIEM / SOC)
 app.use(requestLoggerMiddleware);
 
@@ -122,8 +125,8 @@ if (fs.existsSync(publicPath)) {
   });
 }
 
-// Rotas da API com Rate Limiter Global Ativo
-app.use('/api', globalLimiter, routes);
+// Rotas da API
+app.use('/api', routes);
 
 // Fallback SPA para navegação do Flutter Web
 if (fs.existsSync(publicPath)) {

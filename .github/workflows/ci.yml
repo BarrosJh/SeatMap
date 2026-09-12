@@ -54,7 +54,7 @@ jobs:
         run: docker build --tag seatmap-backend:${{ github.sha }} .
 
       - name: Scan Production Container
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.29.0
         with:
           image-ref: seatmap-backend:${{ github.sha }}
           format: table
