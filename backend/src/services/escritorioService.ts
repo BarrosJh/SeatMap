@@ -26,7 +26,11 @@ export class EscritorioService {
     // 2. Obter todas as baias do escritório
     const baiasRes = await pool.query('SELECT id, nome FROM baias WHERE escritorio_id = $1 ORDER BY id ASC', [escritorioId]);
 
-    // 3. Obter todas as cadeiras do escritório com suas reservas ativas na data
+    // 3. Obter todas as cadeiras do escritório com suas reservas correspondentes na data
+    const hoje = DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
+    const isDataPassada = dataReserva < hoje;
+    const statusFiltro = isDataPassada ? 'CONCLUIDA' : 'ATIVA';
+
     const cadeirasRes = await pool.query(`
       SELECT 
         c.id AS cadeira_id,
@@ -42,6 +46,7 @@ export class EscritorioService {
         r.usuario_id,
         r.checkin_realizado,
         r.checkin_em,
+        r.checkout_em,
         r.status AS reserva_status,
         u.nome AS ocupante_nome,
         u.matricula AS ocupante_matricula,
@@ -50,12 +55,12 @@ export class EscritorioService {
         d.nome AS ocupante_departamento_nome
       FROM cadeiras c
       JOIN baias b ON c.baia_id = b.id
-      LEFT JOIN reservas r ON c.id = r.cadeira_id AND r.data_reserva = $2 AND r.status = 'ATIVA'
+      LEFT JOIN reservas r ON c.id = r.cadeira_id AND r.data_reserva = $2 AND r.status = $3
       LEFT JOIN usuarios u ON r.usuario_id = u.id
       LEFT JOIN departamentos d ON u.departamento_id = d.id
       WHERE b.escritorio_id = $1 AND c.ativa = true
       ORDER BY c.baia_id ASC, c.id ASC
-    `, [escritorioId, dataReserva]);
+    `, [escritorioId, dataReserva, statusFiltro]);
 
     // 4. Organizar cadeiras por baia e calcular distribuição percentual por departamento
     const baiasMap: Record<number, any> = {};
@@ -86,7 +91,7 @@ export class EscritorioService {
       if (row.status_operacional === 'EM_MANUTENCAO') {
         status = 'manutencao';
         baia.totalManutencao++;
-      } else if (row.reserva_id && row.reserva_status === 'ATIVA') {
+      } else if (row.reserva_id && row.reserva_status === statusFiltro) {
         if (currentUserId && row.usuario_id === currentUserId) {
           status = 'minha_reserva';
         } else {
@@ -108,7 +113,8 @@ export class EscritorioService {
           departamentoId: row.ocupante_departamento_id,
           departamento: row.ocupante_departamento_nome,
           checkinRealizado: row.checkin_realizado,
-          checkinEm: row.checkin_em
+          checkinEm: row.checkin_em,
+          checkoutEm: row.checkout_em
         };
       } else {
         baia.totalLivres++;

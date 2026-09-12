@@ -117,142 +117,140 @@ class TabTiSmtp extends StatelessWidget {
                       const SizedBox(height: 20),
 
                       // SELETOR COM SWITCH / RADIO VISUAL CLARO
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () => onProviderChanged('RESEND'),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: isResend ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: isResend ? const Color(0xFF22C55E) : const Color(0xFFE2E8F0),
-                                    width: isResend ? 2 : 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Radio<String>(
-                                      value: 'RESEND',
-                                      groupValue: emailProvider,
-                                      activeColor: const Color(0xFF16A34A),
-                                      onChanged: (val) {
-                                        if (val != null) onProviderChanged(val);
-                                      },
+                      RadioGroup<String>(
+                        groupValue: emailProvider,
+                        onChanged: (val) {
+                          if (val != null) onProviderChanged(val);
+                        },
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => onProviderChanged('RESEND'),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: isResend ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isResend ? const Color(0xFF22C55E) : const Color(0xFFE2E8F0),
+                                      width: isResend ? 2 : 1,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              const Text(
-                                                'Resend API (HTTPS)',
-                                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: isResend ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
-                                                  borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Radio<String>(
+                                        value: 'RESEND',
+                                        activeColor: Color(0xFF16A34A),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                const Text(
+                                                  'Resend API (HTTPS)',
+                                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                                                 ),
-                                                child: Text(
-                                                  isResend ? 'ATIVO' : 'CLIQUE P/ ATIVAR',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: isResend ? const Color(0xFF15803D) : const Color(0xFF94A3B8),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: isResend ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    isResend ? 'ATIVO' : 'CLIQUE P/ ATIVAR',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: isResend ? const Color(0xFF15803D) : const Color(0xFF94A3B8),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          const Text(
-                                            'Recomendado para Nuvem / Render (Porta 443 sem bloqueios)',
-                                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                                          ),
-                                        ],
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            const Text(
+                                              'Recomendado para Nuvem / Render (Porta 443 sem bloqueios)',
+                                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () => onProviderChanged('SMTP'),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: !isResend ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: !isResend ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
-                                    width: !isResend ? 2 : 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Radio<String>(
-                                      value: 'SMTP',
-                                      groupValue: emailProvider,
-                                      activeColor: const Color(0xFF2563EB),
-                                      onChanged: (val) {
-                                        if (val != null) onProviderChanged(val);
-                                      },
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => onProviderChanged('SMTP'),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: !isResend ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: !isResend ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                                      width: !isResend ? 2 : 1,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              const Text(
-                                                'SMTP Tradicional',
-                                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: !isResend ? const Color(0xFFDBEAFE) : const Color(0xFFF1F5F9),
-                                                  borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Radio<String>(
+                                        value: 'SMTP',
+                                        activeColor: Color(0xFF2563EB),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                const Text(
+                                                  'SMTP Tradicional',
+                                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                                                 ),
-                                                child: Text(
-                                                  !isResend ? 'ATIVO' : 'CLIQUE P/ ATIVAR',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: !isResend ? const Color(0xFF1E40AF) : const Color(0xFF94A3B8),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: !isResend ? const Color(0xFFDBEAFE) : const Color(0xFFF1F5F9),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    !isResend ? 'ATIVO' : 'CLIQUE P/ ATIVAR',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: !isResend ? const Color(0xFF1E40AF) : const Color(0xFF94A3B8),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          const Text(
-                                            'Gmail, Office 365 ou Servidor de E-mail Dedicado',
-                                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                                          ),
-                                        ],
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            const Text(
+                                              'Gmail, Office 365 ou Servidor de E-mail Dedicado',
+                                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 24),
 

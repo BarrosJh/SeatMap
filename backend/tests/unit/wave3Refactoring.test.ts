@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { DateTime } from 'luxon';
 import { EscritorioService } from '../../src/services/escritorioService';
 import { FacilitiesService } from '../../src/services/facilitiesService';
 import { EscritorioController } from '../../src/controllers/escritorioController';
@@ -72,7 +73,7 @@ describe('Onda 3: Refatoração de Serviços, DTO Unificado & Resiliência Opera
 
     it('deve formatar mapa com resumo percentual de ocupação departmental', async () => {
       mockReq.params = { id: '1' };
-      mockReq.query = { data: '2026-09-10' };
+      mockReq.query = { data: DateTime.now().setZone('America/Sao_Paulo').toISODate()! };
 
       const querySpy = jest.spyOn(pool, 'query').mockImplementation(async (q: any) => {
         const text = String(q);
