@@ -1,5 +1,5 @@
 // SeatMap Enterprise PWA Service Worker
-const CACHE_NAME = 'seatmap-assets-v3';
+const CACHE_NAME = 'seatmap-assets-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -9,11 +9,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
       )
     ).then(() => self.clients.claim())
   );
@@ -24,6 +22,9 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
+
+  // Apenas intercepta requisições para a mesma origem (ignora APIs externas/cross-origin)
+  if (url.origin !== self.location.origin) return;
   if (!url.protocol.startsWith('http')) return;
 
   // Bypassa completamente requisições dinâmicas de API ou WebSockets
@@ -82,6 +83,8 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           return new Response('', { status: 408, statusText: 'Request Timeout' });
         });
+    }).catch(() => {
+      return new Response('', { status: 500, statusText: 'Cache Read Error' });
     })
   );
 });
