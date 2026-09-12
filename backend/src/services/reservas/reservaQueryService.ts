@@ -74,9 +74,8 @@ export class ReservaQueryService {
     }
 
     const reserva = result.rows[0];
-    const emailMatches = (reserva.usuario_email || '').trim().toLowerCase() === (userEmail || '').trim().toLowerCase();
-    const idMatches = Number(reserva.usuario_id) === Number(usuarioId);
-    const hasPermission = idMatches || emailMatches || userPerfil === 'ADMIN_RH' || userPerfil === 'ADMIN_TI' || isRh;
+    const isOwner = Number(reserva.usuario_id) === Number(usuarioId);
+    const hasPermission = isOwner || userPerfil === 'ADMIN_RH' || userPerfil === 'ADMIN_TI' || isRh;
 
     if (!hasPermission) {
       return { success: false, code: 403, error: 'Você não tem permissão para acessar o comprovante desta reserva.' };

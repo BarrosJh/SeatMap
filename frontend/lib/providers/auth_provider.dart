@@ -22,6 +22,7 @@ class AuthProvider extends ChangeNotifier {
   String? _emailMascarado;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isInitialized = false;
 
   // Auto-Lock por Inatividade (Segurança Bancária)
   bool _autoLockAtivo = true;
@@ -39,6 +40,7 @@ class AuthProvider extends ChangeNotifier {
   bool get requiresMfaStep => _mfaTempToken != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get isInitialized => _isInitialized;
   bool get shouldSuggestBiometrics => _shouldSuggestBiometrics;
 
   void clearShouldSuggestBiometrics() {
@@ -97,34 +99,48 @@ class AuthProvider extends ChangeNotifier {
       logout();
     };
 
-    // Carrega políticas públicas de segurança da sessão
-    await carregarConfigSeguranca();
-
-    // Executa migração transparente de SharedPreferences legados, se houver
-    await _secureStorage.migrateFromSharedPreferences();
-
-    _token = await _secureStorage.getToken();
-    _refreshToken = await _secureStorage.getRefreshToken();
-    final userJson = await _secureStorage.getUserData();
-    if (userJson != null) {
-      try {
-        _user = UserModel.fromJsonString(userJson);
-      } catch (e) {
-        _user = null;
+    try {
+      // 1. Fase Local Rápida: Leitura do SecureStorage sem bloqueio de rede
+      await _secureStorage.migrateFromSharedPreferences();
+      _token = await _secureStorage.getToken();
+      _refreshToken = await _secureStorage.getRefreshToken();
+      final userJson = await _secureStorage.getUserData();
+      if (userJson != null) {
+        try {
+          _user = UserModel.fromJsonString(userJson);
+        } catch (e) {
+          _user = null;
+        }
       }
-    }
-    _adminToken = await _secureStorage.getAdminToken();
+      _adminToken = await _secureStorage.getAdminToken();
 
-    if (_token != null && !_isTokenUsable(_token!)) {
-      _token = null;
-      _adminToken = null;
-      await _secureStorage.delete(AppConstants.keyToken);
+      if (_token != null && !_isTokenUsable(_token!)) {
+        _token = null;
+        _adminToken = null;
+        await _secureStorage.delete(AppConstants.keyToken);
+      }
+
+      if (_token == null && _refreshToken == null) {
+        _user = null;
+        await _secureStorage.delete(AppConstants.keyUserData);
+      }
+    } catch (e) {
+      debugPrint('[AuthProvider] Erro ao ler credenciais locais: $e');
+    } finally {
+      // Libera a renderização da interface no primeiro frame
+      _isInitialized = true;
+      notifyListeners();
     }
 
-    if (_token == null && _refreshToken == null) {
-      _user = null;
-      await _secureStorage.delete(AppConstants.keyUserData);
-    } else if (_token == null && _refreshToken != null) {
+    // 2. Fase Remota em Segundo Plano (Background): Validação e atualização de segurança
+    _executarValidacaoBackground();
+  }
+
+  Future<void> _executarValidacaoBackground() async {
+    // Carrega políticas públicas de segurança da sessão
+    carregarConfigSeguranca();
+
+    if (_token == null && _refreshToken != null) {
       await renovarSessaoComRefreshToken();
     } else if (_token != null) {
       // Validação autoritativa e busca de perfil mais recente no Backend (PostgreSQL)
@@ -133,17 +149,16 @@ class AuthProvider extends ChangeNotifier {
         if (meRes.success && meRes.data != null) {
           _user = meRes.data;
           await _secureStorage.saveUserData(_user!.toJsonString());
+          notifyListeners();
         } else if (meRes.statusCode == 401) {
           // Token revogado, usuário inativo ou tokenVersion alterada
           debugPrint('[AuthProvider] Sessão inválida no backend ao iniciar. Executando logout.');
           await logout();
-          return;
         }
       } catch (e) {
         debugPrint('[AuthProvider] Falha de conexão ao sincronizar com /auth/me: $e');
       }
     }
-    notifyListeners();
   }
 
   bool _isTokenUsable(String token) {

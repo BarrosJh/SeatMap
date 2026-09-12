@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/db';
 import { ConfigService } from '../services/configService';
 import { env } from '../config/env';
+import { logger } from '../utils/logger';
 
 export type Permission =
   | 'config:read'
@@ -180,7 +181,7 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
       req.user = decoded as AuthUser;
       next();
     } catch (dbErr) {
-      console.error('[authenticateToken] Erro ao validar status do usuário no banco:', dbErr);
+      logger.error('[authenticateToken] Erro ao validar status do usuário no banco:', { correlationId: (req as any).correlationId, error: dbErr });
       return res.status(503).json({ error: 'Serviço temporariamente indisponível para validação de credenciais.' });
     }
   });
@@ -238,7 +239,7 @@ export const authenticateAdminMfa = async (req: AuthenticatedRequest, res: Respo
       next();
     });
   } catch (error) {
-    console.error('[authenticateAdminMfa] Erro ao verificar política de MFA:', error);
+    logger.error('[authenticateAdminMfa] Erro ao verificar política de MFA:', { correlationId: req.correlationId, error });
     return res.status(500).json({ error: 'Erro de segurança ao validar autenticação em duas etapas.' });
   }
 };

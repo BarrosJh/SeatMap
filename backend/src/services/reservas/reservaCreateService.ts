@@ -133,7 +133,7 @@ export class ReservaCreateService {
       }
 
       const reservaExistenteDiaRes = await client.query(`
-        SELECT r.id, r.cadeira_id, b.escritorio_id, c.identificador
+        SELECT r.id, r.cadeira_id, r.checkin_realizado, r.checkin_em, b.escritorio_id, c.identificador
         FROM reservas r
         JOIN cadeiras c ON r.cadeira_id = c.id
         JOIN baias b ON c.baia_id = b.id
@@ -143,6 +143,7 @@ export class ReservaCreateService {
 
       const isTroca = reservaExistenteDiaRes.rowCount! > 0;
       const reservaAntiga = isTroca ? reservaExistenteDiaRes.rows[0] : null;
+      const isTrocaPosCheckin = isTroca && Boolean(reservaAntiga.checkin_realizado);
 
       if (isTroca && reservaAntiga.cadeira_id === cadeiraId) {
         await client.query('COMMIT');
@@ -170,8 +171,8 @@ export class ReservaCreateService {
           FROM reservas
           WHERE usuario_id = $1
             AND status = 'ATIVA'
-            AND data_reserva >= CURRENT_DATE
-        `, [usuarioId]);
+            AND data_reserva >= $2
+        `, [usuarioId, hoje]);
 
         const totalAtivas = parseInt(contagemAtivasRes.rows[0].total, 10);
         if (totalAtivas >= limiteAtivas) {
@@ -194,13 +195,51 @@ export class ReservaCreateService {
 
       let novaReserva: any;
       if (isTroca && reservaAntiga) {
-        const updateRes = await client.query(`
-          UPDATE reservas
-          SET cadeira_id = $1, checkin_realizado = $2, checkin_em = $3, status = 'ATIVA', codigo_comprovante = $4, criado_em = NOW()
-          WHERE id = $5
-          RETURNING id, cadeira_id, usuario_id, to_char(data_reserva, 'YYYY-MM-DD') AS data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante, criado_em
-        `, [cadeiraId, checkinRealizado, checkinEm, codigoComprovante, reservaAntiga.id]);
-        novaReserva = updateRes.rows[0];
+        if (isTrocaPosCheckin) {
+          // Se o check-in já havia sido realizado na mesa anterior:
+          // 1. Marca a reserva antiga como CONCLUIDA (checkout automático por troca)
+          const checkoutTimestamp = new Date();
+          await client.query(`
+            UPDATE reservas
+            SET status = 'CONCLUIDA', checkout_em = $1
+            WHERE id = $2 AND status = 'ATIVA'
+          `, [checkoutTimestamp, reservaAntiga.id]);
+
+          // Registra a liberação da mesa anterior no histórico de auditoria
+          await ReservaHistoryService.registrarEvento({
+            reservaId: reservaAntiga.id,
+            cadeiraId: reservaAntiga.cadeira_id,
+            usuarioId,
+            dataReserva: dataAlvoIso,
+            tipoEvento: 'MESA_LIBERADA',
+            executadoPorUsuarioId: usuarioId,
+            motivo: `Mesa concluída automaticamente por troca de assento para a Mesa ${cadeira.identificador}`,
+            detalhes: {
+              codigoComprovanteAntigo: reservaAntiga.codigo_comprovante,
+              cadeiraAntigaIdentificador: reservaAntiga.identificador,
+              novaCadeiraId: cadeira.id,
+              novaCadeiraIdentificador: cadeira.identificador,
+              checkoutEm: checkoutTimestamp.toISOString()
+            }
+          }, client);
+
+          // 2. Insere uma nova reserva com status ATIVA na nova mesa
+          const insertRes = await client.query(`
+            INSERT INTO reservas (cadeira_id, usuario_id, data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante)
+            VALUES ($1, $2, $3, $4, $5, 'ATIVA', $6)
+            RETURNING id, cadeira_id, usuario_id, to_char(data_reserva, 'YYYY-MM-DD') AS data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante, criado_em
+          `, [cadeiraId, usuarioId, dataAlvoIso, checkinRealizado, checkinEm, codigoComprovante]);
+          novaReserva = insertRes.rows[0];
+        } else {
+          // Se o check-in AINDA NÃO foi realizado: segue o fluxo normal de troca mutando a reserva atual
+          const updateRes = await client.query(`
+            UPDATE reservas
+            SET cadeira_id = $1, checkin_realizado = $2, checkin_em = $3, status = 'ATIVA', codigo_comprovante = $4, criado_em = NOW()
+            WHERE id = $5
+            RETURNING id, cadeira_id, usuario_id, to_char(data_reserva, 'YYYY-MM-DD') AS data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante, criado_em
+          `, [cadeiraId, checkinRealizado, checkinEm, codigoComprovante, reservaAntiga.id]);
+          novaReserva = updateRes.rows[0];
+        }
       } else {
         const insertRes = await client.query(`
           INSERT INTO reservas (cadeira_id, usuario_id, data_reserva, checkin_realizado, checkin_em, status, codigo_comprovante)
@@ -215,15 +254,18 @@ export class ReservaCreateService {
         cadeiraId: cadeira.id,
         usuarioId,
         dataReserva: dataAlvoIso,
-        tipoEvento: isTroca ? 'TROCADA' : 'CRIADA',
+        tipoEvento: (isTroca && !isTrocaPosCheckin) ? 'TROCADA' : 'CRIADA',
         executadoPorUsuarioId: usuarioId,
-        motivo: isTroca ? `Troca atômica de assento (Mesa ${reservaAntiga?.identificador} -> Mesa ${cadeira.identificador})` : 'Reserva de assento efetuada',
+        motivo: isTrocaPosCheckin
+          ? `Nova reserva de assento efetuada após troca pós check-in (Mesa ${reservaAntiga?.identificador} -> Mesa ${cadeira.identificador})`
+          : (isTroca ? `Troca atômica de assento (Mesa ${reservaAntiga?.identificador} -> Mesa ${cadeira.identificador})` : 'Reserva de assento efetuada'),
         detalhes: {
           codigoComprovante,
           escritorioId: cadeira.escritorio_id,
           cadeiraAntigaId: reservaAntiga?.cadeira_id || null,
           cadeiraAntigaIdentificador: reservaAntiga?.identificador || null,
-          checkinAutomatico: checkinRealizado
+          checkinAutomatico: checkinRealizado,
+          trocaPosCheckin: isTrocaPosCheckin
         }
       }, client);
 

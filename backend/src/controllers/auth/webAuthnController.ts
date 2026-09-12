@@ -47,7 +47,7 @@ export class WebAuthnController {
       return res.status(200).json(options);
     } catch (error: any) {
       logger.error('[WebAuthnController.registerOptions] Erro:', { correlationId: req.correlationId, error: error.message });
-      return res.status(500).json({ error: error.message || 'Erro ao gerar opções de registro biométrico.' });
+      return res.status(500).json({ error: 'Erro ao gerar opções de registro biométrico.' });
     }
   }
 
@@ -98,7 +98,7 @@ export class WebAuthnController {
       });
     } catch (error: any) {
       logger.error('[WebAuthnController.registerVerify] Erro:', { correlationId: req.correlationId, error: error.message });
-      return res.status(400).json({ error: error.message || 'Falha ao validar biometria.' });
+      return res.status(400).json({ error: 'Falha ao validar biometria neste dispositivo.' });
     }
   }
 
@@ -198,7 +198,7 @@ export class WebAuthnController {
         userAgent,
         detalhes: { motivo: 'Falha na validação biométrica', erro: error.message }
       });
-      return res.status(401).json({ error: error.message || 'Falha na autenticação biométrica.' });
+      return res.status(401).json({ error: 'Falha na autenticação biométrica ou credencial não reconhecida.' });
     }
   }
 

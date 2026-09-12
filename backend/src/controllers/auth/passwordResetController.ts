@@ -72,7 +72,7 @@ export class PasswordResetController {
         message: 'Código de recuperação enviado com sucesso para o seu e-mail cadastrado.',
         emailMascarado,
         expiraEmMinutos: expiraMin,
-        codigoSimulado: process.env.NODE_ENV !== 'production' ? codigo : undefined
+        codigoSimulado: (process.env.NODE_ENV === 'test' && process.env.ENABLE_DEV_MFA_EXPOSURE === 'true') ? codigo : undefined
       });
     } catch (error) {
       logger.error('[PasswordResetController.solicitarRecuperacaoSenha] Erro:', { correlationId: (req as any).correlationId, error });

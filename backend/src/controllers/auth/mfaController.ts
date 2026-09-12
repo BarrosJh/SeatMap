@@ -420,7 +420,7 @@ export class MfaController {
         message: 'Código de autenticação MFA gerado e enviado por e-mail com sucesso.',
         email: user.email,
         expiraEmMinutos: expiraMin,
-        codigoSimulado: process.env.NODE_ENV !== 'production' ? codigo : undefined
+        codigoSimulado: (process.env.NODE_ENV === 'test' && process.env.ENABLE_DEV_MFA_EXPOSURE === 'true') ? codigo : undefined
       });
     } catch (error) {
       logger.error('[MfaController.solicitarMfa] Erro:', { correlationId: req.correlationId, error });

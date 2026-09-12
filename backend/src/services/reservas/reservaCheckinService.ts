@@ -170,37 +170,41 @@ export class ReservaCheckinService {
 
       if (calculoLimite.isExpirada) {
         // Auto-expirar como No-Show e liberar assento no mapa de forma atômica
-        await client.query(`
+        const updateNoShowRes = await client.query(`
           UPDATE reservas
           SET status = 'EXPIRADA_NOSHOW'
           WHERE id = $1 AND status = 'ATIVA' AND checkin_realizado = false
         `, [reservaId]);
 
-        await ReservaHistoryService.registrarEvento({
-          reservaId: reserva.id,
-          cadeiraId: reserva.cadeira_id,
-          usuarioId: reserva.usuario_id,
-          dataReserva: dataReservaIso,
-          tipoEvento: 'EXPIRADA_NOSHOW',
-          executadoPorUsuarioId: usuarioId,
-          motivo: `Tentativa de check-in após o horário limite das ${calculoLimite.limiteFormatado}. Reserva expirada por No-Show e assento liberado.`,
-          detalhes: {
-            cadeiraIdentificador: reserva.cadeira_identificador,
-            horarioLimite: calculoLimite.limiteFormatado,
-            isReservaTardia: calculoLimite.isReservaTardia
-          }
-        }, client);
+        if (updateNoShowRes.rowCount && updateNoShowRes.rowCount > 0) {
+          await ReservaHistoryService.registrarEvento({
+            reservaId: reserva.id,
+            cadeiraId: reserva.cadeira_id,
+            usuarioId: reserva.usuario_id,
+            dataReserva: dataReservaIso,
+            tipoEvento: 'EXPIRADA_NOSHOW',
+            executadoPorUsuarioId: usuarioId,
+            motivo: `Tentativa de check-in após o horário limite das ${calculoLimite.limiteFormatado}. Reserva expirada por No-Show e assento liberado.`,
+            detalhes: {
+              cadeiraIdentificador: reserva.cadeira_identificador,
+              horarioLimite: calculoLimite.limiteFormatado,
+              isReservaTardia: calculoLimite.isReservaTardia
+            }
+          }, client);
+        }
 
         await client.query('COMMIT');
 
-        wsManager.broadcastSeatUpdate({
-          evento: 'assento_atualizado',
-          escritorioId: reserva.escritorio_id,
-          cadeiraId: reserva.cadeira_id,
-          data: dataReservaIso,
-          status: 'livre',
-          ocupante: null
-        });
+        if (updateNoShowRes.rowCount && updateNoShowRes.rowCount > 0) {
+          wsManager.broadcastSeatUpdate({
+            evento: 'assento_atualizado',
+            escritorioId: reserva.escritorio_id,
+            cadeiraId: reserva.cadeira_id,
+            data: dataReservaIso,
+            status: 'livre',
+            ocupante: null
+          });
+        }
 
         return {
           success: false,

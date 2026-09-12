@@ -14,7 +14,7 @@ void main() async {
   await initializeDateFormatting('pt_BR', null);
 
   final authProvider = AuthProvider();
-  await authProvider.initAuth();
+  authProvider.initAuth(); // Inicialização sem bloquear a renderização inicial
 
   runApp(
     MultiProvider(
@@ -62,6 +62,17 @@ class SeatMapApp extends StatelessWidget {
       ),
       home: Consumer<AuthProvider>(
         builder: (context, auth, _) {
+          if (!auth.isInitialized) {
+            return const Scaffold(
+              backgroundColor: Color(0xFF0F172A),
+              body: Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                ),
+              ),
+            );
+          }
           return auth.isAuthenticated ? const MainNavigation() : const LoginScreen();
         },
       ),

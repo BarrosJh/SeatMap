@@ -5,7 +5,8 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 export const criarReservaSchema = z.object({
   cadeiraId: z.coerce.number().int().positive('ID de cadeira inválido'),
-  dataReserva: z.string().regex(DATE_REGEX, 'Data deve estar no formato YYYY-MM-DD')
+  dataReserva: z.string().regex(DATE_REGEX, 'Data deve estar no formato YYYY-MM-DD'),
+  idempotencyKey: z.string().max(100).optional()
 }).strict();
 
 export const fazerCheckinSchema = z.object({

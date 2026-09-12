@@ -253,6 +253,7 @@ class SeatMapProvider extends ChangeNotifier {
   }
 
   Future<void> carregarInicial(String token, UserModel user) async {
+    if (_isLoading) return;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();

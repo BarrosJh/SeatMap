@@ -10,6 +10,7 @@ import http from 'http';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import routes from './routes';
 import { wsManager } from './websocket/wsServer';
 import { CronService } from './services/cronService';
@@ -143,19 +144,33 @@ app.use('/api', (req, res, next) => {
 // Permissions-Policy e Headers para o PWA (Câmera liberada para QR Code scanner na própria aplicação)
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api')) {
-    res.setHeader('Permissions-Policy', 'camera=(self "https://seatmap-api-tvy9.onrender.com"), microphone=(), geolocation=(), payment=(), usb=()');
-    res.setHeader('Feature-Policy', "camera 'self' https://seatmap-api-tvy9.onrender.com; microphone 'none'; geolocation 'none'");
+    const extraOrigin = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL;
+    const cameraOrigin = extraOrigin ? `(self "${extraOrigin.replace(/\/$/, '')}")` : '(self)';
+    const cameraFeatureOrigin = extraOrigin ? `'self' ${extraOrigin.replace(/\/$/, '')}` : "'self'";
+    res.setHeader('Permissions-Policy', `camera=${cameraOrigin}, microphone=(), geolocation=(), payment=(), usb=()`);
+    res.setHeader('Feature-Policy', `camera ${cameraFeatureOrigin}; microphone 'none'; geolocation 'none'`);
   }
   next();
 });
+
+// Ativa Compressão HTTP (Gzip/Deflate) para acelerar a transferência de bundles e WASM
+app.use(compression());
 
 // Servir Aplicação Flutter Web (Frontend Monolith) se a pasta public existir
 const publicPath = path.join(__dirname, '../public');
 if (fs.existsSync(publicPath)) {
   app.use(express.static(publicPath, {
+    maxAge: '1y',
+    immutable: true,
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.wasm')) {
         res.setHeader('Content-Type', 'application/wasm');
+      }
+      // index.html e service worker sempre revalidados para deploy instantâneo
+      if (filePath.endsWith('index.html') || filePath.endsWith('sw.js') || filePath.endsWith('flutter_bootstrap.js') || filePath.endsWith('flutter_service_worker.js')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
       }
     }
   }));

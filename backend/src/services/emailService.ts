@@ -1,6 +1,7 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import dns from 'dns';
 import { ConfigService } from './configService';
+import { logger } from '../utils/logger';
 
 if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder('ipv4first');
@@ -464,15 +465,15 @@ export class EmailService {
 
         const resData: any = await res.json().catch(() => ({}));
         if (!res.ok) {
-          console.error('[EmailService Resend API Error]:', res.status, resData);
+          logger.error('[EmailService Resend API Error]', { status: res.status, resData });
           return false;
         }
 
-        console.log('================================================================');
-        console.log('[EmailService Resend HTTPS] E-mail enviado com sucesso!');
-        console.log('[EmailService] Tipo:', opts.tipoLog, '| Destinatário:', opts.to);
-        console.log('[EmailService] Resend ID:', resData?.id);
-        console.log('================================================================');
+        logger.info('[EmailService Resend HTTPS] E-mail enviado com sucesso', {
+          tipo: opts.tipoLog,
+          destinatario: opts.to,
+          resendId: resData?.id
+        });
 
         return true;
       }
@@ -488,22 +489,21 @@ export class EmailService {
 
       const info = await transporter.sendMail(mailOptions);
 
-      console.log('================================================================');
-      console.log('[EmailService SMTP] E-mail enviado com sucesso!');
-      console.log('[EmailService] Tipo:', opts.tipoLog, '| Destinatário:', opts.to);
-      console.log('[EmailService] Assunto:', opts.subject);
-      if (info.messageId) {
-        console.log('[EmailService] MessageId:', info.messageId);
-      }
-      console.log('================================================================');
+      logger.info('[EmailService SMTP] E-mail enviado com sucesso', {
+        tipo: opts.tipoLog,
+        destinatario: opts.to,
+        assunto: opts.subject,
+        messageId: info.messageId
+      });
 
       return true;
     } catch (error: any) {
-      console.error('[EmailService Error] Falha ao despachar e-mail para:', opts.to, {
+      logger.error('[EmailService Error] Falha ao despachar e-mail para:', {
+        destinatario: opts.to,
         message: error?.message,
         code: error?.code,
         response: error?.response,
-        command: error?.command
+        stack: error?.stack
       });
       return false;
     }

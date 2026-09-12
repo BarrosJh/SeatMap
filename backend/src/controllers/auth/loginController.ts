@@ -260,7 +260,7 @@ export class LoginController {
             tempToken,
             emailMascarado,
             expiraEmMinutos: mfaExpiracaoMinutos,
-            codigoSimulado: process.env.NODE_ENV !== 'production' ? codigoPin : undefined,
+            codigoSimulado: (process.env.NODE_ENV === 'test' && process.env.ENABLE_DEV_MFA_EXPOSURE === 'true') ? codigoPin : undefined,
             message: `Código de verificação enviado para ${emailMascarado}. Insira o código de 6 dígitos para continuar.`
           });
         }
