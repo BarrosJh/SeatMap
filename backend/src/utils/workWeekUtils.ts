@@ -91,18 +91,16 @@ export async function isProximaSemanaLiberada(
   now: DateTime = DateTime.now().setZone('America/Sao_Paulo')
 ): Promise<{ liberada: boolean; mensagemBloqueio?: string }> {
   const perfil = typeof userOrPerfil === 'string' ? userOrPerfil : (userOrPerfil?.perfil || 'COLABORADOR');
-  const isPrivileged = typeof userOrPerfil === 'object' && (
-    userOrPerfil.permissaoRh === true ||
-    userOrPerfil.permissaoTi === true ||
-    userOrPerfil.is_admin === true ||
-    userOrPerfil.perfil === 'ADMIN_RH' ||
-    userOrPerfil.perfil === 'ADMIN_TI'
-  );
-
-  // Administradores do RH e TI sempre têm acesso total para planejar
-  if (isPrivileged || perfil === 'ADMIN_RH' || perfil === 'ADMIN_TI') {
-    return { liberada: true };
-  }
+  const isGestaoOrAdmin = typeof userOrPerfil === 'object'
+    ? (
+        userOrPerfil.perfil === 'GESTAO' ||
+        userOrPerfil.perfil === 'ADMIN_RH' ||
+        userOrPerfil.perfil === 'ADMIN_TI' ||
+        userOrPerfil.permissaoRh === true ||
+        userOrPerfil.permissaoTi === true ||
+        userOrPerfil.is_admin === true
+      )
+    : (perfil === 'GESTAO' || perfil === 'ADMIN_RH' || perfil === 'ADMIN_TI');
 
   const diaSemanaHoje = now.weekday; // 1 = Seg, 5 = Sex, 6 = Sáb, 7 = Dom
   const horaAtual = now.toFormat('HH:mm');
@@ -116,7 +114,7 @@ export async function isProximaSemanaLiberada(
     5: 'Sexta-feira'
   };
 
-  if (perfil === 'GESTAO') {
+  if (isGestaoOrAdmin) {
     const diaAberturaGestao = await ConfigService.getNumber('DIA_ABERTURA_GESTAO', 5);
     const horarioAberturaGestao = await ConfigService.get('HORARIO_ABERTURA_GESTAO', '08:00');
 
@@ -130,7 +128,7 @@ export async function isProximaSemanaLiberada(
       const nomeDia = diasNomes[diaAberturaGestao] || 'Sexta-feira';
       return {
         liberada: false,
-        mensagemBloqueio: `A agenda da próxima semana para Gestão abre na ${nomeDia} às ${horarioAberturaGestao}.`
+        mensagemBloqueio: `A agenda da próxima semana para Gestão e Administração abre na ${nomeDia} às ${horarioAberturaGestao}.`
       };
     }
   } else {

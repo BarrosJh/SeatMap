@@ -229,22 +229,31 @@ describe('Wave 5: Enterprise Security Compliance & Hardening', () => {
     });
   });
 
-  describe('5. Agenda da Próxima Semana para Perfis Privilegiados', () => {
-    it('deve liberar a agenda da próxima semana para perfil ADMIN_RH e ADMIN_TI independente do dia da semana', async () => {
-      // Quinta-feira às 10:00 (antes da abertura padrão de sexta-feira)
+  describe('5. Agenda da Próxima Semana para Perfis Gestão / Admin (RH e TI)', () => {
+    it('deve bloquear a agenda da próxima semana para perfil ADMIN_RH e ADMIN_TI antes da abertura da Gestão', async () => {
+      jest.spyOn(ConfigService, 'getNumber').mockResolvedValue(5); // Sexta
+      jest.spyOn(ConfigService, 'get').mockResolvedValue('08:00');
+
+      // Quinta-feira às 10:00 (antes da abertura padrão de sexta-feira 08:00)
       const quintaFeira = DateTime.fromISO('2026-09-10T10:00:00', { zone: 'America/Sao_Paulo' });
 
       const statusRh = await isProximaSemanaLiberada('ADMIN_RH', quintaFeira);
-      expect(statusRh.liberada).toBe(true);
+      expect(statusRh.liberada).toBe(false);
+      expect(statusRh.mensagemBloqueio).toContain('Gestão e Administração');
 
       const statusTi = await isProximaSemanaLiberada('ADMIN_TI', quintaFeira);
-      expect(statusTi.liberada).toBe(true);
+      expect(statusTi.liberada).toBe(false);
 
       const statusUserObj = await isProximaSemanaLiberada({
         perfil: 'COLABORADOR',
         permissaoRh: true
       }, quintaFeira);
-      expect(statusUserObj.liberada).toBe(true);
+      expect(statusUserObj.liberada).toBe(false);
+
+      // Sexta-feira às 09:00 (após a abertura de Gestão/Admin às 08:00)
+      const sextaManha = DateTime.fromISO('2026-09-11T09:00:00', { zone: 'America/Sao_Paulo' });
+      const statusRhAberto = await isProximaSemanaLiberada('ADMIN_RH', sextaManha);
+      expect(statusRhAberto.liberada).toBe(true);
     });
 
     it('deve respeitar horários de abertura para perfil COLABORADOR', async () => {

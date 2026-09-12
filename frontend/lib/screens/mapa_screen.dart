@@ -79,14 +79,14 @@ class _MapaScreenState extends State<MapaScreen> {
 
     if (diffWeeks <= 0) return true; // Semana vigente sempre aberta
     if (diffWeeks == 1) {
-      final diaSemanaHoje = now.weekday; // 1=Seg, 5=Sex
+      final diaSemanaHoje = now.weekday; // 1=Seg, 5=Sex, 6=Sáb, 7=Dom
       final horaAtual = DateFormat('HH:mm').format(now);
-      if (user.isGestao) {
-        // Gestão abre Quinta/Sexta 08h
-        return diaSemanaHoje >= 5 || (diaSemanaHoje == 4 && horaAtual.compareTo('08:00') >= 0);
+      if (user.isGestao || user.isAdmin || user.isTi) {
+        // Gestão e Administração (RH/TI) abre Sexta 08h
+        return diaSemanaHoje >= 6 || (diaSemanaHoje == 5 && horaAtual.compareTo('08:00') >= 0);
       } else {
         // Colaborador abre Sexta 12h
-        return diaSemanaHoje == 5 && horaAtual.compareTo('12:00') >= 0;
+        return diaSemanaHoje >= 6 || (diaSemanaHoje == 5 && horaAtual.compareTo('12:00') >= 0);
       }
     }
     return false;

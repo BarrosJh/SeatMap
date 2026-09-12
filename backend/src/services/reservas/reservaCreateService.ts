@@ -15,6 +15,9 @@ export interface CriarReservaInput {
   usuarioNome: string;
   usuarioEmail: string;
   usuarioPerfil: string;
+  usuarioPermissaoRh?: boolean;
+  usuarioPermissaoTi?: boolean;
+  usuarioIsAdmin?: boolean;
   departamentoId?: number | null;
   departamentoNome?: string;
   dataReserva: string;
@@ -32,6 +35,9 @@ export class ReservaCreateService {
       usuarioId,
       usuarioNome,
       usuarioPerfil,
+      usuarioPermissaoRh,
+      usuarioPermissaoTi,
+      usuarioIsAdmin,
       departamentoId,
       departamentoNome,
       dataReserva,
@@ -60,7 +66,12 @@ export class ReservaCreateService {
     }
 
     if (diffSemanas === 1) {
-      const statusAbertura = await isProximaSemanaLiberada(usuarioPerfil, DateTime.now().setZone('America/Sao_Paulo'));
+      const statusAbertura = await isProximaSemanaLiberada({
+        perfil: usuarioPerfil,
+        permissaoRh: usuarioPermissaoRh,
+        permissaoTi: usuarioPermissaoTi,
+        is_admin: usuarioIsAdmin
+      }, DateTime.now().setZone('America/Sao_Paulo'));
       if (!statusAbertura.liberada) {
         return {
           success: false,

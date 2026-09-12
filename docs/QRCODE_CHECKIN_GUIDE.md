@@ -174,3 +174,4 @@ Para garantir que a câmera do celular dos colaboradores faça a leitura instant
    - **Se o ID bater com a reserva de hoje:** O check-in é confirmado no backend (`POST /api/reservas/:id/checkin`), o status é emitido em tempo real via WebSocket para todos os usuários e o comprovante digital é exibido.
    - **Se o colaborador leu a mesa errada:** O sistema bloqueia e alerta: *"QR Code pertence à Mesa X, mas sua reserva de hoje é para a Mesa Y"*.
    - **Se o colaborador não possui reserva hoje:** O sistema alerta e oferece o botão para ir ao Mapa e realizar a reserva.
+

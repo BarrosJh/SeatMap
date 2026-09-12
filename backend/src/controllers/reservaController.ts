@@ -17,6 +17,8 @@ export class ReservaController {
         usuarioNome: user.nome,
         usuarioEmail: user.email,
         usuarioPerfil: user.perfil,
+        usuarioPermissaoRh: user.permissaoRh,
+        usuarioPermissaoTi: user.permissaoTi,
         departamentoId: user.departamentoId,
         departamentoNome: user.departamentoNome,
         dataReserva,
