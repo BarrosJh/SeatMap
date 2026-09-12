@@ -1,9 +1,9 @@
-# Bloco 7 - Politica de backup, restore e recuperacao
+# Política de Backup, Restore e Continuidade Operacional
 
-## Politica
+## Política
 
-- Backup logico completo PostgreSQL todos os dias, fora do horario de pico.
-- Retencao minima local: 30 dias, aplicada por `scripts/backup.sh` ou `scripts/backup.ps1`.
+- Backup lógico completo do PostgreSQL executado diariamente fora do horário de pico.
+- Retenção mínima local: 30 dias, aplicada pelos scripts de automação (`scripts/backup.sh` ou `scripts/backup.ps1` - consulte [Guia Operacional de Scripts](operations/SCRIPTS.md)).
 - Uma copia deve ser enviada para armazenamento externo ao host (object storage ou servidor de backup) apos o checksum.
 - Retencao recomendada externa: 12 backups mensais e 7 diarios. O storage externo deve usar criptografia e versionamento.
 - O volume Docker `pgdata` e persistencia operacional, nao substitui backup.

@@ -1,11 +1,11 @@
-# Bloco 6 - Observabilidade e resposta a incidentes
+# Observabilidade e Resposta a Incidentes (Backend)
 
 ## Logs
 
 O logger central em `src/utils/logger` produz entradas estruturadas com timestamp, nivel,
 servico, ambiente, mensagem, contexto e `correlationId`. Em producao, use `LOG_FORMAT=json`
 e encaminhe stdout/stderr para o coletor central da plataforma (por exemplo, Loki, ELK ou
-CloudWatch). O redator remove senhas, tokens, segredos, CPF e dados de cartao antes da saida.
+CloudWatch). O mecanismo de sanitização e mascaramento remove senhas, tokens, segredos, CPF e dados de cartao antes da saida.
 
 Cada request recebe ou propaga `X-Correlation-Id`. O mesmo identificador aparece no log de
 entrada/saida, nos controllers e nos erros tratados, permitindo buscar uma transacao completa.

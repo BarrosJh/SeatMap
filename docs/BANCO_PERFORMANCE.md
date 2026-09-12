@@ -1,4 +1,4 @@
-# Bloco 8 - Revisao de banco e performance
+# Engenharia de Banco de Dados e Performance (PostgreSQL)
 
 ## Resultado da revisao
 

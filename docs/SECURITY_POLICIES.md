@@ -36,7 +36,7 @@ Aplica-se a todos os ambientes (**Desenvolvimento, Staging e Produção**), oper
 | **`ENCRYPTION_KEY`** | Chave AES-256-GCM de cifragem de segredos TOTP no PostgreSQL. | **P0 - Crítica** | A cada **90 dias** ou incidente | Re-encriptação em lote via script `npm run db:reencrypt`. |
 | **`DB_PASSWORD`** | Senha do usuário de aplicação no PostgreSQL. | **P1 - Alta** | A cada **90 dias** | Alteração no banco via RDS/Cloud SQL e injeção da nova variável. |
 | **`INTERNAL_HEALTH_TOKEN`** | Token de sondas de liveness/readiness e métricas Prometheus. | **P1 - Alta** | A cada **90 dias** | Atualização simultânea no Kubernetes/Scraper e na API. |
-| **`SCIM_BEARER_TOKEN`** | Token de integração com IdP para provisionamento RFC 7644. | **P1 - Alta** | A cada **90 dias** | Rotação coordenada no Microsoft Entra ID / Okta. |
+| **`SCIM_BEARER_TOKEN`** | Token de integração com IdP para provisionamento RFC 7644. | **P1 - Alta** | A cada **90 dias** | Rotação coordenada no Microsoft Entra ID. |
 | **`SMTP_PASS`** | Senha/Token de serviço SMTP para envio de códigos MFA e alertas. | **P2 - Média** | A cada **180 dias** | Geração de novo App Password no servidor SMTP. |
 
 ---
@@ -83,9 +83,9 @@ Em caso de suspeita fundamentada ou confirmação de vazamento de segredos:
 3. Executar o redeploy ou reload gracioso dos containers da API (`kubectl rollout restart` ou restart no Render/AWS).
 
 ### Passo 3: Trilha e Notificação
-1. Consultar os logs de auditoria na tabela `auditoria_logs` para verificar possíveis acessos anômalos no intervalo do incidente:
+1. Consultar os logs de auditoria na tabela `auditoria_acessos` para verificar possíveis acessos anômalos no intervalo do incidente:
    ```sql
-   SELECT * FROM auditoria_logs WHERE criado_em >= NOW() - INTERVAL '24 HOURS' ORDER BY id DESC;
+   SELECT * FROM auditoria_acessos WHERE criado_em >= NOW() - INTERVAL '24 HOURS' ORDER BY id DESC;
    ```
 2. Registrar o incidente no Relatório de Não-Conformidade de Segurança conforme exigido pela resolução BACEN CMN 4.893.
 

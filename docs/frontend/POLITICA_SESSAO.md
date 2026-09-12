@@ -1,4 +1,4 @@
-# Bloco 9 - Politica de sessao no cliente
+# Política de Sessão e Armazenamento Seguro (Frontend Flutter)
 
 ## Armazenamento
 

@@ -7,7 +7,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="SeatMap - Sistema Corporativo de Reserva e Gestão Inteligente de Assentos">
   
-  <!-- iOS Safari PWA -->
+  <!-- PWA Mobile Capabilities -->
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SeatMap">
@@ -17,6 +18,7 @@
   <meta name="msapplication-navbutton-color" content="#0F172A">
 
   <title>SeatMap - Reserva de Assentos</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.json">
   <style>
     body {
@@ -31,6 +33,14 @@
   </style>
 </head>
 <body>
+  <script>
+    window._flutter = {
+      config: {
+        useLocalCanvasKit: true,
+        canvasKitBaseUrl: "canvaskit/"
+      }
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

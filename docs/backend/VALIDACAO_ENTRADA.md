@@ -1,4 +1,4 @@
-# Bloco 4 - Validacao e hardening de entrada
+# Validação e Hardening de Entrada (Backend)
 
 Todas as rotas que recebem entrada externa devem usar `validateRequest` antes do controller.
 Os schemas Zod rejeitam campos desconhecidos, normalizam tipos quando seguro e limitam tamanho,

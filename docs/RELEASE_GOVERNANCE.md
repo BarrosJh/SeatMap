@@ -1,18 +1,16 @@
-# Bloco 10 - Release gate e governanca
+# Governança de Releases e Quality Gates (DevSecOps)
 
-## Pipeline obrigatorio
+## Pipeline Obrigatório de CI/CD
 
-O workflow `.github/workflows/ci.yml` executa:
+O workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) executa os seguintes gates automatizados em cada Pull Request e push para a branch `main`:
 
-1. `npm ci` e `npm audit --audit-level=high` no backend;
-2. `npm run typecheck`;
-3. `npm run build`;
-4. todos os testes Jest;
-5. `flutter pub get`, `flutter analyze` e `flutter test`;
-6. build web de release do Flutter;
-7. Dependency Review do GitHub em pull requests;
-8. `quality-gate`, que reprova se qualquer job obrigatorio falhar;
-9. smoke test manual de staging quando o workflow for promovido com `run_staging_smoke=true`.
+1. **Secret Scanning (Gitleaks):** Inspeção estática de commits para prevenção de vazamento de segredos/chaves;
+2. **Backend Quality Gate:** `npm ci`, `npm audit --audit-level=high`, `npm run typecheck`, `npm run build` e suíte de testes unitários/integração Jest;
+3. **Frontend Quality Gate:** `flutter pub get`, `flutter analyze`, `flutter test` e build de release web;
+4. **Dependency & Supply-Chain Review:** Verificação de vulnerabilidades em dependências via GitHub Dependency Review e Trivy;
+5. **SAST & Análise Estática:** Análise contínua de vulnerabilidades de código;
+6. **Agregador `quality-gate`:** Job unificador que bloqueia a integração caso qualquer verificação anterior falhe;
+7. **Smoke Test de Staging:** Executado mediante promoção controlada (`run_staging_smoke=true`) validando `/api/health/ready` e `/api/health/metrics`.
 
 O ambiente GitHub `staging` deve exigir aprovacao dos responsaveis e fornecer a variavel
 `STAGING_HEALTH_URL`. O smoke test verifica `/api/health/ready` e `/api/health/metrics`.

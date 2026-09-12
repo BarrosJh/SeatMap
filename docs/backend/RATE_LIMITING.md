@@ -1,4 +1,4 @@
-# Bloco 5 - Rate limiting, brute force e abuso
+# Rate Limiting, Proteção contra Força Bruta e Abuso (Backend)
 
 Os limitadores usam `express-rate-limit` com armazenamento em memoria. Cada instancia do
 processo mantem suas proprias janelas; em producao com mais de uma instancia, o `store` deve
