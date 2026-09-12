@@ -81,7 +81,7 @@ class WebSocketService {
 
   void _startPingTimer() {
     _pingTimer?.cancel();
-    _pingTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+    _pingTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_isConnected && _channel != null) {
         _send({'action': 'ping'});
       }

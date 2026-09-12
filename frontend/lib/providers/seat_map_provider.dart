@@ -191,9 +191,13 @@ class SeatMapProvider extends ChangeNotifier {
         // Atualiza a ocupação semanal do Dashboard imediatamente
         carregarOcupacaoSemanal(_lastToken!);
         
-        final msgEscritorioId = msg['escritorioId'];
-        final msgData = msg['data'];
-        if (_selectedEscritorio != null && _selectedEscritorio!.id == msgEscritorioId && selectedDateIso == msgData) {
+        final msgEscritorioId = int.tryParse(msg['escritorioId']?.toString() ?? '') ?? msg['escritorioId'];
+        final msgDataRaw = msg['data']?.toString() ?? '';
+        final msgDataIso = msgDataRaw.contains('T') ? msgDataRaw.split('T')[0] : msgDataRaw;
+
+        if (_selectedEscritorio != null &&
+            (_selectedEscritorio!.id == msgEscritorioId || msgEscritorioId == null) &&
+            (msgDataIso.isEmpty || selectedDateIso == msgDataIso)) {
           carregarMapaSilencioso(_lastToken!);
         }
       }
@@ -201,6 +205,9 @@ class SeatMapProvider extends ChangeNotifier {
     }
 
     if (msg['evento'] == 'assento_atualizado') {
+      if (_lastToken != null) {
+        carregarOcupacaoSemanal(_lastToken!);
+      }
       _handleRealtimeSeatUpdate(msg);
     }
   }
@@ -209,14 +216,18 @@ class SeatMapProvider extends ChangeNotifier {
   void _handleRealtimeSeatUpdate(Map<String, dynamic> update) {
     if (_mapaData == null) return;
 
-    final escritorioId = update['escritorioId'];
-    final cadeiraId = update['cadeiraId'];
-    final data = update['data'];
+    final escritorioId = int.tryParse(update['escritorioId']?.toString() ?? '') ?? update['escritorioId'];
+    final cadeiraId = int.tryParse(update['cadeiraId']?.toString() ?? '') ?? update['cadeiraId'];
+    final dataRaw = update['data']?.toString() ?? '';
+    final dataIso = dataRaw.contains('T') ? dataRaw.split('T')[0] : dataRaw;
     final novoStatus = update['status'];
     final ocupanteRaw = update['ocupante'];
 
     // Se o evento for para outro escritório ou data diferente da selecionada, ignora a renderização visual
-    if (escritorioId != _selectedEscritorio?.id || data != selectedDateIso) {
+    if (escritorioId != null && _selectedEscritorio != null && escritorioId != _selectedEscritorio!.id) {
+      return;
+    }
+    if (dataIso.isNotEmpty && dataIso != selectedDateIso) {
       return;
     }
 

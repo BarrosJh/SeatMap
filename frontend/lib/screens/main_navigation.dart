@@ -50,6 +50,19 @@ class _MainNavigationState extends State<MainNavigation> {
       Navigator.pop(context);
     }
     setState(() => _currentIndex = index);
+    
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
+    if (auth.token != null) {
+      if (index == 0) {
+        seatProvider.carregarOcupacaoSemanal(auth.token!);
+        seatProvider.carregarMinhasReservas(auth.token!);
+      } else if (index == 1) {
+        seatProvider.carregarMapaSilencioso(auth.token!);
+      } else if (index == 3) {
+        seatProvider.carregarMinhasReservas(auth.token!);
+      }
+    }
   }
 
   void _selecionarEscritorio(String nomeEscritorio, {bool isDrawer = false}) {

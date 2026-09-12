@@ -174,6 +174,15 @@ export class WsManager {
       ws.on('message', (data: string) => {
         try {
           const msg = JSON.parse(data.toString());
+          ws.isAlive = true;
+
+          if (msg.action === 'ping' || msg.type === 'ping') {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ action: 'pong', timestamp: Date.now() }));
+            }
+            return;
+          }
+
           if (msg.action === 'subscribe' && msg.escritorioId) {
             const escritorioId = parseInt(msg.escritorioId, 10);
             this.joinRoom(escritorioId, ws);
@@ -196,7 +205,7 @@ export class WsManager {
       });
     });
 
-    // Heartbeat periódico anti-zumbi a cada 30 segundos
+    // Heartbeat periódico anti-zumbi a cada 45 segundos
     this.pingInterval = setInterval(() => {
       if (!this.wss) return;
       this.wss.clients.forEach((client) => {
@@ -206,9 +215,11 @@ export class WsManager {
           return ws.terminate();
         }
         ws.isAlive = false;
-        ws.ping();
+        try {
+          ws.ping();
+        } catch (_) {}
       });
-    }, 30000);
+    }, 45000);
   }
 
   public joinRoom(escritorioId: number, ws: AuthenticatedWebSocket): void {
