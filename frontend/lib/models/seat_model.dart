@@ -209,15 +209,43 @@ class BaiaModel {
   }
 }
 
+class AgendaStatusModel {
+  final bool permiteReserva;
+  final String? motivoBloqueio;
+  final bool permiteVisualizacao;
+  final int diffSemanas;
+
+  AgendaStatusModel({
+    required this.permiteReserva,
+    this.motivoBloqueio,
+    this.permiteVisualizacao = true,
+    this.diffSemanas = 0,
+  });
+
+  factory AgendaStatusModel.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return AgendaStatusModel(permiteReserva: true);
+    }
+    return AgendaStatusModel(
+      permiteReserva: json['permiteReserva'] ?? true,
+      motivoBloqueio: json['motivoBloqueio'],
+      permiteVisualizacao: json['permiteVisualizacao'] ?? true,
+      diffSemanas: json['diffSemanas'] ?? 0,
+    );
+  }
+}
+
 class MapaDataModel {
   final EscritorioModel escritorio;
   final String data;
   final List<BaiaModel> baias;
+  final AgendaStatusModel agenda;
 
   MapaDataModel({
     required this.escritorio,
     required this.data,
     required this.baias,
+    required this.agenda,
   });
 
   factory MapaDataModel.fromJson(Map<String, dynamic> json) {
@@ -226,6 +254,7 @@ class MapaDataModel {
       escritorio: EscritorioModel.fromJson(json['escritorio'] ?? {}),
       data: json['data'] ?? '',
       baias: list.map((b) => BaiaModel.fromJson(b)).toList(),
+      agenda: AgendaStatusModel.fromJson(json['agenda']),
     );
   }
 }

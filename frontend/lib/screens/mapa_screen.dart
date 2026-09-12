@@ -66,32 +66,6 @@ class _MapaScreenState extends State<MapaScreen> {
     return monday.add(Duration(days: offset * 7));
   }
 
-  bool _isDateOpenForBooking(DateTime date, UserModel user) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final target = DateTime(date.year, date.month, date.day);
-    if (target.isBefore(today)) return false;
-
-    // Calcular diferença em semanas úteis
-    final baseMonday = _getBaseMonday(0);
-    final targetMonday = target.subtract(Duration(days: target.weekday - 1));
-    final diffWeeks = (targetMonday.difference(baseMonday).inDays / 7).round();
-
-    if (diffWeeks <= 0) return true; // Semana vigente sempre aberta
-    if (diffWeeks == 1) {
-      final diaSemanaHoje = now.weekday; // 1=Seg, 5=Sex, 6=Sáb, 7=Dom
-      final horaAtual = DateFormat('HH:mm').format(now);
-      if (user.isGestao || user.isAdmin || user.isTi) {
-        // Gestão e Administração (RH/TI) abre Sexta 08h
-        return diaSemanaHoje >= 6 || (diaSemanaHoje == 5 && horaAtual.compareTo('08:00') >= 0);
-      } else {
-        // Colaborador abre Sexta 12h
-        return diaSemanaHoje >= 6 || (diaSemanaHoje == 5 && horaAtual.compareTo('12:00') >= 0);
-      }
-    }
-    return false;
-  }
-
   List<DateTime> _getDiasUteisSemana() {
     final monday = _getBaseMonday(_weekOffset);
     return List.generate(5, (index) => monday.add(Duration(days: index)));
@@ -101,14 +75,9 @@ class _MapaScreenState extends State<MapaScreen> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final user = auth.user;
     final isRh = user?.isAdmin == true;
-    final isNextOpen = user != null && _isDateOpenForBooking(_getBaseMonday(1), user);
-
-    if (!isRh && delta > 0 && !isNextOpen) {
-      return;
-    }
 
     final minOffset = isRh ? -52 : 0;
-    final maxOffset = isRh ? 52 : (isNextOpen ? 1 : 0);
+    final maxOffset = isRh ? 52 : 1;
 
     final nextOffset = (_weekOffset + delta).clamp(minOffset, maxOffset);
     if (nextOffset == _weekOffset) return;
@@ -140,7 +109,6 @@ class _MapaScreenState extends State<MapaScreen> {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final user = auth.user;
     final isRh = user?.isAdmin == true;
-    final isNextOpen = user != null && _isDateOpenForBooking(_getBaseMonday(1), user);
 
     final thisMonday = _getBaseMonday(0);
     DateTime firstDate;
@@ -150,8 +118,7 @@ class _MapaScreenState extends State<MapaScreen> {
       firstDate = DateTime.now().subtract(const Duration(days: 365));
       lastDate = DateTime.now().add(const Duration(days: 365));
     } else {
-      final maxWeeks = isNextOpen ? 1 : 0;
-      final lastFriday = _getBaseMonday(maxWeeks).add(const Duration(days: 4));
+      final lastFriday = _getBaseMonday(1).add(const Duration(days: 4));
       firstDate = DateTime(thisMonday.year, thisMonday.month, thisMonday.day);
       lastDate = DateTime(lastFriday.year, lastFriday.month, lastFriday.day);
     }
@@ -212,9 +179,8 @@ class _MapaScreenState extends State<MapaScreen> {
 
     if (cadeira.isLivre) {
       final seatProvider = Provider.of<SeatMapProvider>(context, listen: false);
-      final isOpen = _isDateOpenForBooking(seatProvider.selectedDate, currentUser);
 
-      if (!isOpen) {
+      if (!seatProvider.agendaPermiteReserva) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -225,9 +191,10 @@ class _MapaScreenState extends State<MapaScreen> {
                 Text('Agenda Fechada'),
               ],
             ),
-            content: const Text(
-              'A agenda para esta data ainda não está aberta para agendamento de reservas. A visualização no mapa é exclusiva para planejamento e consulta.',
-              style: TextStyle(fontSize: 13),
+            content: Text(
+              seatProvider.agendaMotivoBloqueio ??
+                  'A agenda para esta data ainda não está aberta para agendamento de reservas. A visualização no mapa é exclusiva para planejamento e consulta.',
+              style: const TextStyle(fontSize: 13),
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Entendido')),
@@ -285,9 +252,8 @@ class _MapaScreenState extends State<MapaScreen> {
     }
 
     final isRh = auth.user?.isAdmin == true;
-    final isNextOpen = auth.user != null && _isDateOpenForBooking(_getBaseMonday(1), auth.user!);
     final canGoBack = isRh ? true : _weekOffset > 0;
-    final canGoForward = isRh ? true : (_weekOffset < (isNextOpen ? 1 : 0));
+    final canGoForward = isRh ? true : _weekOffset < 1;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

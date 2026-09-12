@@ -27,7 +27,7 @@ export class EscritorioController {
     const dataReserva = dataQuery || DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
 
     try {
-      const mapa = await EscritorioService.getMapa(escritorioId, dataReserva, currentUserId);
+      const mapa = await EscritorioService.getMapa(escritorioId, dataReserva, currentUserId, req.user);
       if (!mapa) {
         return res.status(404).json({ error: 'Escritório não encontrado ou inativo.' });
       }

@@ -74,6 +74,27 @@ void main() {
       final manutencao = AdminManutencaoModel.fromJson(jsonPassada);
       expect(manutencao.isAtrasada, true);
     });
+
+    test('MapaDataModel e AgendaStatusModel devem desserializar metadados dinâmicos da API', () {
+      final jsonMapa = {
+        'escritorio': {'id': 1, 'nome': 'Sede', 'cidade': 'São Paulo'},
+        'data': '2026-09-18',
+        'baias': [],
+        'agenda': {
+          'permiteReserva': false,
+          'motivoBloqueio': 'A agenda da próxima semana abre na Sexta-feira às 12:00.',
+          'permiteVisualizacao': true,
+          'diffSemanas': 1
+        }
+      };
+
+      final mapaData = MapaDataModel.fromJson(jsonMapa);
+      expect(mapaData.data, '2026-09-18');
+      expect(mapaData.agenda.permiteReserva, false);
+      expect(mapaData.agenda.motivoBloqueio, 'A agenda da próxima semana abre na Sexta-feira às 12:00.');
+      expect(mapaData.agenda.permiteVisualizacao, true);
+      expect(mapaData.agenda.diffSemanas, 1);
+    });
   });
 }
 

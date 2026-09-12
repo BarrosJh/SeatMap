@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import pool from '../config/db';
-import { getMondayOfCurrentWorkWeek, isProximaSemanaLiberada } from '../utils/workWeekUtils';
+import { getMondayOfCurrentWorkWeek, getWorkWeekDiff, isProximaSemanaLiberada } from '../utils/workWeekUtils';
 import { ConfigService } from './configService';
 
 export class EscritorioService {
@@ -15,7 +15,7 @@ export class EscritorioService {
   /**
    * Obtém o mapa de baias e assentos para um determinado escritório e data
    */
-  public static async getMapa(escritorioId: number, dataReserva: string, currentUserId?: number) {
+  public static async getMapa(escritorioId: number, dataReserva: string, currentUserId?: number, userOrPerfil?: any) {
     // 1. Obter dados do escritório
     const escRes = await pool.query('SELECT id, nome, cidade FROM escritorios WHERE id = $1 AND ativo = true', [escritorioId]);
     if (escRes.rowCount === 0) {
@@ -153,10 +153,53 @@ export class EscritorioService {
       return baia;
     });
 
+    // 5. Calcular permissão e disponibilidade da agenda para a data informada
+    const now = DateTime.now().setZone('America/Sao_Paulo');
+    const dataLuxon = DateTime.fromISO(dataReserva, { zone: 'America/Sao_Paulo' }).startOf('day');
+    const hojeLuxon = now.startOf('day');
+    const isFimDeSemana = dataLuxon.weekday === 6 || dataLuxon.weekday === 7;
+    const diffSemanas = getWorkWeekDiff(dataLuxon, hojeLuxon);
+
+    let permiteReserva = true;
+    let motivoBloqueio: string | null = null;
+    let permiteVisualizacao = true;
+
+    if (isDataPassada) {
+      permiteReserva = false;
+      motivoBloqueio = 'Não é permitido realizar reservas para datas passadas.';
+      permiteVisualizacao = true;
+    } else if (isFimDeSemana) {
+      permiteReserva = false;
+      motivoBloqueio = 'Não há expediente aos finais de semana. Selecione um dia útil (Segunda a Sexta).';
+      permiteVisualizacao = false;
+    } else if (diffSemanas > 1) {
+      permiteReserva = false;
+      motivoBloqueio = 'Só é permitido reservar assentos para a semana corrente ou a semana seguinte.';
+      permiteVisualizacao = userOrPerfil?.perfil === 'ADMIN_RH' || userOrPerfil?.permissaoRh === true;
+    } else if (diffSemanas === 1) {
+      const statusAbertura = await isProximaSemanaLiberada(userOrPerfil || 'COLABORADOR', now);
+      permiteReserva = statusAbertura.liberada;
+      motivoBloqueio = statusAbertura.mensagemBloqueio || null;
+      permiteVisualizacao = true;
+    } else {
+      // diffSemanas <= 0 (semana corrente)
+      permiteReserva = true;
+      motivoBloqueio = null;
+      permiteVisualizacao = true;
+    }
+
+    const agenda = {
+      permiteReserva,
+      motivoBloqueio,
+      permiteVisualizacao,
+      diffSemanas
+    };
+
     return {
       escritorio,
       data: dataReserva,
-      baias: baiasArray
+      baias: baiasArray,
+      agenda
     };
   }
 

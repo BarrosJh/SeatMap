@@ -38,6 +38,10 @@ class SeatMapProvider extends ChangeNotifier {
   String? get filtroDataIso => _filtroData != null ? DateFormat('yyyy-MM-dd').format(_filtroData!) : null;
   List<OcupacaoEscritorioModel> get ocupacaoSemanal => _ocupacaoSemanal;
   String? get avisoGlobal => _avisoGlobal;
+  bool get agendaPermiteReserva => _mapaData?.agenda.permiteReserva ?? true;
+  String? get agendaMotivoBloqueio => _mapaData?.agenda.motivoBloqueio;
+  bool get agendaPermiteVisualizacao => _mapaData?.agenda.permiteVisualizacao ?? true;
+  int get agendaDiffSemanas => _mapaData?.agenda.diffSemanas ?? 0;
   bool get carregandoOcupacao => _carregandoOcupacao;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
