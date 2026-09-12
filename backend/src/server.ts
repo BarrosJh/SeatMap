@@ -54,7 +54,7 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: { policy: 'same-origin' },
-  crossOriginResourcePolicy: { policy: 'same-origin' },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
@@ -74,31 +74,50 @@ app.use((req, res, next) => {
 
 const server = http.createServer(app);
 
-// Configuração segura de CORS (Sem wildcard em produção/staging)
+// Configuração segura de CORS (Sem wildcard aberto em produção/staging, com suporte a self-host e Render)
 const isProduction = ['production', 'staging'].includes((process.env.NODE_ENV || 'development').toLowerCase());
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
   : (isProduction ? [] : ['*']);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Permite chamadas sem origin (mobile apps nativos, curl, health probes internos)
-    if (!origin) return callback(null, true);
+app.use(cors((req, callback) => {
+  const origin = req.headers.origin;
+  // Permite chamadas sem origin (mobile apps nativos, curl, health probes internos)
+  if (!origin) {
+    return callback(null, { origin: true, credentials: true });
+  }
 
-    if (
-      (!isProduction && allowedOrigins.includes('*')) ||
-      allowedOrigins.includes(origin) ||
-      (!isProduction && (origin.endsWith('.onrender.com') || origin.includes('localhost') || origin.includes('127.0.0.1')))
-    ) {
-      return callback(null, true);
+  const host = req.headers.host;
+  const forwardedHost = req.headers['x-forwarded-host'] as string | undefined;
+
+  let isAllowed = false;
+
+  if (!isProduction && (allowedOrigins.includes('*') || origin.endsWith('.onrender.com') || origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+    isAllowed = true;
+  } else if (allowedOrigins.includes(origin)) {
+    isAllowed = true;
+  } else if (process.env.RENDER_EXTERNAL_URL && origin === process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '')) {
+    isAllowed = true;
+  } else if (process.env.APP_URL && origin === process.env.APP_URL.replace(/\/$/, '')) {
+    isAllowed = true;
+  } else {
+    try {
+      const parsedOrigin = new URL(origin);
+      if (host && (parsedOrigin.host === host || (forwardedHost && parsedOrigin.host === forwardedHost))) {
+        isAllowed = true;
+      }
+    } catch {
+      isAllowed = false;
     }
+  }
 
-    callback(new Error('Origem não permitida pela política de CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token', 'x-correlation-id', 'x-request-id'],
-  exposedHeaders: ['X-Correlation-Id', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'Retry-After']
+  callback(null, {
+    origin: isAllowed,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token', 'x-correlation-id', 'x-request-id'],
+    exposedHeaders: ['X-Correlation-Id', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'Retry-After']
+  });
 }));
 app.use(express.json({
   limit: '256kb',
@@ -131,7 +150,13 @@ app.use((req, res, next) => {
 // Servir Aplicação Flutter Web (Frontend Monolith) se a pasta public existir
 const publicPath = path.join(__dirname, '../public');
 if (fs.existsSync(publicPath)) {
-  app.use(express.static(publicPath));
+  app.use(express.static(publicPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.wasm')) {
+        res.setHeader('Content-Type', 'application/wasm');
+      }
+    }
+  }));
 } else {
   // Rota Raiz para Health Check do Load Balancer / Render quando rodando sem frontend embutido
   app.get('/', (req, res) => {
