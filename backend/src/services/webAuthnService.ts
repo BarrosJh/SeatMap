@@ -18,6 +18,21 @@ export class WebAuthnService {
     if (process.env.RP_ID) {
       return process.env.RP_ID;
     }
+    if (process.env.RP_ORIGIN) {
+      try {
+        return new URL(process.env.RP_ORIGIN).hostname;
+      } catch (_) {}
+    }
+    if (process.env.RENDER_EXTERNAL_URL) {
+      try {
+        return new URL(process.env.RENDER_EXTERNAL_URL).hostname;
+      } catch (_) {}
+    }
+    if (process.env.APP_URL) {
+      try {
+        return new URL(process.env.APP_URL).hostname;
+      } catch (_) {}
+    }
     if (originHeader) {
       try {
         const parsed = new URL(originHeader);
@@ -30,24 +45,41 @@ export class WebAuthnService {
     return 'localhost';
   }
 
-  public static getExpectedOrigin(originHeader?: string): string {
+  public static getExpectedOrigin(originHeader?: string, hostHeader?: string): string {
     if (process.env.RP_ORIGIN) {
-      return process.env.RP_ORIGIN;
+      return process.env.RP_ORIGIN.replace(/\/$/, '');
+    }
+    if (process.env.RENDER_EXTERNAL_URL) {
+      return process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '');
+    }
+    if (process.env.APP_URL) {
+      return process.env.APP_URL.replace(/\/$/, '');
     }
     const isProduction = ['production', 'staging'].includes((process.env.NODE_ENV || 'development').toLowerCase());
     if (process.env.ALLOWED_ORIGINS) {
-      const allowed = process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim());
-      if (originHeader && allowed.includes(originHeader)) {
-        return originHeader;
+      const allowed = process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim().replace(/\/$/, ''));
+      if (originHeader && allowed.includes(originHeader.replace(/\/$/, ''))) {
+        return originHeader.replace(/\/$/, '');
       }
       if (allowed.length > 0 && allowed[0] !== '*') {
         return allowed[0];
       }
     }
+    if (originHeader && (originHeader.startsWith('http://') || originHeader.startsWith('https://'))) {
+      try {
+        const parsed = new URL(originHeader);
+        if (!isProduction) {
+          return originHeader.replace(/\/$/, '');
+        }
+        if (parsed.hostname.endsWith('.onrender.com') || (hostHeader && parsed.host === hostHeader)) {
+          return originHeader.replace(/\/$/, '');
+        }
+      } catch (_) {}
+    }
+    if (hostHeader && !isProduction) {
+      return `https://${hostHeader}`;
+    }
     if (!isProduction) {
-      if (originHeader && (originHeader.startsWith('http://') || originHeader.startsWith('https://'))) {
-        return originHeader;
-      }
       return 'http://localhost:3000';
     }
     throw new Error('Configuração de segurança RP_ORIGIN ou ALLOWED_ORIGINS obrigatória em ambiente de produção.');

@@ -48,7 +48,7 @@ export class WebAuthnController {
       }
 
       const rpId = WebAuthnService.getRpId(req.headers.origin as string, req.headers.host);
-      const expectedOrigin = WebAuthnService.getExpectedOrigin(req.headers.origin as string);
+      const expectedOrigin = WebAuthnService.getExpectedOrigin(req.headers.origin as string, req.headers.host);
 
       const result = await WebAuthnService.verifyRegister(
         user.userId,
@@ -105,7 +105,7 @@ export class WebAuthnController {
 
     try {
       const rpId = WebAuthnService.getRpId(req.headers.origin as string, req.headers.host);
-      const expectedOrigin = WebAuthnService.getExpectedOrigin(req.headers.origin as string);
+      const expectedOrigin = WebAuthnService.getExpectedOrigin(req.headers.origin as string, req.headers.host);
 
       const result = await WebAuthnService.verifyAuth(
         challengeKey,

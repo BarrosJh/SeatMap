@@ -34,8 +34,6 @@
     },
 
     isAvailable: async function () {
-      // Biometria autorizada exclusivamente no app PWA instalado
-      if (!this.isPwaStandalone()) return false;
       if (!window.PublicKeyCredential) return false;
       try {
         if (PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
