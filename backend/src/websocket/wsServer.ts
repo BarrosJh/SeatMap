@@ -267,6 +267,21 @@ export class WsManager {
     this.broadcastAssento(payload);
   }
 
+  public broadcastReservaAlterada(data: {
+    escritorioId: number;
+    data: string;
+    tipo: 'CRIADA' | 'CANCELADA' | 'TROCADA' | 'CHECKIN' | 'CHECKOUT' | 'MANUTENCAO';
+    usuarioId?: number;
+    cadeiraId?: number;
+  }): void {
+    const payload = {
+      evento: 'reserva_alterada',
+      ...data,
+      timestamp: new Date().toISOString()
+    };
+    this.broadcastToAll(payload);
+  }
+
   public broadcastToAll(data: any): void {
     if (!this.wss) return;
     const msg = typeof data === 'string' ? data : JSON.stringify(data);

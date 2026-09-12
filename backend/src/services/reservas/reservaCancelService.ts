@@ -104,6 +104,14 @@ export class ReservaCancelService {
         ocupante: null
       });
 
+      wsManager.broadcastReservaAlterada({
+        escritorioId: reserva.escritorio_id,
+        data: dataReservaIso,
+        tipo: 'CANCELADA',
+        usuarioId: reserva.usuario_id,
+        cadeiraId: reserva.cadeira_id
+      });
+
       return {
         success: true,
         code: 200,

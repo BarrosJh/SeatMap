@@ -312,6 +312,14 @@ export class ReservaCreateService {
         });
       }
 
+      wsManager.broadcastReservaAlterada({
+        escritorioId: cadeira.escritorio_id,
+        data: dataAlvoIso,
+        tipo: isTroca ? 'TROCADA' : 'CRIADA',
+        usuarioId,
+        cadeiraId: cadeira.id
+      });
+
       const calculoLimite = ReservaToleranceUtils.calcularLimiteCheckin(
         dataAlvoIso,
         novaReserva.criado_em,

@@ -25,6 +25,7 @@ class SeatMapProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   StreamSubscription? _wsSubscription;
+  String? _lastToken;
 
   List<EscritorioModel> get escritorios => _escritorios;
   EscritorioModel? get selectedEscritorio => _selectedEscritorio;
@@ -147,6 +148,7 @@ class SeatMapProvider extends ChangeNotifier {
   }
 
   void initWebSocket(String token) {
+    _lastToken = token;
     _wsSubscription?.cancel();
     _wsSubscription = _wsService.seatUpdates.listen((msg) {
       _handleRealtimeMessage(msg);
@@ -180,6 +182,20 @@ class SeatMapProvider extends ChangeNotifier {
           }
         }
         notifyListeners();
+      }
+      return;
+    }
+
+    if (msg['evento'] == 'reserva_alterada') {
+      if (_lastToken != null) {
+        // Atualiza a ocupação semanal do Dashboard imediatamente
+        carregarOcupacaoSemanal(_lastToken!);
+        
+        final msgEscritorioId = msg['escritorioId'];
+        final msgData = msg['data'];
+        if (_selectedEscritorio != null && _selectedEscritorio!.id == msgEscritorioId && selectedDateIso == msgData) {
+          carregarMapaSilencioso(_lastToken!);
+        }
       }
       return;
     }
@@ -357,6 +373,20 @@ class SeatMapProvider extends ChangeNotifier {
       _errorMessage = res.error ?? 'Erro ao carregar mapa de assentos.';
     }
     notifyListeners();
+  }
+
+  /// Recarrega o mapa em background sem disparar spinners de carregamento na UI
+  Future<void> carregarMapaSilencioso(String token) async {
+    if (_selectedEscritorio == null) return;
+    final reqId = ++_mapaRequestId;
+    final res = await _apiService.getMapa(token, _selectedEscritorio!.id, selectedDateIso);
+    if (reqId != _mapaRequestId) return;
+    if (res.success && res.data != null) {
+      if (res.data!.escritorio.id == _selectedEscritorio!.id && res.data!.data == selectedDateIso) {
+        _mapaData = res.data;
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> carregarMinhasReservas(String token) async {

@@ -143,18 +143,18 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Token de autenticação não fornecido' });
+    return res.status(401).json({ error: 'Token de autenticação não fornecido', code: 'MISSING_TOKEN' });
   }
 
   let decoded: any;
   try {
     decoded = JwtCryptoUtils.verifyToken(token);
   } catch (err) {
-    return res.status(403).json({ error: 'Token inválido ou expirado' });
+    return res.status(401).json({ error: 'Token inválido ou expirado', code: 'INVALID_TOKEN' });
   }
 
   if (!decoded || !decoded.userId) {
-    return res.status(403).json({ error: 'Token inválido ou expirado' });
+    return res.status(401).json({ error: 'Token inválido ou expirado', code: 'INVALID_TOKEN' });
   }
 
   try {
@@ -164,14 +164,14 @@ export const authenticateToken = async (req: AuthenticatedRequest, res: Response
     );
 
     if (userCheck.rowCount === 0 || !userCheck.rows[0].ativo) {
-      return res.status(401).json({ error: 'Conta de usuário desativada ou inexistente. Acesso revogado.' });
+      return res.status(401).json({ error: 'Conta de usuário desativada ou inexistente. Acesso revogado.', code: 'USER_DEACTIVATED' });
     }
 
     const dbTokenVersion = userCheck.rows[0].token_version;
     const tokenPayloadVersion = decoded.tokenVersion || 1;
 
     if (tokenPayloadVersion < dbTokenVersion) {
-      return res.status(401).json({ error: 'Sessão revogada ou credenciais alteradas. Faça login novamente.' });
+      return res.status(401).json({ error: 'Sessão revogada ou credenciais alteradas. Faça login novamente.', code: 'SESSION_REVOKED' });
     }
 
     // Timeout Absoluto Server-Side de 60 minutos (3600 segundos) a partir do login inicial
