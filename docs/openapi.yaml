@@ -20,8 +20,10 @@ servers:
 tags:
   - name: Autenticação & Sessão
     description: Gerenciamento de credenciais, refresh tokens, timeouts de sessão e auto-bloqueio.
+  - name: Autenticação Biométrica & WebAuthn
+    description: Login nativo por biometria de hardware (Face ID, Touch ID, Impressão Digital) via WebAuthn / FIDO2 / Passkeys.
   - name: Single Sign-On (SSO)
-    description: Integração de identidade corporativa via Microsoft Entra ID, Google Workspace e Okta.
+    description: Integração de identidade corporativa via Microsoft Entra ID (Azure AD).
   - name: Multi-Factor Authentication (MFA)
     description: Autenticação em duas etapas via TOTP (App Authenticator) e E-mail Corporativo.
   - name: Escritórios & Plantas

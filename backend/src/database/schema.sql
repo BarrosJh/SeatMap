@@ -223,4 +223,23 @@ CREATE TRIGGER trg_historico_reservas_immutable
 BEFORE UPDATE OR DELETE ON historico_reservas
 FOR EACH ROW EXECUTE FUNCTION trg_prevent_audit_tampering();
 
+-- ======================================================================================
+-- AUTENTICAÇÃO BIOMÉTRICA NATIVA & PASSKEYS (WEBAUTHN / FIDO2 / W3C STANDARD)
+-- ======================================================================================
+CREATE TABLE IF NOT EXISTS usuarios_biometria_passkeys (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    credential_id TEXT NOT NULL UNIQUE,
+    public_key TEXT NOT NULL,
+    counter BIGINT NOT NULL DEFAULT 0,
+    transports TEXT[] DEFAULT '{}',
+    nome_dispositivo VARCHAR(100) DEFAULT 'Dispositivo Móvel',
+    criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    ultimo_uso TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_biometria_usuario_id ON usuarios_biometria_passkeys(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_biometria_credential_id ON usuarios_biometria_passkeys(credential_id);
+
+
 

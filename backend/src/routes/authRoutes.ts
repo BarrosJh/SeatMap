@@ -3,6 +3,7 @@ import { LoginController } from '../controllers/auth/loginController';
 import { MfaController } from '../controllers/auth/mfaController';
 import { SsoController } from '../controllers/auth/ssoController';
 import { PasswordResetController } from '../controllers/auth/passwordResetController';
+import { WebAuthnController } from '../controllers/auth/webAuthnController';
 import { authenticateToken } from '../middleware/auth';
 import { authLimiter, authUserLimiter } from '../middleware/rateLimiter';
 import { validateRequest } from '../middleware/validateRequest';
@@ -31,22 +32,31 @@ router.post('/login', authUserLimiter, validateRequest({ body: loginSchema }), L
 router.get('/sso/config', SsoController.getSsoConfig);
 router.post('/sso/login', authUserLimiter, validateRequest({ body: ssoLoginSchema }), SsoController.loginSso);
 
-// 2. Validação de Login com TOTP ou E-mail (Passo 2 do 2FA)
+// 2. Autenticação Biométrica Nativa (WebAuthn / Passkeys / FIDO2)
+router.post('/webauthn/login/options', WebAuthnController.loginOptions);
+router.post('/webauthn/login/verify', authUserLimiter, WebAuthnController.loginVerify);
+router.post('/webauthn/register/options', authenticateToken, WebAuthnController.registerOptions);
+router.post('/webauthn/register/verify', authenticateToken, WebAuthnController.registerVerify);
+router.get('/webauthn/devices', authenticateToken, WebAuthnController.listDevices);
+router.delete('/webauthn/devices/:id', authenticateToken, WebAuthnController.deleteDevice);
+
+// 3. Validação de Login com TOTP ou E-mail (Passo 2 do 2FA)
 router.post('/totp/validar-login', validateRequest({ body: validarTotpSchema }), MfaController.validarLoginTotp);
 router.post('/mfa/validar-login-email', validateRequest({ body: validarMfaEmailSchema }), MfaController.validarLoginEmailMfa);
 
-// 3. Gestão de TOTP pelo próprio Usuário Logado
+// 4. Gestão de TOTP pelo próprio Usuário Logado
 router.get('/totp/setup', authenticateToken, MfaController.setupTotp);
 router.post('/totp/ativar', authenticateToken, validateRequest({ body: codigoMfaSchema }), MfaController.ativarTotp);
 router.post('/totp/desativar', authenticateToken, validateRequest({ body: senhaAtualSchema }), MfaController.desativarTotp);
 
-// 4. Esqueci minha Senha & Redefinição
+// 5. Esqueci minha Senha & Redefinição
 router.post('/esqueci-senha', authUserLimiter, validateRequest({ body: esqueciSenhaSchema }), PasswordResetController.solicitarRecuperacaoSenha);
 router.post('/redefinir-senha', authUserLimiter, validateRequest({ body: redefinirSenhaSchema }), PasswordResetController.redefinirSenha);
 
-// 5. Refresh Token (Rotação de Sessão) & Logout
+// 6. Refresh Token (Rotação de Sessão) & Logout
 router.post('/refresh-token', validateRequest({ body: refreshTokenSchema }), LoginController.refreshToken);
 router.post('/logout', validateRequest({ body: logoutSchema }), LoginController.logout);
 router.post('/logout-global', authenticateToken, LoginController.logoutGlobal);
 
 export default router;
+
