@@ -1,7 +1,8 @@
 import { Response } from 'express';
 import { DateTime } from 'luxon';
 import pool from '../../config/db';
-import { AuthenticatedRequest } from '../../middleware/auth';
+import { getDbClient } from '../../utils/dbClient';
+import { AuthenticatedRequest, isRhGlobal } from '../../middleware/auth';
 import { ReservaHistoryService } from '../../services/reservaHistoryService';
 import { wsManager } from '../../websocket/wsServer';
 import { logger } from '../../utils/logger';
@@ -10,31 +11,23 @@ import { escapeSqlWildcards } from '../../utils/sanitizer';
 export class AdminReservasController {
   public static async getReservas(req: AuthenticatedRequest, res: Response) {
     try {
+      const user = req.user;
       const { dataInicio, dataFim, escritorioId, departamentoId, status, busca, limit = 100, offset = 0 } = req.query;
 
       const conditions: string[] = [];
       const values: any[] = [];
       let idx = 1;
 
-      if (dataInicio) {
-        conditions.push(`r.data_reserva >= $${idx}`);
-        values.push(dataInicio);
-        idx++;
-      }
-
-      if (dataFim) {
-        conditions.push(`r.data_reserva <= $${idx}`);
-        values.push(dataFim);
-        idx++;
-      }
-
-      if (escritorioId && escritorioId !== 'todos') {
-        conditions.push(`e.id = $${idx}`);
-        values.push(parseInt(escritorioId as string, 10));
-        idx++;
-      }
-
-      if (departamentoId && departamentoId !== 'todos') {
+      // Restrição de escopo: Gestão sem permissão global de RH só visualiza reservas do seu departamento
+      if (user && user.perfil === 'GESTAO' && !isRhGlobal(user)) {
+        if (user.departamentoId) {
+          conditions.push(`d.id = $${idx}`);
+          values.push(user.departamentoId);
+          idx++;
+        } else {
+          conditions.push('1 = 0');
+        }
+      } else if (departamentoId && departamentoId !== 'todos') {
         conditions.push(`d.id = $${idx}`);
         values.push(parseInt(departamentoId as string, 10));
         idx++;
@@ -114,9 +107,14 @@ export class AdminReservasController {
 
   public static async cancelarReservaAdmin(req: AuthenticatedRequest, res: Response) {
     const user = req.user!;
+
+    if (!isRhGlobal(user)) {
+      return res.status(403).json({ error: 'Apenas a equipe de RH possui permissão para cancelar reservas de outros colaboradores.' });
+    }
+
     let client;
     try {
-      client = await pool.connect();
+      client = await getDbClient();
       const { id } = req.params;
       const { justificativa } = req.body;
 
@@ -138,6 +136,7 @@ export class AdminReservasController {
         JOIN baias b ON c.baia_id = b.id
         JOIN usuarios u ON r.usuario_id = u.id
         WHERE r.id = $1
+        FOR UPDATE OF r
       `, [id]);
 
       if (resRes.rowCount === 0) {

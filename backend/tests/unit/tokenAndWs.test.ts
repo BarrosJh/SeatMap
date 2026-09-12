@@ -1,12 +1,9 @@
 import { TokenService } from '../../src/services/tokenService';
 import { WsManager } from '../../src/websocket/wsServer';
 import pool from '../../src/config/db';
-import jwt from 'jsonwebtoken';
-import { env } from '../../src/config/env';
+import { JwtCryptoUtils } from '../../src/config/jwtCryptoUtils';
 
 describe('TokenService & Autenticação WebSocket', () => {
-  const JWT_SECRET = env.JWT_SECRET;
-
   describe('TokenService (Rotação de Refresh Tokens e Prevenção de Replay)', () => {
     it('deve rejeitar tentativa de rotação com token nulo ou vazio', async () => {
       const res = await TokenService.rotacionarRefreshToken('', '127.0.0.1', 'Jest');
@@ -29,20 +26,19 @@ describe('TokenService & Autenticação WebSocket', () => {
 
     it('deve gerar e verificar JWT válidos para autenticação do WebSocket', () => {
       const payload = { userId: 42, email: 'tech@empresa.com', perfil: 'ADMIN_TI' };
-      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+      const token = JwtCryptoUtils.signToken(payload, { expiresIn: '1h' });
 
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const decoded = JwtCryptoUtils.verifyToken(token) as any;
       expect(decoded.userId).toBe(42);
       expect(decoded.email).toBe('tech@empresa.com');
       expect(decoded.perfil).toBe('ADMIN_TI');
     });
 
     it('deve falhar verificação do WebSocket se o token for adulterado ou assinado com chave errada', () => {
-      const payload = { userId: 99, email: 'fake@empresa.com' };
-      const invalidToken = jwt.sign(payload, 'wrong_secret_key');
+      const invalidToken = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.invalidpayload.invalidsig';
 
       expect(() => {
-        jwt.verify(invalidToken, JWT_SECRET);
+        JwtCryptoUtils.verifyToken(invalidToken);
       }).toThrow();
     });
   });
@@ -74,7 +70,7 @@ describe('TokenService & Autenticação WebSocket', () => {
     });
 
     it('authenticateRequest deve validar token legítimo e usuário ativo', async () => {
-      const token = jwt.sign({ userId: 15, email: 'ativo@empresa.com', tokenVersion: 1 }, JWT_SECRET);
+      const token = JwtCryptoUtils.signToken({ userId: 15, email: 'ativo@empresa.com', tokenVersion: 1 });
       const req: any = {
         headers: { authorization: `Bearer ${token}` }
       };
@@ -92,7 +88,7 @@ describe('TokenService & Autenticação WebSocket', () => {
     });
 
     it('authenticateRequest deve rejeitar conexão com tokenVersion defasada (sessão revogada)', async () => {
-      const token = jwt.sign({ userId: 15, email: 'ativo@empresa.com', tokenVersion: 1 }, JWT_SECRET);
+      const token = JwtCryptoUtils.signToken({ userId: 15, email: 'ativo@empresa.com', tokenVersion: 1 });
       const req: any = {
         headers: { authorization: `Bearer ${token}` }
       };

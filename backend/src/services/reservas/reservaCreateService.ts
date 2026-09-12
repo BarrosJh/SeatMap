@@ -106,12 +106,15 @@ export class ReservaCreateService {
     try {
       await client.query('BEGIN');
 
+      // 1. Lock determinístico no registro do usuário para serializar ações do mesmo colaborador e evitar deadlocks em trocas simultâneas
+      await client.query('SELECT id FROM usuarios WHERE id = $1 FOR UPDATE', [usuarioId]);
+
       const cadeiraRes = await client.query(`
         SELECT c.id, c.identificador, c.ativa, c.status_operacional, c.motivo_manutencao, c.previsao_retorno, b.id AS baia_id, b.nome AS baia_nome, b.escritorio_id
         FROM cadeiras c
         JOIN baias b ON c.baia_id = b.id
         WHERE c.id = $1 AND c.ativa = true
-        FOR UPDATE
+        FOR UPDATE OF c
       `, [cadeiraId]);
 
       if (cadeiraRes.rowCount === 0) {
@@ -149,7 +152,7 @@ export class ReservaCreateService {
         JOIN cadeiras c ON r.cadeira_id = c.id
         JOIN baias b ON c.baia_id = b.id
         WHERE r.usuario_id = $1 AND r.data_reserva = $2 AND r.status = 'ATIVA'
-        FOR UPDATE
+        FOR UPDATE OF r
       `, [usuarioId, dataAlvoIso]);
 
       const isTroca = reservaExistenteDiaRes.rowCount! > 0;
@@ -174,9 +177,6 @@ export class ReservaCreateService {
       }
 
       if (!isTroca) {
-        // Lock no registro do usuário para evitar concorrência bypassando o limite semanal
-        await client.query('SELECT id FROM usuarios WHERE id = $1 FOR UPDATE', [usuarioId]);
-
         const contagemAtivasRes = await client.query(`
           SELECT COUNT(*) AS total
           FROM reservas
@@ -201,8 +201,8 @@ export class ReservaCreateService {
       const codigoComprovante = 'RES-' + crypto.createHash('sha256').update(rawPayload).digest('hex').substring(0, 16).toUpperCase();
 
       const isGestao = usuarioPerfil === 'GESTAO';
-      const checkinRealizado = isGestao && checkinAutoGestao;
-      const checkinEm = checkinRealizado ? new Date() : null;
+      const checkinRealizado = isTrocaPosCheckin ? true : (isGestao && checkinAutoGestao);
+      const checkinEm = isTrocaPosCheckin ? (reservaAntiga?.checkin_em || new Date()) : (checkinRealizado ? new Date() : null);
 
       let novaReserva: any;
       if (isTroca && reservaAntiga) {
@@ -290,6 +290,7 @@ export class ReservaCreateService {
         data: dataAlvoIso,
         status: 'ocupada',
         ocupante: {
+          usuarioId,
           nome: usuarioNome,
           departamento: departamentoNome || 'Colaborador',
           departamentoId: departamentoId || undefined
@@ -334,6 +335,14 @@ export class ReservaCreateService {
         await client.query('ROLLBACK');
       } catch (rollbackErr) {
         logger.error('[ReservaCreateService] Falha ao executar ROLLBACK:', { correlationId, error: rollbackErr });
+      }
+
+      if (error.code === '40P01') {
+        return {
+          success: false,
+          code: 409,
+          error: 'Conflito de Concorrência: Detectada concorrência simultânea na reserva/troca de assentos. Por favor, tente novamente.'
+        };
       }
 
       if (error.code === '23505') {

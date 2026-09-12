@@ -48,7 +48,7 @@ export class NoShowJobService {
         WHERE r.data_reserva <= $1
           AND r.status = 'ATIVA'
           AND r.checkin_realizado = false
-        FOR UPDATE;
+        FOR UPDATE OF r;
       `, [dataAlvo]);
 
       if (selectRes.rowCount === 0) {

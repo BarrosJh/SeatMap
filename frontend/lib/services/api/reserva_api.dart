@@ -28,7 +28,7 @@ class ReservaApi extends ApiClientBase {
   Future<ApiResponse<List<OcupacaoEscritorioModel>>> getOcupacaoSemanal(String token) async {
     try {
       final response = await http.get(
-        Uri.parse('${AppConstants.baseUrl}/escritorios/ocupacao/semanal'),
+        Uri.parse('${AppConstants.baseUrl}/escritorios/ocupacao-semanal'),
         headers: headers(token),
       );
 

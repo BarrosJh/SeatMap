@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { DateTime } from 'luxon';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db';
+import { getDbClient } from '../utils/dbClient';
 import { AuditService } from './auditService';
 import { env } from '../config/env';
 import { toUserResponseDto } from '../utils/userDtoMapper';
@@ -65,14 +66,19 @@ export class TokenService {
 
     const tokenHash = this.hashToken(rawRefreshToken.trim());
 
+    const client = await getDbClient();
     try {
-      const tokenRes = await pool.query(`
+      await client.query('BEGIN');
+
+      const tokenRes = await client.query(`
         SELECT id, usuario_id, family_id, revogado, expira_em, criado_em
         FROM auth_refresh_tokens
         WHERE token_hash = $1
+        FOR UPDATE
       `, [tokenHash]);
 
       if (tokenRes.rowCount === 0) {
+        await client.query('ROLLBACK');
         return { success: false, error: 'Refresh token inválido ou não encontrado.' };
       }
 
@@ -85,11 +91,13 @@ export class TokenService {
           usuarioId: tokenRecord.usuario_id,
           ip
         });
-        await pool.query(`
+        await client.query(`
           UPDATE auth_refresh_tokens
           SET revogado = true
           WHERE family_id = $1
         `, [tokenRecord.family_id]);
+
+        await client.query('COMMIT');
 
         AuditService.log({
           usuarioId: tokenRecord.usuario_id,
@@ -108,11 +116,12 @@ export class TokenService {
 
       // 2. Validação de Expiração do Refresh Token
       if (new Date(tokenRecord.expira_em) < new Date()) {
+        await client.query('ROLLBACK');
         return { success: false, error: 'Refresh token expirado. Faça login novamente.' };
       }
 
       // 3. Timeout Absoluto Server-Side de 60 minutos (Baseado na criação da família de sessão)
-      const familyFirstTokenRes = await pool.query(`
+      const familyFirstTokenRes = await client.query(`
         SELECT MIN(criado_em) AS session_start
         FROM auth_refresh_tokens
         WHERE family_id = $1
@@ -125,11 +134,13 @@ export class TokenService {
       const sessionAgeSeconds = Math.floor((Date.now() - sessionStart) / 1000);
 
       if (sessionAgeSeconds > MAX_ABSOLUTE_SESSION_SECONDS) {
-        await pool.query(`
+        await client.query(`
           UPDATE auth_refresh_tokens
           SET revogado = true
           WHERE family_id = $1
         `, [tokenRecord.family_id]);
+
+        await client.query('COMMIT');
 
         AuditService.log({
           usuarioId: tokenRecord.usuario_id,
@@ -147,7 +158,7 @@ export class TokenService {
       }
 
       // 4. Buscar dados atualizados do usuário
-      const userRes = await pool.query(`
+      const userRes = await client.query(`
         SELECT u.id, u.nome, u.email, u.matricula, u.perfil,
                COALESCE(u.permissao_rh, false) AS permissao_rh,
                COALESCE(u.permissao_ti, false) AS permissao_ti,
@@ -159,25 +170,30 @@ export class TokenService {
       `, [tokenRecord.usuario_id]);
 
       if (userRes.rowCount === 0 || !userRes.rows[0].ativo) {
+        await client.query('ROLLBACK');
         return { success: false, error: 'Usuário inativo ou inexistente.' };
       }
 
       const user = userRes.rows[0];
 
       // 5. Revogar o refresh token atual
-      await pool.query(`
+      await client.query(`
         UPDATE auth_refresh_tokens
         SET revogado = true
         WHERE id = $1
       `, [tokenRecord.id]);
 
       // 6. Emitir novo Refresh Token na mesma família (Rotação)
-      const novoRefreshToken = await this.gerarRefreshToken(
-        user.id,
-        ip,
-        userAgent,
-        tokenRecord.family_id
-      );
+      const rawNewRefreshToken = crypto.randomBytes(40).toString('hex');
+      const newTokenHash = this.hashToken(rawNewRefreshToken);
+      const expiraEm = DateTime.now().plus({ days: REFRESH_TOKEN_DAYS }).toJSDate();
+
+      await client.query(`
+        INSERT INTO auth_refresh_tokens (usuario_id, token_hash, family_id, expira_em, ip, user_agent)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [user.id, newTokenHash, tokenRecord.family_id, expiraEm, ip, userAgent]);
+
+      await client.query('COMMIT');
 
       const authTime = Math.floor(sessionStart / 1000);
 
@@ -211,12 +227,17 @@ export class TokenService {
       return {
         success: true,
         token: novoAccessToken,
-        refreshToken: novoRefreshToken,
+        refreshToken: rawNewRefreshToken,
         user: toUserResponseDto(user)
       };
     } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {}
       logger.error('[TokenService.rotacionarRefreshToken Error]:', { error });
       return { success: false, error: 'Erro interno ao renovar sessão.' };
+    } finally {
+      client.release();
     }
   }
 

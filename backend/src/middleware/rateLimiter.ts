@@ -162,4 +162,12 @@ export const globalLimiter = createAbuseLimiter({
   message: 'Limite de tráfego excedido temporariamente. Tente novamente em alguns segundos.'
 });
 
+export const cspReportLimiter = createAbuseLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: getIp,
+  kind: 'API',
+  message: 'Muitos relatórios CSP recebidos deste IP. Aguarde alguns instantes.'
+});
+
 

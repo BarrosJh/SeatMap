@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodSchema, ZodError } from 'zod';
 
+/**
+ * @deprecated Utilize `validateRequest` em `middleware/validateRequest.ts` para validação declarativa unificada (body, params, query).
+ */
 export function validateBody(schema: ZodSchema) {
   return (req: Request, res: Response, next: NextFunction) => {
     try {

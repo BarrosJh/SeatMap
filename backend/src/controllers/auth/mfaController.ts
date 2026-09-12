@@ -157,7 +157,7 @@ export class MfaController {
     try {
       let decoded: any;
       try {
-        decoded = jwt.verify(tempToken, JWT_MFA_TEMP_SECRET);
+        decoded = JwtCryptoUtils.verifyToken(tempToken);
       } catch (e) {
         return res.status(401).json({ error: 'Sessão temporária de MFA expirada. Faça login novamente.' });
       }
@@ -279,7 +279,7 @@ export class MfaController {
     try {
       let decoded: any;
       try {
-        decoded = jwt.verify(tempToken, JWT_MFA_TEMP_SECRET);
+        decoded = JwtCryptoUtils.verifyToken(tempToken);
       } catch (e) {
         return res.status(401).json({ error: 'Sessão temporária de MFA expirada. Faça login novamente.' });
       }
@@ -474,14 +474,15 @@ export class MfaController {
 
       await pool.query('UPDATE auth_mfa_codes SET utilizado = true WHERE id = $1', [mfaRecord.id]);
 
-      const adminToken = jwt.sign({
+      const adminToken = JwtCryptoUtils.signToken({
         userId: user.userId,
         nome: user.nome,
         perfil: user.perfil,
         permissaoRh: user.permissaoRh,
         permissaoTi: user.permissaoTi,
         role: 'ADMIN_STEP_UP_AUTHENTICATED'
-      }, JWT_ADMIN_SECRET, { expiresIn: JWT_ADMIN_EXPIRATION as any });
+      }, { expiresIn: JWT_ADMIN_EXPIRATION as any });
+
 
       AuditService.log({
         usuarioId: user.userId,

@@ -11,7 +11,6 @@ router.get('/', authenticateToken, EscritorioController.listar);
 
 // GET /api/escritorios/ocupacao-semanal
 router.get('/ocupacao-semanal', authenticateToken, EscritorioController.getOcupacaoSemanal);
-router.get('/ocupacao/semanal', authenticateToken, EscritorioController.getOcupacaoSemanal);
 
 // GET /api/escritorios/aviso
 router.get('/aviso', authenticateToken, EscritorioController.getAvisoGlobal);

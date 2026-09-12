@@ -30,7 +30,7 @@ export class ReservaCancelService {
         JOIN cadeiras c ON r.cadeira_id = c.id
         JOIN baias b ON c.baia_id = b.id
         WHERE r.id = $1
-        FOR UPDATE
+        FOR UPDATE OF r
       `, [reservaId]);
 
       if (result.rowCount === 0) {

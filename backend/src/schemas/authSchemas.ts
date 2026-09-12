@@ -48,3 +48,17 @@ export const senhaAtualSchema = z.object({
 export const codigoMfaSchema = z.object({
   codigo: z.string().regex(/^\d{6}$/, 'Código deve conter 6 dígitos')
 }).strict();
+
+export const webAuthnLoginOptionsSchema = z.object({
+  emailOrMatricula: z.string().max(255).optional()
+}).strict().optional();
+
+export const webAuthnLoginVerifySchema = z.object({
+  challengeKey: z.string().min(1, 'Chave do desafio é obrigatória').max(512),
+  response: z.record(z.string(), z.any())
+}).strict();
+
+export const webAuthnRegisterVerifySchema = z.object({
+  response: z.record(z.string(), z.any()),
+  deviceName: z.string().max(255).optional()
+}).strict();

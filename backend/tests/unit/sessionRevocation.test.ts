@@ -1,13 +1,9 @@
-import jwt from 'jsonwebtoken';
 import { Request, Response } from 'express';
 import pool from '../../src/config/db';
 import { authenticateToken, authenticateAdminMfa, AuthenticatedRequest } from '../../src/middleware/auth';
 import { TokenService } from '../../src/services/tokenService';
 import { ConfigService } from '../../src/services/configService';
-import { env } from '../../src/config/env';
-
-const JWT_SECRET = env.JWT_SECRET;
-const JWT_ADMIN_SECRET = env.JWT_ADMIN_SECRET;
+import { JwtCryptoUtils } from '../../src/config/jwtCryptoUtils';
 
 describe('Instant Session Revocation & Token Versioning (BACEN Compliance)', () => {
   afterAll(async () => {
@@ -38,9 +34,8 @@ describe('Instant Session Revocation & Token Versioning (BACEN Compliance)', () 
 
   describe('authenticateToken with token_version validation', () => {
     it('deve rejeitar token quando o usuário estiver inativo no banco', async () => {
-      const token = jwt.sign(
-        { userId: 10, email: 'inativo@banco.com', tokenVersion: 1 },
-        JWT_SECRET
+      const token = JwtCryptoUtils.signToken(
+        { userId: 10, email: 'inativo@banco.com', tokenVersion: 1 }
       );
 
       const querySpy = jest.spyOn(pool, 'query').mockImplementation(async () => ({
@@ -71,9 +66,8 @@ describe('Instant Session Revocation & Token Versioning (BACEN Compliance)', () 
     });
 
     it('deve rejeitar token com tokenVersion defasada (sessão revogada)', async () => {
-      const tokenAntigo = jwt.sign(
-        { userId: 10, email: 'colaborador@banco.com', tokenVersion: 1 },
-        JWT_SECRET
+      const tokenAntigo = JwtCryptoUtils.signToken(
+        { userId: 10, email: 'colaborador@banco.com', tokenVersion: 1 }
       );
 
       // Banco já está na versão 2 (após demissão, reset de senha ou logout global)
@@ -105,9 +99,8 @@ describe('Instant Session Revocation & Token Versioning (BACEN Compliance)', () 
     });
 
     it('deve autorizar token com tokenVersion válida e usuário ativo', async () => {
-      const tokenValido = jwt.sign(
-        { userId: 10, email: 'colaborador@banco.com', tokenVersion: 2, perfil: 'COLABORADOR' },
-        JWT_SECRET
+      const tokenValido = JwtCryptoUtils.signToken(
+        { userId: 10, email: 'colaborador@banco.com', tokenVersion: 2, perfil: 'COLABORADOR' }
       );
 
       const querySpy = jest.spyOn(pool, 'query').mockImplementation(async () => ({
@@ -136,9 +129,8 @@ describe('Instant Session Revocation & Token Versioning (BACEN Compliance)', () 
     });
 
     it('deve rejeitar com 503 (Fail-Close) se o banco de dados falhar durante a validação de credenciais', async () => {
-      const tokenValido = jwt.sign(
-        { userId: 10, email: 'colaborador@banco.com', tokenVersion: 1 },
-        JWT_SECRET
+      const tokenValido = JwtCryptoUtils.signToken(
+        { userId: 10, email: 'colaborador@banco.com', tokenVersion: 1 }
       );
 
       const querySpy = jest.spyOn(pool, 'query').mockImplementation(async () => {
@@ -221,7 +213,7 @@ describe('Instant Session Revocation & Token Versioning (BACEN Compliance)', () 
     it('deve autorizar acesso quando x-admin-token for um JWT válido do mesmo usuário', async () => {
       jest.spyOn(ConfigService, 'get').mockResolvedValue('OBRIGATORIO_RH');
 
-      const adminToken = jwt.sign({ userId: 99, tipo: 'ADMIN_STEP_UP' }, JWT_ADMIN_SECRET);
+      const adminToken = JwtCryptoUtils.signToken({ userId: 99, role: 'ADMIN_STEP_UP_AUTHENTICATED' });
 
       const req = {
         headers: { 'x-admin-token': adminToken },

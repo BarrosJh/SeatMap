@@ -46,13 +46,15 @@ describe('Regra de Troca de Assento: Conclusão Pós Check-in vs Troca Pré Chec
 
   it('deve realizar troca simples via UPDATE se o check-in AINDA NÃO foi realizado', async () => {
     // 1. BEGIN
-    // 2. SELECT cadeira (Mesa 02)
-    // 3. SELECT cadeira ocupada
-    // 4. SELECT reserva existente do dia
-    // 5. UPDATE reservas SET cadeira_id = ...
-    // 6. COMMIT
+    // 2. SELECT id FROM usuarios WHERE id = $1 FOR UPDATE
+    // 3. SELECT cadeira (Mesa 02)
+    // 4. SELECT cadeira ocupada
+    // 5. SELECT reserva existente do dia
+    // 6. UPDATE reservas SET cadeira_id = ...
+    // 7. COMMIT
     mockClient.query
       .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 10 }] }) // SELECT usuarios FOR UPDATE
       .mockResolvedValueOnce({ // SELECT cadeira 2
         rowCount: 1,
         rows: [{ id: 2, identificador: '02', ativa: true, status_operacional: 'DISPONIVEL', baia_id: 1, baia_nome: 'Baia 1', escritorio_id: 1 }]
@@ -117,6 +119,7 @@ describe('Regra de Troca de Assento: Conclusão Pós Check-in vs Troca Pré Chec
   it('deve marcar a reserva antiga como CONCLUIDA e criar uma NOVA reserva com status ATIVA se o check-in JÁ FOI realizado', async () => {
     mockClient.query
       .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 10 }] }) // SELECT usuarios FOR UPDATE
       .mockResolvedValueOnce({ // SELECT cadeira 2
         rowCount: 1,
         rows: [{ id: 2, identificador: '02', ativa: true, status_operacional: 'DISPONIVEL', baia_id: 1, baia_nome: 'Baia 1', escritorio_id: 1 }]

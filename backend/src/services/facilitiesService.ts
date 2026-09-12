@@ -26,7 +26,7 @@ export class FacilitiesService {
         JOIN baias b ON c.baia_id = b.id
         JOIN escritorios e ON b.escritorio_id = e.id
         WHERE c.id = $1
-        FOR UPDATE
+        FOR UPDATE OF c
       `, [cadeiraId]);
 
       if (cadeiraRes.rowCount === 0) {
@@ -61,43 +61,61 @@ export class FacilitiesService {
       ]);
 
       const reservasAfetadasRes = await client.query(`
-        SELECT r.id, r.usuario_id, r.data_reserva, r.codigo_comprovante, u.nome AS usuario_nome, u.email AS usuario_email
+        SELECT r.id, r.usuario_id, r.data_reserva, r.codigo_comprovante, r.checkin_realizado, u.nome AS usuario_nome, u.email AS usuario_email
         FROM reservas r
         JOIN usuarios u ON r.usuario_id = u.id
         WHERE r.cadeira_id = $1
           AND r.data_reserva >= CURRENT_DATE
           AND r.status = 'ATIVA'
-        FOR UPDATE
+        FOR UPDATE OF r
       `, [cadeiraId]);
 
       const reservasAfetadas = reservasAfetadasRes.rows;
 
       if (reservasAfetadas.length > 0) {
-        const ids = reservasAfetadas.map(r => r.id);
-        await client.query(`
-          UPDATE reservas
-          SET status = 'CANCELADA'
-          WHERE id = ANY($1::int[])
-        `, [ids]);
+        const idsCheckinFeito = reservasAfetadas.filter(r => r.checkin_realizado).map(r => r.id);
+        const idsPendentes = reservasAfetadas.filter(r => !r.checkin_realizado).map(r => r.id);
+
+        if (idsCheckinFeito.length > 0) {
+          await client.query(`
+            UPDATE reservas
+            SET status = 'CONCLUIDA', checkout_em = NOW()
+            WHERE id = ANY($1::int[])
+          `, [idsCheckinFeito]);
+        }
+
+        if (idsPendentes.length > 0) {
+          await client.query(`
+            UPDATE reservas
+            SET status = 'CANCELADA'
+            WHERE id = ANY($1::int[])
+          `, [idsPendentes]);
+        }
 
         for (const resItem of reservasAfetadas) {
           const dataIso = typeof resItem.data_reserva === 'string'
             ? resItem.data_reserva
             : DateTime.fromJSDate(resItem.data_reserva).toISODate()!;
 
+          const tipoEvento = resItem.checkin_realizado ? 'MESA_LIBERADA' : 'CANCELADA_MANUTENCAO';
+          const motivoEvento = resItem.checkin_realizado
+            ? `Mesa concluída automaticamente por manutenção preventiva do assento: ${motivo.trim()}`
+            : `Bloqueio operacional de manutenção do assento: ${motivo.trim()}`;
+
           await ReservaHistoryService.registrarEvento({
             reservaId: resItem.id,
             cadeiraId: cadeira.id,
             usuarioId: resItem.usuario_id,
             dataReserva: dataIso,
-            tipoEvento: 'CANCELADA_MANUTENCAO',
+            tipoEvento,
             executadoPorUsuarioId: userId,
-            motivo: `Bloqueio operacional de manutenção do assento: ${motivo.trim()}`,
+            motivo: motivoEvento,
             detalhes: {
               motivoManutencao: motivo.trim(),
               previsaoRetorno: previsaoRetorno || null,
               comprovante: resItem.codigo_comprovante,
-              cadeiraIdentificador: cadeira.identificador
+              cadeiraIdentificador: cadeira.identificador,
+              checkinRealizado: resItem.checkin_realizado
             }
           }, client);
         }
@@ -180,6 +198,17 @@ export class FacilitiesService {
     }
 
     const cadeira = updateRes.rows[0];
+    const hojeIso = DateTime.now().setZone('America/Sao_Paulo').toISODate()!;
+
+    // Broadcast WebSocket padrão de assento liberado para a sala do escritório
+    wsManager.broadcastSeatUpdate({
+      evento: 'assento_atualizado',
+      escritorioId: cadeira.escritorio_id,
+      cadeiraId: cadeira.id,
+      data: hojeIso,
+      status: 'livre',
+      ocupante: null
+    });
 
     wsManager.broadcastToAll({
       tipo: 'STATUS_CADEIRA_ALTERADO',
@@ -193,6 +222,7 @@ export class FacilitiesService {
       cadeiraId: cadeira.id,
       statusOperacional: 'DISPONIVEL'
     };
+
   }
 
   /**

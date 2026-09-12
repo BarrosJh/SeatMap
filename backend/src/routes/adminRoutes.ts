@@ -62,7 +62,7 @@ router.get('/departamentos', requirePermission('usuarios:read'), AdminDepartamen
 router.post('/departamentos', userActionLimiter, requirePermission('usuarios:write'), validateRequest({ body: criarDepartamentoSchema }), AdminDepartamentosController.criarDepartamento);
 
 router.get('/reservas', heavyQueryLimiter, requirePermission('reservas:read'), validateRequest({ query: adminReservaQuerySchema }), AdminReservasController.getReservas);
-router.post('/reservas/:id/cancelar', userActionLimiter, requirePermission('reservas:write'), validateRequest({ params: idParamSchema, body: justificativaSchema }), AdminReservasController.cancelarReservaAdmin);
+router.post('/reservas/:id/cancelar', userActionLimiter, requireAdmin, validateRequest({ params: idParamSchema, body: justificativaSchema }), AdminReservasController.cancelarReservaAdmin);
 
 router.get('/cadeiras/manutencao', requirePermission('infra:read'), validateRequest({ query: facilitiesQuerySchema }), FacilitiesController.getCadeirasManutencao);
 router.get('/cadeiras/todas', requirePermission('infra:read'), validateRequest({ query: facilitiesQuerySchema }), FacilitiesController.getTodasCadeiras);

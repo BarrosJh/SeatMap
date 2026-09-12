@@ -1,6 +1,7 @@
 import pool from '../config/db';
 import { DateTime } from 'luxon';
 import { normalizeIsoDate } from '../utils/workWeekUtils';
+import { escapeSqlWildcards } from '../utils/sanitizer';
 
 export class RelatorioService {
   private static readonly DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -64,7 +65,7 @@ export class RelatorioService {
     }
 
     if (busca && busca.trim().length > 0) {
-      const term = `%${busca.trim()}%`;
+      const term = `%${escapeSqlWildcards(busca.trim())}%`;
       conditions.push(`(u.nome ILIKE $${paramIndex} OR u.matricula ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex} OR c.identificador ILIKE $${paramIndex} OR r.codigo_comprovante ILIKE $${paramIndex})`);
       params.push(term);
       paramIndex++;

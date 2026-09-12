@@ -188,10 +188,10 @@ export class LoginController {
       if (isMfaRequired && mfaPolicy !== 'DESATIVADO') {
         // 1. Prioridade A: TOTP (App Authenticator) se ativo para o usuário e habilitado globalmente
         if (user.totp_ativo && user.totp_secret && mfaTotpEnabled) {
-          const tempToken = jwt.sign({
+          const tempToken = JwtCryptoUtils.signToken({
             userId: user.id,
             tipo: 'TOTP_CHALLENGE'
-          }, JWT_MFA_TEMP_SECRET, { expiresIn: '5m' });
+          }, { expiresIn: '5m' });
 
           AuditService.log({
             usuarioId: user.id,
@@ -233,10 +233,11 @@ export class LoginController {
             logger.error('[LoginController.login] Erro ao enviar e-mail com código MFA:', { correlationId: req.correlationId, error: err });
           });
 
-          const tempToken = jwt.sign({
+          const tempToken = JwtCryptoUtils.signToken({
             userId: user.id,
             tipo: 'EMAIL_MFA_CHALLENGE'
-          }, JWT_MFA_TEMP_SECRET, { expiresIn: `${mfaExpiracaoMinutos}m` });
+          }, { expiresIn: `${mfaExpiracaoMinutos}m` as any });
+
 
           const partesEmail = user.email.split('@');
           const nomeEmail = partesEmail[0];

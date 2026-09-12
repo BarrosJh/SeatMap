@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/db';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
+import { JwtCryptoUtils } from '../config/jwtCryptoUtils';
 
 export interface AuthenticatedWebSocket extends WebSocket {
   userId?: number;
@@ -21,6 +22,7 @@ export interface SeatUpdatePayload {
   data: string;
   status: 'livre' | 'ocupada' | 'minha_reserva' | 'expirada' | 'manutencao';
   ocupante?: {
+    usuarioId?: number;
     nome: string;
     departamento: string;
     departamentoId?: number;
@@ -85,7 +87,7 @@ export class WsManager {
 
     let decoded: any;
     try {
-      decoded = jwt.verify(token, env.JWT_SECRET) as any;
+      decoded = JwtCryptoUtils.verifyToken(token) as any;
     } catch (err: any) {
       return { valid: false, reason: 'Token JWT inválido ou expirado' };
     }
@@ -210,6 +212,9 @@ export class WsManager {
   }
 
   public joinRoom(escritorioId: number, ws: AuthenticatedWebSocket): void {
+    if (ws.escritorioId && ws.escritorioId !== escritorioId) {
+      this.leaveRoom(ws.escritorioId, ws);
+    }
     if (!this.rooms.has(escritorioId)) {
       this.rooms.set(escritorioId, new Set());
     }
@@ -247,11 +252,10 @@ export class WsManager {
 
     for (const client of room) {
       if (client.readyState === WebSocket.OPEN) {
+        const isMinhaReserva = payload.status === 'ocupada' && client.userId && payload.ocupante?.usuarioId === client.userId;
         const userSpecificPayload = {
           ...payload,
-          status: payload.status === 'ocupada' && client.userId && payload.ocupante
-            ? 'ocupada'
-            : payload.status
+          status: isMinhaReserva ? ('minha_reserva' as const) : payload.status
         };
 
         client.send(JSON.stringify(userSpecificPayload));

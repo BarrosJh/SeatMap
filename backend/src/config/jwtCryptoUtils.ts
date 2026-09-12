@@ -1,61 +1,75 @@
+import crypto from 'crypto';
 import jwt, { SignOptions, VerifyOptions } from 'jsonwebtoken';
-import { env } from './env';
 import { logger } from '../utils/logger';
 
 /**
- * Utilitário centralizado de Criptografia e Assinatura JWT
- * Suporta chaves assimétricas RS256/ES256 com fallback para HS256.
+ * Utilitário centralizado de Criptografia e Assinatura JWT 100% Assimétrica (RS256)
+ * Em conformidade com OWASP e padrões bancários BACEN.
  */
 export class JwtCryptoUtils {
-  private static getPrivateKey(): string {
-    const rawKey = process.env.JWT_PRIVATE_KEY;
-    if (rawKey && rawKey.trim().length > 0) {
-      return rawKey.replace(/\\n/g, '\n');
+  private static ephemeralKeyPair: { privateKey: string; publicKey: string } | null = null;
+
+  private static getOrGenerateKeyPair(): { privateKey: string; publicKey: string } {
+    const rawPrivateKey = process.env.JWT_PRIVATE_KEY;
+    const rawPublicKey = process.env.JWT_PUBLIC_KEY;
+
+    if (rawPrivateKey && rawPrivateKey.trim().length > 0 && rawPublicKey && rawPublicKey.trim().length > 0) {
+      return {
+        privateKey: rawPrivateKey.replace(/\\n/g, '\n'),
+        publicKey: rawPublicKey.replace(/\\n/g, '\n')
+      };
     }
-    return env.JWT_SECRET;
+
+    const nodeEnv = (process.env.NODE_ENV || 'development').toLowerCase();
+    const isProduction = nodeEnv === 'production' || nodeEnv === 'staging';
+
+    if (isProduction) {
+      const errorMsg = 'Configuração de segurança crítica ausente: JWT_PRIVATE_KEY e JWT_PUBLIC_KEY são obrigatórias em ambiente de produção/staging.';
+      logger.error(`[JwtCryptoUtils] ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+
+    // Em ambiente de desenvolvimento ou testes: autogera par de chaves RSA 2048-bit em memória
+    if (!this.ephemeralKeyPair) {
+      logger.info('[JwtCryptoUtils] JWT_PRIVATE_KEY / JWT_PUBLIC_KEY não configuradas. Gerando par de chaves RSA-2048 efêmero para ambiente de dev/teste...');
+      const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+      });
+      this.ephemeralKeyPair = { privateKey, publicKey };
+    }
+
+    return this.ephemeralKeyPair;
   }
 
-  private static getPublicKey(): string {
-    const rawKey = process.env.JWT_PUBLIC_KEY;
-    if (rawKey && rawKey.trim().length > 0) {
-      return rawKey.replace(/\\n/g, '\n');
-    }
-    return env.JWT_SECRET;
+  public static getPrivateKey(): string {
+    return this.getOrGenerateKeyPair().privateKey;
+  }
+
+  public static getPublicKey(): string {
+    return this.getOrGenerateKeyPair().publicKey;
   }
 
   public static getAlgorithm(): jwt.Algorithm {
-    const requested = (process.env.JWT_ALGORITHM || '').toUpperCase();
-    if (requested === 'RS256' || requested === 'ES256') {
-      return requested as jwt.Algorithm;
-    }
-    if (process.env.JWT_PRIVATE_KEY && process.env.JWT_PUBLIC_KEY) {
-      return 'RS256';
-    }
-    return 'HS256';
+    return 'RS256';
   }
 
   public static signToken(payload: object, options?: SignOptions): string {
-    const algorithm = this.getAlgorithm();
-    const secretOrKey = (algorithm === 'RS256' || algorithm === 'ES256')
-      ? this.getPrivateKey()
-      : env.JWT_SECRET;
-
-    return jwt.sign(payload, secretOrKey, {
+    const privateKey = this.getPrivateKey();
+    return jwt.sign(payload, privateKey, {
       ...options,
-      algorithm
+      algorithm: 'RS256'
     });
   }
 
   public static verifyToken(token: string, options?: VerifyOptions): any {
-    const algorithm = this.getAlgorithm();
-    const secretOrKey = (algorithm === 'RS256' || algorithm === 'ES256')
-      ? this.getPublicKey()
-      : env.JWT_SECRET;
-
-    return jwt.verify(token, secretOrKey, {
+    const publicKey = this.getPublicKey();
+    return jwt.verify(token, publicKey, {
       ...options,
-      algorithms: [algorithm, 'HS256'] // Permite transição suave se houver tokens em trânsito
+      algorithms: ['RS256']
     });
   }
 }
+
 

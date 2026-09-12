@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import pool from '../../src/config/db';
 import { env } from '../../src/config/env';
+import { JwtCryptoUtils } from '../../src/config/jwtCryptoUtils';
 import { TokenService } from '../../src/services/tokenService';
 import { ConfigService } from '../../src/services/configService';
 import { authenticateToken, authenticateAdminMfa } from '../../src/middleware/auth';
@@ -112,7 +112,7 @@ describe('Wave 5: Enterprise Security Compliance & Hardening', () => {
 
     it('deve bloquear requisição no authenticateToken se authTime no JWT exceder 3600 segundos', async () => {
       const pastAuthTime = Math.floor(Date.now() / 1000) - 3650; // > 1h
-      const token = jwt.sign({
+      const token = JwtCryptoUtils.signToken({
         userId: 1,
         nome: 'Usuario Teste',
         email: 'user@empresa.com',
@@ -120,7 +120,7 @@ describe('Wave 5: Enterprise Security Compliance & Hardening', () => {
         perfil: 'COLABORADOR',
         tokenVersion: 1,
         authTime: pastAuthTime
-      }, env.JWT_SECRET, { expiresIn: '15m' });
+      }, { expiresIn: '15m' });
 
       mockReq.headers['authorization'] = `Bearer ${token}`;
 
@@ -144,7 +144,7 @@ describe('Wave 5: Enterprise Security Compliance & Hardening', () => {
 
     it('deve permitir requisição no authenticateToken se authTime estiver dentro da janela de 60 minutos', async () => {
       const validAuthTime = Math.floor(Date.now() / 1000) - 300; // 5 minutos atrás
-      const token = jwt.sign({
+      const token = JwtCryptoUtils.signToken({
         userId: 1,
         nome: 'Usuario Teste',
         email: 'user@empresa.com',
@@ -152,7 +152,7 @@ describe('Wave 5: Enterprise Security Compliance & Hardening', () => {
         perfil: 'COLABORADOR',
         tokenVersion: 1,
         authTime: validAuthTime
-      }, env.JWT_SECRET, { expiresIn: '15m' });
+      }, { expiresIn: '15m' });
 
       mockReq.headers['authorization'] = `Bearer ${token}`;
 
@@ -213,11 +213,11 @@ describe('Wave 5: Enterprise Security Compliance & Hardening', () => {
     it('authenticateAdminMfa deve permitir acesso quando x-admin-token for válido', async () => {
       jest.spyOn(ConfigService, 'get').mockResolvedValue('OBRIGATORIO_RH');
 
-      const adminToken = jwt.sign({
+      const adminToken = JwtCryptoUtils.signToken({
         userId: 1,
         nome: 'Admin RH',
         role: 'ADMIN_STEP_UP_AUTHENTICATED'
-      }, env.JWT_ADMIN_SECRET, { expiresIn: '15m' });
+      }, { expiresIn: '15m' });
 
       mockReq.headers = { 'x-admin-token': adminToken };
       mockReq.user = { userId: 1, perfil: 'ADMIN_RH', permissaoRh: true };

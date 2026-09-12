@@ -16,8 +16,11 @@ export async function getDbClient(): Promise<DbClient> {
       if (conn && typeof conn.query === 'function') {
         return conn;
       }
-    } catch (_) {
-      // Fallback para pool.query caso connect não esteja disponível
+    } catch (err) {
+      const nodeEnv = (process.env.NODE_ENV || 'development').toLowerCase();
+      if (nodeEnv === 'production' || nodeEnv === 'staging') {
+        throw err;
+      }
     }
   }
 

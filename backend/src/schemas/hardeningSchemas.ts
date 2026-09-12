@@ -68,11 +68,6 @@ export const tiConfigSchema = z.object({
   ssoAutoProvision: z.boolean().optional(),
   ssoDefaultRole: z.enum(['COLABORADOR', 'GESTAO', 'ADMIN_RH', 'ADMIN_TI']).optional(),
   ssoEnforceForDomains: z.boolean().optional(),
-  ssoGoogleEnabled: z.boolean().optional(),
-  ssoGoogleClientId: boundedText(500).optional(),
-  ssoGoogleClientSecret: boundedText(500).optional(),
-  ssoGoogleHd: boundedText(255).optional(),
-  ssoGoogleRedirectUri: z.string().url().max(1000).optional(),
   ssoAzureEnabled: z.boolean().optional(),
   ssoAzureTenantType: z.enum(['single_tenant', 'multi_tenant', 'common']).optional(),
   ssoAzureTenantId: boundedText(255).optional(),
@@ -80,11 +75,7 @@ export const tiConfigSchema = z.object({
   ssoAzureClientSecret: boundedText(500).optional(),
   ssoAzureScopes: boundedText(1000).optional(),
   ssoAzureSecurityGroup: boundedText(255).optional(),
-  ssoAzureRedirectUri: z.string().url().max(1000).optional(),
-  ssoOktaEnabled: z.boolean().optional(),
-  ssoOktaDomain: z.string().url().max(500).optional(),
-  ssoOktaClientId: boundedText(500).optional(),
-  ssoOktaClientSecret: boundedText(500).optional()
+  ssoAzureRedirectUri: z.string().url().max(1000).optional()
 }).strict();
 
 export const testarEmailSchema = z.object({

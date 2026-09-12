@@ -64,7 +64,7 @@ export class ReservaCheckinService {
         JOIN usuarios u ON r.usuario_id = u.id
         LEFT JOIN departamentos d ON u.departamento_id = d.id
         WHERE r.id = $1
-        FOR UPDATE
+        FOR UPDATE OF r
       `, [reservaId]);
 
       if (reservaRes.rowCount === 0) {
@@ -248,6 +248,7 @@ export class ReservaCheckinService {
         data: dataReservaIso,
         status: 'ocupada',
         ocupante: {
+          usuarioId: reserva.usuario_id,
           nome: reserva.usuario_nome,
           departamento: reserva.departamento_nome || 'Sem Departamento'
         }

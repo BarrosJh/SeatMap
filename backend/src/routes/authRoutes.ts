@@ -17,7 +17,11 @@ import {
 	validarMfaEmailSchema,
 	validarTotpSchema,
 	codigoMfaSchema,
-	senhaAtualSchema
+	senhaAtualSchema,
+	webAuthnLoginOptionsSchema,
+	webAuthnLoginVerifySchema,
+	webAuthnRegisterVerifySchema,
+	idParamSchema
 } from '../schemas';
 
 const router = Router();
@@ -33,12 +37,12 @@ router.get('/sso/config', SsoController.getSsoConfig);
 router.post('/sso/login', authUserLimiter, validateRequest({ body: ssoLoginSchema }), SsoController.loginSso);
 
 // 2. Autenticação Biométrica Nativa (WebAuthn / Passkeys / FIDO2)
-router.post('/webauthn/login/options', WebAuthnController.loginOptions);
-router.post('/webauthn/login/verify', authUserLimiter, WebAuthnController.loginVerify);
+router.post('/webauthn/login/options', validateRequest({ body: webAuthnLoginOptionsSchema }), WebAuthnController.loginOptions);
+router.post('/webauthn/login/verify', authUserLimiter, validateRequest({ body: webAuthnLoginVerifySchema }), WebAuthnController.loginVerify);
 router.post('/webauthn/register/options', authenticateToken, WebAuthnController.registerOptions);
-router.post('/webauthn/register/verify', authenticateToken, WebAuthnController.registerVerify);
+router.post('/webauthn/register/verify', authenticateToken, validateRequest({ body: webAuthnRegisterVerifySchema }), WebAuthnController.registerVerify);
 router.get('/webauthn/devices', authenticateToken, WebAuthnController.listDevices);
-router.delete('/webauthn/devices/:id', authenticateToken, WebAuthnController.deleteDevice);
+router.delete('/webauthn/devices/:id', authenticateToken, validateRequest({ params: idParamSchema }), WebAuthnController.deleteDevice);
 
 // 3. Validação de Login com TOTP ou E-mail (Passo 2 do 2FA)
 router.post('/totp/validar-login', validateRequest({ body: validarTotpSchema }), MfaController.validarLoginTotp);
